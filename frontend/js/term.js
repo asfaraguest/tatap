@@ -526,7 +526,7 @@ var Tui = (function () {
           }
           if(S.view==="riwayat"){
             if(!a.id) a.id = a.slug;
-            if(!a.badge && a.episode) a.badge = "EP " + a.episode;
+            if(!a.badge && a.episode) a.badge = String(a.episode);
           }
           var isUnavail=!a.id;
           var d=document.createElement("div");
@@ -595,7 +595,7 @@ var Tui = (function () {
             bgTag.className="pc-badge-tag"+bCls;
             var bText=a.badge;
             if(a.badge==="ONGOING"&&a.eps_counter){
-              bText="EP "+a.eps_counter;
+              bText=a.eps_counter;
             }
             bgTag.textContent=bText;
             media.appendChild(bgTag);

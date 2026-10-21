@@ -234,25 +234,25 @@ public class DetailActivity extends Activity {
             mb.setAllCaps(false);
             mb.setIconResource(R.drawable.ic_play);
             if (lastEp > 0) {
-                mb.setText("Lanjutkan Ep " + lastEp);
-                mb.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xFF38BDF8));
-                mb.setTextColor(0xFF080C14);
-                mb.setIconTint(android.content.res.ColorStateList.valueOf(0xFF080C14));
-                mb.setStrokeColor(android.content.res.ColorStateList.valueOf(0xFF38BDF8));
+                mb.setText("Lanjutkan " + lastEp);
+                mb.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xFF0A84FF));
+                mb.setTextColor(0xFFFFFFFF);
+                mb.setIconTint(android.content.res.ColorStateList.valueOf(0xFFFFFFFF));
+                mb.setStrokeColor(android.content.res.ColorStateList.valueOf(0xFF0A84FF));
                 mb.setStrokeWidth((int) (1 * getResources().getDisplayMetrics().density));
             } else {
-                mb.setText("Putar Ep 1");
-                mb.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xFF161C28));
-                mb.setTextColor(0xFF38BDF8);
-                mb.setIconTint(android.content.res.ColorStateList.valueOf(0xFF38BDF8));
-                mb.setStrokeColor(android.content.res.ColorStateList.valueOf(0xFF38BDF8));
+                mb.setText("Putar 1");
+                mb.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xFF0A84FF));
+                mb.setTextColor(0xFFFFFFFF);
+                mb.setIconTint(android.content.res.ColorStateList.valueOf(0xFFFFFFFF));
+                mb.setStrokeColor(android.content.res.ColorStateList.valueOf(0xFF0A84FF));
                 mb.setStrokeWidth((int) (1 * getResources().getDisplayMetrics().density));
             }
         } else {
             if (lastEp > 0) {
-                btnQuickPlay.setText("Lanjutkan Ep " + lastEp);
+                btnQuickPlay.setText("Lanjutkan " + lastEp);
             } else {
-                btnQuickPlay.setText("Putar Ep 1");
+                btnQuickPlay.setText("Putar 1");
             }
         }
     }
@@ -671,29 +671,29 @@ public class DetailActivity extends Activity {
         @Override
         public void onBindViewHolder(@NonNull EpisodeViewHolder holder, int position) {
             int ep = episodes.get(position);
-            holder.tvTitle.setText(String.format("EP %02d", ep));
+            holder.tvTitle.setText(String.valueOf(ep));
 
             if (ep == cachedLastPlayedEp) {
-                // Last played episode
-                holder.card.setCardBackgroundColor(0xFF1C2230);
-                holder.card.setStrokeColor(0xFF38BDF8);
-                holder.tvTitle.setTextColor(0xFF38BDF8);
+                // Last played episode: Apple System Blue
+                holder.card.setCardBackgroundColor(0xFF1E2B45);
+                holder.card.setStrokeColor(0xFF0A84FF);
+                holder.tvTitle.setTextColor(0xFF0A84FF);
                 holder.tvBadge.setVisibility(View.VISIBLE);
                 holder.tvBadge.setText("TERAKHIR");
-                holder.tvBadge.setTextColor(0xFF38BDF8);
+                holder.tvBadge.setTextColor(0xFF0A84FF);
             } else if (cachedWatchedSet.contains(ep)) {
-                // Watched episode
-                holder.card.setCardBackgroundColor(0xFF0E1017);
-                holder.card.setStrokeColor(0xFF1C202C);
-                holder.tvTitle.setTextColor(0xFF64748B);
+                // Watched episode: Apple Muted
+                holder.card.setCardBackgroundColor(0xFF18181C);
+                holder.card.setStrokeColor(0xFF26262B);
+                holder.tvTitle.setTextColor(0xFF71717A);
                 holder.tvBadge.setVisibility(View.VISIBLE);
                 holder.tvBadge.setText("DITONTON");
-                holder.tvBadge.setTextColor(0xFF10B981);
+                holder.tvBadge.setTextColor(0xFF30D158);
             } else {
-                // Unwatched episode
-                holder.card.setCardBackgroundColor(0xFF11141C);
-                holder.card.setStrokeColor(0xFF1C202C);
-                holder.tvTitle.setTextColor(0xFFF1F5F9);
+                // Unwatched episode: Apple Elevated Surface
+                holder.card.setCardBackgroundColor(0xFF22242B);
+                holder.card.setStrokeColor(0xFF2C2E38);
+                holder.tvTitle.setTextColor(0xFFF5F5F7);
                 holder.tvBadge.setVisibility(View.GONE);
             }
 

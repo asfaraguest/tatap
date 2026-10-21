@@ -10,14 +10,14 @@
     android:foreground="?attr/selectableItemBackground"
     app:cardCornerRadius="8dp"
     app:cardElevation="0dp"
-    app:cardBackgroundColor="#11141C"
-    app:strokeColor="#1C202C"
-    app:strokeWidth="1.5dp">
+    app:cardBackgroundColor="@color/bg_surface_elevated"
+    app:strokeColor="@color/border_soft"
+    app:strokeWidth="1.2dp">
 
     <LinearLayout
         android:id="@+id/layout_ep_body"
         android:layout_width="match_parent"
-        android:layout_height="50dp"
+        android:layout_height="48dp"
         android:orientation="vertical"
         android:gravity="center"
         android:paddingHorizontal="4dp">
@@ -38,7 +38,7 @@
             android:id="@+id/tv_ep_title"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="EP 01"
+            android:text="1"
             android:textColor="@color/text_primary"
             android:textSize="@dimen/text_title_medium"
             android:fontFamily="sans-serif-medium" />

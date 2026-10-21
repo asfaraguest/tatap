@@ -1,25 +1,25 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Background & Surface Colors -->
-    <color name="bg_root">#090A0F</color>
-    <color name="bg_surface">#11141C</color>
-    <color name="bg_surface_elevated">#161B26</color>
-    <color name="border_soft">#1C202C</color>
-    <color name="border_focus">#38BDF8</color>
+    <!-- Background & Surface Colors (Apple Dark Palette) -->
+    <color name="bg_root">#161618</color>
+    <color name="bg_surface">#1E1E22</color>
+    <color name="bg_surface_elevated">#26262B</color>
+    <color name="border_soft">#2C2C32</color>
+    <color name="border_focus">#0A84FF</color>
 
     <!-- Semantic Typography Colors -->
-    <color name="text_primary">#F8FAFC</color>
-    <color name="text_secondary">#E2E8F0</color>
-    <color name="text_muted">#94A3B8</color>
-    <color name="text_dim">#64748B</color>
-    <color name="text_hint">#475569</color>
-    <color name="text_accent">#38BDF8</color>
-    <color name="text_success">#10B981</color>
-    <color name="text_warning">#F59E0B</color>
-    <color name="text_danger">#EF4444</color>
+    <color name="text_primary">#F5F5F7</color>
+    <color name="text_secondary">#E5E5EA</color>
+    <color name="text_muted">#A1A1A6</color>
+    <color name="text_dim">#6E6E73</color>
+    <color name="text_hint">#48484A</color>
+    <color name="text_accent">#0A84FF</color>
+    <color name="text_success">#30D158</color>
+    <color name="text_warning">#FF9F0A</color>
+    <color name="text_danger">#FF453A</color>
 
-    <!-- UI Accent Tokens -->
-    <color name="accent_cyan">#38BDF8</color>
-    <color name="accent_cyan_glow">#3338BDF8</color>
-    <color name="hud_background">#D9090A0F</color>
+    <!-- UI Accent Tokens (Apple System Blue) -->
+    <color name="accent_cyan">#0A84FF</color>
+    <color name="accent_cyan_glow">#330A84FF</color>
+    <color name="hud_background">#D9161618</color>
 </resources>

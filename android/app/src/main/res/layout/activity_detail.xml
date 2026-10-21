@@ -9,7 +9,7 @@
     android:paddingTop="@dimen/tv_overscan_vertical"
     android:paddingBottom="@dimen/tv_overscan_vertical"
     android:clipToPadding="false"
-    android:background="#090A0F">
+    android:background="@color/bg_root">
 
     <!-- Top App Bar -->
     <LinearLayout
@@ -18,7 +18,7 @@
         android:orientation="horizontal"
         android:gravity="center_vertical"
         android:paddingHorizontal="12dp"
-        android:background="#090A0F">
+        android:background="@color/bg_root">
 
         <ImageButton
             android:id="@+id/btn_back"
@@ -50,7 +50,7 @@
             android:layout_height="20dp"
             android:layout_marginEnd="6dp"
             android:visibility="gone"
-            android:indeterminateTint="#38BDF8" />
+            android:indeterminateTint="@color/text_accent" />
     </LinearLayout>
 
     <!-- Hero Card Banner -->
@@ -62,8 +62,8 @@
         android:layout_marginBottom="12dp"
         app:cardCornerRadius="12dp"
         app:cardElevation="0dp"
-        app:cardBackgroundColor="#11141C"
-        app:strokeColor="#1C202C"
+        app:cardBackgroundColor="@color/bg_surface"
+        app:strokeColor="@color/border_soft"
         app:strokeWidth="1dp">
 
         <LinearLayout
@@ -199,7 +199,7 @@
                 </LinearLayout>
             </LinearLayout>
 
-            <!-- Action Buttons Row (Full Width, Unclipped Full Shape) -->
+            <!-- Action Buttons Row (Apple Flat Capsule Style) -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -213,9 +213,9 @@
                     android:layout_height="40dp"
                     android:insetTop="0dp"
                     android:insetBottom="0dp"
-                    android:text="Putar Ep 1"
-                    android:textColor="@color/text_accent"
-                    android:backgroundTint="#161C28"
+                    android:text="Putar 1"
+                    android:textColor="#FFFFFF"
+                    android:backgroundTint="#0A84FF"
                     android:textSize="@dimen/text_subhead"
                     android:fontFamily="sans-serif-medium"
                     android:textAllCaps="false"
@@ -229,8 +229,8 @@
                     app:iconSize="15dp"
                     app:iconPadding="8dp"
                     app:iconGravity="textStart"
-                    app:iconTint="#38BDF8"
-                    app:strokeColor="#38BDF8"
+                    app:iconTint="#FFFFFF"
+                    app:strokeColor="#0A84FF"
                     app:strokeWidth="1dp"
                     app:cornerRadius="10dp"
                     android:paddingHorizontal="14dp" />
@@ -243,13 +243,13 @@
                     android:insetTop="0dp"
                     android:insetBottom="0dp"
                     app:icon="@drawable/ic_star_outline"
-                    app:iconTint="#94A3B8"
+                    app:iconTint="#A1A1A6"
                     app:iconPadding="6dp"
                     app:iconSize="15dp"
                     app:iconGravity="textStart"
                     android:text="+ Favorit"
-                    android:textColor="@color/text_secondary"
-                    android:backgroundTint="#1E2433"
+                    android:textColor="#F5F5F7"
+                    android:backgroundTint="#26262B"
                     android:textSize="@dimen/text_subhead"
                     android:fontFamily="sans-serif-medium"
                     android:textAllCaps="false"
@@ -295,10 +295,10 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="SINOPSIS"
-                    android:textColor="@color/text_accent"
+                    android:textColor="#86868B"
                     android:textSize="@dimen/text_badge"
                     android:fontFamily="sans-serif-medium"
-                    android:letterSpacing="0.06"
+                    android:letterSpacing="0.08"
                     android:layout_marginBottom="5dp" />
 
                 <TextView

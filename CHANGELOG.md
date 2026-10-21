@@ -13,6 +13,36 @@ Format versi menggunakan skema `MAJOR.MINOR.PATCH`:
 - **MINOR (x.Y.0):** Penambahan fitur atau kapabilitas baru yang tetap kompatibel ke belakang (*backward-compatible new features*). Digit PATCH direset ke 0.
 - **PATCH (x.y.Z):** Perbaikan bug, peningkatan stabilitas, atau perbaikan internal tanpa penambahan fitur baru (*backward-compatible bug fixes*).
 
+## [2.12.0] - 2026-10-22
+
+### Justifikasi SemVer 2.0.0 (MINOR: 2.11.0 -> 2.12.0)
+Kenaikan digit MINOR diterapkan secara mutlak sesuai kaidah Semantic Versioning 2.0.0 dan Direktif #3 [`AGENTS.md`](AGENTS.md) karena memuat perombakan arsitektur navigasi Android TV 10-Foot UI (*Left Vertical Sidebar Navigation*), restrukturisasi navigasi Desktop berbasis Apple HIG Flat UI (*single-source navigation & Apple Options Popover*), standardisasi indikator episode murni angka (*Episode Number Only*), polesan tampilan Detail Anime Apple Flat Inspector, serta ketahanan metadata franchise dan katalog:
+
+1. **Android TV Left Vertical Sidebar Navigation (10-Foot UI):**
+   - Menggantikan bar menu horizontal atas yang memakan ruang vertikal pada layar TV dengan **Left Vertical Sidebar (~200dp)** pada `layout-television/activity_main.xml` dan `src/tv/res/layout/activity_main.xml`.
+   - Memberikan area katalog kanan ruang vertikal penuh (100% full height) dengan grid 5-6 kolom yang lebih lega dan imersif.
+   - Integrasi navigasi spasial D-Pad mulus: D-Pad Kanan dari item sidebar langsung berpindah ke kartu kolom 0 pada katalog, dan D-Pad Kiri dari kolom 0 katalog secara otomatis kembali ke tab sidebar yang sedang aktif via `dispatchKeyEvent` di `MainActivity.java`.
+   - Adopsi Apple tvOS Flat Dark Palette (`#161618`, `#1E1E22`, `#26262B`, Apple Blue `#0A84FF`) dengan selector fokus `bg_tv_sidebar_item.xml`.
+
+2. **Standardisasi Indikator Episode (Clean Episode Number Only):**
+   - Menghilangkan seluruh prefiks redundan (`EP 01`, `EP 12`, `SUB 12`, `Putar Ep 1`) pada seluruh antarmuka Android dan Web.
+   - Badge episode pada kartu anime (`AnimeAdapter.java`, `term.js`) kini secara konsisten menampilkan angka bersih (misal: `1`, `2`, `12` atau `12/24` atau `TAMAT`).
+   - Tombol quick play di Detail Anime diperbarui menjadi `"Putar 1"` atau `"Lanjutkan 4"`.
+   - Nomor episode di modal detail dan selector pemutar kini terpusat dengan angka murni.
+
+3. **Anime Detail View Apple Flat Polish:**
+   - Memperbarui `activity_detail.xml` dan `layout-land/activity_detail.xml` dengan palet Apple Flat UI: kontainer `#161618`, kartu `#1E1E22`, dan tombol aksi kapsul Apple Blue `#0A84FF`.
+   - Tipografi sinopsis Apple Subhead (`#86868B`, sans-serif-medium, letter-spacing 0.08) dengan body text `#D1D1D6` yang bersih dan mudah dibaca pada TV maupun smartphone.
+
+4. **Desktop Apple HIG Redesign & Anti-Menu Ganda:**
+   - Memusatkan navigasi desktop pada Top Segmented Pill Bar sebagai navigasi primer tunggal.
+   - Mengeliminasi menu ganda pada desktop melalui **Apple Options Popover (`⋯`)** untuk utilitas (Cross Filter Katalog, Filter Genre, Ganti Sumber Stream, Cek Pembaruan, Bantuan).
+   - Menambahkan spotlight search bar bergaya macOS dengan pintasan global `⌘K` / `Ctrl+K` dan `/`.
+
+5. **Metadata & Catalog Resilient Fallback:**
+   - Menambahkan fallback franchise relation langsung dari scraper HiAnime ketika AniList mengalami pemadaman (403 disabled) atau limitasi koneksi.
+   - Menyelaraskan filter katalog musim lampau (`sy` dan `ey`) dan pagination agar selalu menyajikan total halaman akurat.
+
 ## [2.11.0] - 2026-10-21
 
 ### Justifikasi SemVer 2.0.0 (MINOR: 2.10.2 -> 2.11.0)

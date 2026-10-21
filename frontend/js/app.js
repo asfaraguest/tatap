@@ -2675,7 +2675,7 @@ function renderContinue(){
         // Floating Episode Badge
         var epBadge=document.createElement("span");
         epBadge.className="hist-ep-badge";
-        epBadge.textContent="EP "+(x.episode||"1");
+        epBadge.textContent=String(x.episode||"1");
         thumbWrap.appendChild(epBadge);
 
         // Hover Play Badge
@@ -3408,7 +3408,77 @@ function init(){
   var btnDrawer = $("btn-drawer");
   if(btnDrawer) btnDrawer.addEventListener("click", openDrawer);
   var btnDrawerHead = $("btn-drawer-head");
-  if(btnDrawerHead) btnDrawerHead.addEventListener("click", openDrawer);
+  function closePopover(){
+    var pop = $("apple-options-popover");
+    if(pop) pop.classList.add("hidden");
+  }
+  if(btnDrawerHead){
+    btnDrawerHead.addEventListener("click", function(e){
+      e.stopPropagation();
+      if(window.innerWidth >= 769){
+        var pop = $("apple-options-popover");
+        if(pop) pop.classList.toggle("hidden");
+      } else {
+        openDrawer();
+      }
+    });
+  }
+  document.addEventListener("click", function(e){
+    var pop = $("apple-options-popover");
+    if(pop && !pop.classList.contains("hidden")){
+      if(!pop.contains(e.target) && e.target !== btnDrawerHead && !(btnDrawerHead && btnDrawerHead.contains(e.target))){
+        pop.classList.add("hidden");
+      }
+    }
+  });
+
+  // Apple Options Popover button listeners
+  var popCatFilter = $("pop-catalog-filter");
+  if(popCatFilter) popCatFilter.addEventListener("click", function(){
+    closePopover();
+    if(window.Tui && window.Tui.openCatalogFilterModal) window.Tui.openCatalogFilterModal();
+  });
+  var popGenre = $("pop-genre-filter");
+  if(popGenre) popGenre.addEventListener("click", function(){
+    closePopover();
+    if(window.Tui && window.Tui.openGenreModal) window.Tui.openGenreModal();
+  });
+  var popSrc = $("pop-switch-source");
+  if(popSrc) popSrc.addEventListener("click", function(){
+    closePopover();
+    switchSource();
+    var b = $("drawer-src-badge");
+    if(b) b.textContent = cur.source === "otakudesu" ? "Otakudesu" : "HiAnime";
+  });
+  var popUpdate = $("pop-update");
+  if(popUpdate) popUpdate.addEventListener("click", function(){
+    closePopover();
+    checkUpdate(true);
+  });
+  var popHelp = $("pop-help");
+  if(popHelp) popHelp.addEventListener("click", function(){
+    closePopover();
+    var ho = $("help-overlay");
+    if(ho) ho.classList.remove("hidden");
+    var hb = $("help-body");
+    if(hb && typeof HELP_TEXT !== "undefined") hb.textContent = HELP_TEXT;
+  });
+
+  // Global ⌘K / Ctrl+K spotlight shortcut
+  window.addEventListener("keydown", function(e){
+    if((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k"){
+      e.preventDefault();
+      var cmd = $("cmd");
+      if(cmd){
+        cmd.removeAttribute("readonly");
+        cmd.focus();
+        cmd.select();
+      }
+    } else if(e.key === "Escape"){
+      closePopover();
+    }
+  });
+
   var btnDrawerClose = $("drawer-close");
   if(btnDrawerClose) btnDrawerClose.addEventListener("click", closeDrawer);
   var drawerBackdrop = $("drawer-backdrop");

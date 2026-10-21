@@ -19,8 +19,8 @@ import com.google.android.material.button.MaterialButton;
 import com.google.android.material.card.MaterialCardView;
 
 public class TvFocusHelper {
-    private static final int COLOR_FOCUSED_STROKE = Color.parseColor("#38BDF8");
-    private static final int COLOR_NORMAL_STROKE = Color.parseColor("#1C202C");
+    private static final int COLOR_FOCUSED_STROKE = Color.parseColor("#0A84FF");
+    private static final int COLOR_NORMAL_STROKE = Color.parseColor("#2C2C34");
 
     public static boolean isTv(Context context) {
         if (context == null) return false;

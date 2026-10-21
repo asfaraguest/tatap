@@ -4546,17 +4546,17 @@ public class PlayerActivity extends Activity {
         @Override
         public void onBindViewHolder(@NonNull EpViewHolder holder, int position) {
             int itemEp = items.get(position);
-            holder.tvTitle.setText(String.format(java.util.Locale.US, "EP %02d", itemEp));
+            holder.tvTitle.setText(String.valueOf(itemEp));
 
             if (itemEp == ep) {
-                // Active playing episode: cyan highlight
-                holder.card.setCardBackgroundColor(0xFF1E293B);
-                holder.card.setStrokeColor(0xFF38BDF8);
+                // Active playing episode: Apple Blue highlight
+                holder.card.setCardBackgroundColor(0xFF1E2B45);
+                holder.card.setStrokeColor(0xFF0A84FF);
                 holder.card.setStrokeWidth(dpToPx(1));
-                holder.tvTitle.setTextColor(0xFF38BDF8);
+                holder.tvTitle.setTextColor(0xFF0A84FF);
                 holder.tvBadge.setVisibility(View.VISIBLE);
                 holder.tvBadge.setText("MEMUTAR");
-                holder.tvBadge.setTextColor(0xFF38BDF8);
+                holder.tvBadge.setTextColor(0xFF0A84FF);
             } else if (watchedSet.contains(itemEp)) {
                 // Watched episode
                 holder.card.setCardBackgroundColor(0xFF0E1017);

@@ -9,7 +9,7 @@
     android:paddingTop="@dimen/tv_overscan_vertical"
     android:paddingBottom="@dimen/tv_overscan_vertical"
     android:clipToPadding="false"
-    android:background="#090A0F">
+    android:background="@color/bg_root">
 
     <!-- Top App Bar (44dp) -->
     <LinearLayout
@@ -18,7 +18,7 @@
         android:orientation="horizontal"
         android:gravity="center_vertical"
         android:paddingHorizontal="14dp"
-        android:background="#090A0F">
+        android:background="@color/bg_root">
 
         <ImageButton
             android:id="@+id/btn_back"
@@ -51,7 +51,7 @@
             android:layout_height="20dp"
             android:layout_marginEnd="6dp"
             android:visibility="gone"
-            android:indeterminateTint="#38BDF8" />
+            android:indeterminateTint="@color/text_accent" />
     </LinearLayout>
 
     <!-- 2-Column Split Body -->
@@ -70,10 +70,10 @@
             android:layout_height="match_parent"
             android:layout_weight="40"
             android:layout_marginEnd="12dp"
-            app:cardCornerRadius="10dp"
+            app:cardCornerRadius="12dp"
             app:cardElevation="0dp"
-            app:cardBackgroundColor="#11141C"
-            app:strokeColor="#1C202C"
+            app:cardBackgroundColor="@color/bg_surface"
+            app:strokeColor="@color/border_soft"
             app:strokeWidth="1dp">
 
             <ScrollView
@@ -99,9 +99,9 @@
                         <androidx.cardview.widget.CardView
                             android:layout_width="85dp"
                             android:layout_height="120dp"
-                            app:cardCornerRadius="8dp"
+                            app:cardCornerRadius="10dp"
                             app:cardElevation="0dp"
-                            app:cardBackgroundColor="#161A24">
+                            app:cardBackgroundColor="@color/bg_surface_elevated">
 
                             <ImageView
                                 android:id="@+id/iv_detail_poster"
@@ -215,7 +215,7 @@
                         </LinearLayout>
                     </LinearLayout>
 
-                    <!-- Action Buttons -->
+                    <!-- Action Buttons (Apple Flat Capsule Style) -->
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
@@ -229,10 +229,10 @@
                             android:layout_height="40dp"
                             android:insetTop="0dp"
                             android:insetBottom="0dp"
-                            android:text="Putar Ep 1"
-                            android:textColor="#38BDF8"
-                            android:backgroundTint="#161C28"
-                            android:textSize="11sp"
+                            android:text="Putar 1"
+                            android:textColor="#FFFFFF"
+                            android:backgroundTint="#0A84FF"
+                            android:textSize="12sp"
                             android:fontFamily="sans-serif-medium"
                             android:textStyle="bold"
                             android:textAllCaps="false"
@@ -246,8 +246,8 @@
                             app:iconSize="14dp"
                             app:iconPadding="6dp"
                             app:iconGravity="textStart"
-                            app:iconTint="#38BDF8"
-                            app:strokeColor="#38BDF8"
+                            app:iconTint="#FFFFFF"
+                            app:strokeColor="#0A84FF"
                             app:strokeWidth="1dp"
                             app:cornerRadius="10dp"
                             android:paddingHorizontal="10dp" />
@@ -260,14 +260,14 @@
                             android:insetTop="0dp"
                             android:insetBottom="0dp"
                             app:icon="@drawable/ic_star_outline"
-                            app:iconTint="#94A3B8"
+                            app:iconTint="#A1A1A6"
                             app:iconPadding="4dp"
                             app:iconSize="14dp"
                             app:iconGravity="textStart"
                             android:text="+ Favorit"
-                            android:textColor="#94A3B8"
-                            android:backgroundTint="#1E2433"
-                            android:textSize="11sp"
+                            android:textColor="#F5F5F7"
+                            android:backgroundTint="#26262B"
+                            android:textSize="12sp"
                             android:fontFamily="sans-serif-medium"
                             android:textStyle="bold"
                             android:textAllCaps="false"
@@ -299,7 +299,7 @@
                             android:orientation="horizontal" />
                     </HorizontalScrollView>
 
-                    <!-- Synopsis Box -->
+                    <!-- Synopsis Box (Apple Subhead Box) -->
                     <LinearLayout
                         android:id="@+id/layout_detail_synopsis"
                         android:layout_width="match_parent"
@@ -314,7 +314,7 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="SINOPSIS"
-                            android:textColor="#38BDF8"
+                            android:textColor="#86868B"
                             android:textSize="@dimen/tv_badge_text_size"
                             android:fontFamily="sans-serif-medium"
                             android:textStyle="bold"
@@ -325,7 +325,7 @@
                             android:id="@+id/tv_detail_synopsis"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:textColor="#CBD5E1"
+                            android:textColor="#D1D1D6"
                             android:textSize="@dimen/detail_synopsis_text_size"
                             android:fontFamily="sans-serif"
                             android:lineSpacingExtra="2dp"
@@ -342,7 +342,7 @@
                             android:paddingVertical="3dp"
                             android:paddingHorizontal="8dp"
                             android:text="Selengkapnya ▼"
-                            android:textColor="#38BDF8"
+                            android:textColor="@color/text_accent"
                             android:textSize="@dimen/tab_text_size"
                             android:fontFamily="sans-serif-medium"
                             android:textStyle="bold"

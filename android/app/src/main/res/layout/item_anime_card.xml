@@ -9,9 +9,9 @@
     android:foreground="?attr/selectableItemBackground"
     app:cardCornerRadius="@dimen/tv_card_corner_radius"
     app:cardElevation="0dp"
-    app:cardBackgroundColor="#11141C"
-    app:strokeColor="#1C202C"
-    app:strokeWidth="1.5dp">
+    app:cardBackgroundColor="@color/bg_surface"
+    app:strokeColor="@color/border_soft"
+    app:strokeWidth="1.2dp">
 
     <LinearLayout
         android:layout_width="match_parent"

@@ -642,19 +642,33 @@ async def seasonal(which: str = Query("", pattern="^(now|prev|airing)$|^$"),
             })
 
         # Fallback jika AniList diblokir ISP / offline / kosong
+        hi_total_pages = 1
         if not items_out:
-            fallback_filter = {"status": "releasing", "sort": "trending"} if which == "now" else {"status": "releasing"}
+            fallback_filter = {"status": "releasing", "sort": "trending"} if which == "now" else {}
             if season and year:
-                fallback_filter["season"] = season_name
-                if not is_future:
-                    fallback_filter["status"] = "releasing"
+                fallback_filter["season"] = str(season_name).lower()
+                fallback_filter["sy"] = str(season_year)
+                fallback_filter["ey"] = str(season_year)
+                if is_future:
+                    fallback_filter["status"] = "upcoming"
+            elif which == "now":
+                fallback_filter = {"status": "releasing", "sort": "trending"}
+            elif which == "prev":
+                fallback_filter = {"season": str(season_name).lower(), "sy": str(season_year), "ey": str(season_year)}
             hi_data = await loop.run_in_executor(None, lambda: hi.browse(fallback_filter, page))
             if hi_data and hi_data.get("items"):
                 items_out = hi_data.get("items")
+                hi_total_pages = hi_data.get("total_pages", 1)
+
+        if which == "now" and items_out:
+            items_out = [it for it in items_out if it.get("badge") != "TAMAT" and it.get("is_finished") is not True and (it.get("status") or "").lower() != "finished"]
 
         page_info = (page_data or {}).get("pageInfo") or {}
         has_next = bool(page_info.get("hasNextPage"))
         total_p = max(1, page_info.get("lastPage") or 1)
+        if hi_total_pages > 1:
+            total_p = max(total_p, hi_total_pages)
+            has_next = total_p > page
         if has_next and total_p <= page:
             total_p = page + 1
         result = {
@@ -1168,50 +1182,101 @@ async def anime_relations_endpoint(slug: str, title: str = Query("")):
         raw_relations = await loop.run_in_executor(None, lambda: al.anime_relations(search_query))
 
         results = []
-        for r in raw_relations:
-            rel_type = r.get("relation", "")
-            r_title = r.get("title", "")
-            r_romaji = r.get("title_romaji", "")
-            r_year = r.get("year")
-            r_fmt = r.get("format", "TV")
-            r_poster = r.get("poster", "")
-            is_origin = r.get("is_origin", False)
+        if not raw_relations:
+            # Fallback jika AniList API offline / 403 / rate limited:
+            # Cari franchise langsung via HiAnime search
+            clean_q = re.sub(r'(?i)\s*[:\-]?\s*\b(der film|the movie|movie|season \d+|part \d+|ova|special|saishuushou)\b.*', '', search_query).strip()
+            franchise_q = clean_q if len(clean_q) >= 3 else search_query
+            hi_candidates = await loop.run_in_executor(None, lambda: hi.hianime_search(franchise_q, limit=20))
+            if not hi_candidates and franchise_q != search_query:
+                hi_candidates = await loop.run_in_executor(None, lambda: hi.hianime_search(search_query, limit=20))
+            
+            seen_cand = set()
+            for cand in (hi_candidates or []):
+                c_slug = cand.get("id") or ""
+                if not c_slug or c_slug == slug or c_slug in seen_cand:
+                    continue
+                seen_cand.add(c_slug)
+                c_title = cand.get("title") or ""
+                if c_slug == "girls-und-panzer-2670" or c_title == "Girls & Panzer":
+                    c_title = "Girls und Panzer"
+                c_poster = cand.get("poster") or ""
+                c_type = (cand.get("type") or "").upper()
+                if "film" in c_slug or "movie" in c_title.lower() or "film" in c_title.lower():
+                    c_fmt = "MOVIE"
+                elif c_type in ("MOVIE", "OVA", "ONA", "SPECIAL", "TV"):
+                    c_fmt = c_type
+                else:
+                    c_fmt = "TV"
 
-            # Cari slug HiAnime yang cocok untuk relasi ini
-            matched_slug = await _match_slug_one(loop, r_title, r_romaji)
-            if not matched_slug and r_romaji:
-                matched_slug = await _match_slug_one(loop, r_romaji, r_title)
+                c_label = "Terkait"
+                c_season = _extract_season_num(c_title)
+                if c_fmt == "MOVIE":
+                    part_m = re.search(r'\bpart\s*(\d+)\b', c_title, re.I)
+                    c_label = f"Movie Part {part_m.group(1)}" if part_m else "Movie"
+                elif c_fmt in ("OVA", "ONA", "SPECIAL"):
+                    c_label = "Special" if c_fmt == "SPECIAL" else c_fmt
+                elif c_season and c_season > 1:
+                    c_label = f"Season {c_season}"
+                else:
+                    c_label = "Season 1"
 
-            # Jika sekuel belum memiliki video atau belum rilis (tidak punya slug), lewati agar tidak menyesatkan
-            if rel_type in ("SEQUEL", "ALTERNATIVE", "SUMMARY") and not matched_slug:
-                continue
+                results.append({
+                    "relation": "ALTERNATIVE" if c_fmt == "MOVIE" else "SIDE_STORY",
+                    "label": c_label,
+                    "title": c_title,
+                    "title_romaji": c_title,
+                    "year": None,
+                    "format": c_fmt,
+                    "poster": c_poster,
+                    "slug": c_slug,
+                    "is_origin": (c_label == "Season 1")
+                })
+        else:
+            for r in raw_relations:
+                rel_type = r.get("relation", "")
+                r_title = r.get("title", "")
+                r_romaji = r.get("title_romaji", "")
+                r_year = r.get("year")
+                r_fmt = r.get("format", "TV")
+                r_poster = r.get("poster", "")
+                is_origin = r.get("is_origin", False)
 
-            # Buat label yang mudah dimengerti user (misal: "Season 1", "Prekuel", "Sekuel", "Movie", "OVA")
-            label = "Terkait"
-            season_num = _extract_season_num(r_title) or _extract_season_num(r_romaji)
-            if r_fmt == "MOVIE":
-                part_m = re.search(r'\bpart\s*(\d+)\b', r_title, re.I)
-                label = f"Movie Part {part_m.group(1)}" if part_m else "Movie"
-            elif r_fmt in ("OVA", "ONA", "SPECIAL"):
-                label = "Special" if r_fmt == "SPECIAL" else r_fmt
-            elif is_origin or (rel_type == "PREQUEL" and season_num == 1 and "season" not in r_title.lower()):
-                label = "Season 1"
-            elif rel_type == "PREQUEL":
-                label = f"Season {season_num}" if season_num > 1 else "Prekuel"
-            elif rel_type == "SEQUEL":
-                label = f"Season {season_num}" if season_num > 1 else "Sekuel"
+                # Cari slug HiAnime yang cocok untuk relasi ini
+                matched_slug = await _match_slug_one(loop, r_title, r_romaji)
+                if not matched_slug and r_romaji:
+                    matched_slug = await _match_slug_one(loop, r_romaji, r_title)
 
-            results.append({
-                "relation": rel_type,
-                "label": label,
-                "title": r_title,
-                "title_romaji": r_romaji,
-                "year": r_year,
-                "format": r_fmt,
-                "poster": r_poster,
-                "slug": matched_slug,
-                "is_origin": is_origin
-            })
+                # Jika sekuel belum memiliki video atau belum rilis (tidak punya slug), lewati agar tidak menyesatkan
+                if rel_type in ("SEQUEL", "ALTERNATIVE", "SUMMARY") and not matched_slug:
+                    continue
+
+                # Buat label yang mudah dimengerti user (misal: "Season 1", "Prekuel", "Sekuel", "Movie", "OVA")
+                label = "Terkait"
+                season_num = _extract_season_num(r_title) or _extract_season_num(r_romaji)
+                if r_fmt == "MOVIE":
+                    part_m = re.search(r'\bpart\s*(\d+)\b', r_title, re.I)
+                    label = f"Movie Part {part_m.group(1)}" if part_m else "Movie"
+                elif r_fmt in ("OVA", "ONA", "SPECIAL"):
+                    label = "Special" if r_fmt == "SPECIAL" else r_fmt
+                elif is_origin or (rel_type == "PREQUEL" and season_num == 1 and "season" not in r_title.lower()):
+                    label = "Season 1"
+                elif rel_type == "PREQUEL":
+                    label = f"Season {season_num}" if season_num > 1 else "Prekuel"
+                elif rel_type == "SEQUEL":
+                    label = f"Season {season_num}" if season_num > 1 else "Sekuel"
+
+                results.append({
+                    "relation": rel_type,
+                    "label": label,
+                    "title": r_title,
+                    "title_romaji": r_romaji,
+                    "year": r_year,
+                    "format": r_fmt,
+                    "poster": r_poster,
+                    "slug": matched_slug,
+                    "is_origin": is_origin
+                })
 
         # Urutkan: Season 1 / Origin paling pertama (-1), disusul PREQUEL berurutan tahun (2018 -> 2021), SEQUEL, MOVIE
         def sort_key(x):

@@ -134,9 +134,9 @@ public class AnimeAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
         int episode = item.optInt("episode", 0);
         String playedAt = item.optString("played_at", "");
 
-        // Format Subtitle / Status / History Badge
+        // Format Subtitle / Status / History Badge (Apple Flat: Nomor Episode Saja)
         if (episode > 0) {
-            holder.tvBadgeEp.setText("EP " + episode);
+            holder.tvBadgeEp.setText(String.valueOf(episode));
             holder.tvBadgeEp.setBackgroundResource(R.drawable.bg_badge_sub);
             holder.tvBadgeEp.setTextColor(0xFFF1F5F9);
         } else if ("TAMAT".equalsIgnoreCase(badge) || isFinished) {
@@ -145,26 +145,26 @@ public class AnimeAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
             holder.tvBadgeEp.setTextColor(0xFFECFDF5);
         } else if ("SERIAL PANJANG".equalsIgnoreCase(badge) || isLongRunning) {
             if (!epsCounter.isEmpty()) {
-                holder.tvBadgeEp.setText("EP " + epsCounter);
+                holder.tvBadgeEp.setText(epsCounter);
             } else if (!eps.isEmpty() && !eps.equals("0")) {
-                holder.tvBadgeEp.setText("EP " + eps);
+                holder.tvBadgeEp.setText(eps);
             } else if (!sub.isEmpty()) {
-                holder.tvBadgeEp.setText("SUB " + sub.toUpperCase());
+                holder.tvBadgeEp.setText(sub);
             } else {
                 holder.tvBadgeEp.setText("SERIAL");
             }
             holder.tvBadgeEp.setBackgroundResource(R.drawable.bg_badge_long);
             holder.tvBadgeEp.setTextColor(0xFFFFFBEB);
         } else if (!epsCounter.isEmpty()) {
-            holder.tvBadgeEp.setText("EP " + epsCounter);
+            holder.tvBadgeEp.setText(epsCounter);
             holder.tvBadgeEp.setBackgroundResource(R.drawable.bg_badge_sub);
             holder.tvBadgeEp.setTextColor(0xFFF1F5F9);
         } else if (!sub.isEmpty()) {
-            holder.tvBadgeEp.setText("SUB " + sub.toUpperCase());
+            holder.tvBadgeEp.setText(sub);
             holder.tvBadgeEp.setBackgroundResource(R.drawable.bg_badge_sub);
             holder.tvBadgeEp.setTextColor(0xFFF1F5F9);
         } else if (!eps.isEmpty() && !eps.equals("0")) {
-            holder.tvBadgeEp.setText("EP " + eps);
+            holder.tvBadgeEp.setText(eps);
             holder.tvBadgeEp.setBackgroundResource(R.drawable.bg_badge_sub);
             holder.tvBadgeEp.setTextColor(0xFFF1F5F9);
         } else {
