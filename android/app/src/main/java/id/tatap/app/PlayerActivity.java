@@ -86,11 +86,28 @@ import java.util.List;
 import java.util.Map;
 import android.content.Intent;
 import android.widget.EditText;
+import android.app.PictureInPictureParams;
+import android.app.RemoteAction;
+import android.app.PendingIntent;
+import android.graphics.drawable.Icon;
+import android.util.Rational;
+import android.graphics.Rect;
+import android.content.BroadcastReceiver;
+import android.content.IntentFilter;
+import android.content.pm.PackageManager;
 
 public class PlayerActivity extends Activity {
     private ExoPlayer player;
     private ForwardingPlayer forwardingPlayer;
     private PlayerView playerView;
+    private Button btnPip;
+    private Button btnPortraitPip;
+    private BroadcastReceiver pipReceiver;
+    private static final String ACTION_PIP_CONTROL = "id.tatap.app.PIP_CONTROL";
+    private static final String EXTRA_PIP_ACTION = "pip_action";
+    private static final int PIP_ACTION_REWIND = 1;
+    private static final int PIP_ACTION_PLAY_PAUSE = 2;
+    private static final int PIP_ACTION_FORWARD = 3;
     private GestureDetector gestureDetector;
     private AudioManager audioManager;
     private View hudOsd;
@@ -453,6 +470,7 @@ public class PlayerActivity extends Activity {
         btnPortraitQuality = findViewById(R.id.btn_portrait_quality);
         btnPortraitSpeed = findViewById(R.id.btn_portrait_speed);
         btnPortraitFullscreen = findViewById(R.id.btn_portrait_fullscreen);
+        btnPortraitPip = findViewById(R.id.btn_portrait_pip);
         btnPortraitSort = findViewById(R.id.btn_portrait_sort);
         rvPortraitRanges = findViewById(R.id.rv_portrait_ranges);
         rvPortraitEpisodes = findViewById(R.id.rv_portrait_episodes);
@@ -468,6 +486,18 @@ public class PlayerActivity extends Activity {
             android.widget.ImageButton btnPortraitBack = findViewById(R.id.btn_portrait_back);
             if (btnPortraitBack != null) {
                 btnPortraitBack.setOnClickListener(v -> handleBackAction());
+            }
+
+            if (btnPortraitPip != null) {
+                if (isPipSupported()) {
+                    btnPortraitPip.setVisibility(View.VISIBLE);
+                    btnPortraitPip.setOnClickListener(v -> {
+                        HapticHelper.performClick(v);
+                        enterPipMode();
+                    });
+                } else {
+                    btnPortraitPip.setVisibility(View.GONE);
+                }
             }
 
             if (btnPortraitSub != null) {
@@ -550,6 +580,19 @@ public class PlayerActivity extends Activity {
 
         if (btnPlayerBack != null) {
             btnPlayerBack.setOnClickListener(v -> handleBackAction());
+        }
+
+        btnPip = findViewById(R.id.btn_pip);
+        if (btnPip != null) {
+            if (isPipSupported()) {
+                btnPip.setVisibility(View.VISIBLE);
+                btnPip.setOnClickListener(v -> {
+                    HapticHelper.performClick(v);
+                    enterPipMode();
+                });
+            } else {
+                btnPip.setVisibility(View.GONE);
+            }
         }
 
         btnAspect = findViewById(R.id.btn_aspect);
@@ -666,6 +709,7 @@ public class PlayerActivity extends Activity {
         initExoPlayer();
         setupExoNativeControls();
         setupGestureControls();
+        registerPipReceiver();
         checkAndPromptResume();
         resolveAndPlayStream();
     }
@@ -1090,6 +1134,9 @@ public class PlayerActivity extends Activity {
                 }
                 updateHapticGeneratorState();
                 updateExoButtonStates();
+                if (isPipSupported()) {
+                    updatePipParams();
+                }
             }
 
             @Override
@@ -1106,6 +1153,9 @@ public class PlayerActivity extends Activity {
                         sv.requestLayout();
                     }
                     playerView.requestLayout();
+                }
+                if (isPipSupported()) {
+                    updatePipParams();
                 }
             }
 
@@ -3781,8 +3831,63 @@ public class PlayerActivity extends Activity {
     }
 
     @Override
+    protected void onUserLeaveHint() {
+        super.onUserLeaveHint();
+        if (isPipSupported() && player != null && player.isPlaying()) {
+            enterPipMode();
+        }
+    }
+
+    @Override
+    public void onPictureInPictureModeChanged(boolean isInPictureInPictureMode, Configuration newConfig) {
+        super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig);
+        if (isInPictureInPictureMode) {
+            if (playerView != null) {
+                playerView.hideController();
+                playerView.setUseController(false);
+            }
+            if (layoutTopBar != null) layoutTopBar.setVisibility(View.GONE);
+            if (layoutPortraitBottom != null) layoutPortraitBottom.setVisibility(View.GONE);
+            if (btnScreenLock != null) btnScreenLock.setVisibility(View.GONE);
+            if (btnScreenUnlock != null) btnScreenUnlock.setVisibility(View.GONE);
+            if (btnSkipOpEd != null) btnSkipOpEd.setVisibility(View.GONE);
+            if (hudOsd != null) hudOsd.setVisibility(View.GONE);
+            if (hudHoldSpeed != null) hudHoldSpeed.setVisibility(View.GONE);
+
+            if (tvSubtitles != null) {
+                tvSubtitles.setTextSize(TypedValue.COMPLEX_UNIT_SP, 10f);
+                ViewGroup.MarginLayoutParams lp = (ViewGroup.MarginLayoutParams) tvSubtitles.getLayoutParams();
+                if (lp != null) {
+                    lp.bottomMargin = (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 4, getResources().getDisplayMetrics());
+                    tvSubtitles.setLayoutParams(lp);
+                }
+                int padX = (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 6, getResources().getDisplayMetrics());
+                int padY = (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 2, getResources().getDisplayMetrics());
+                tvSubtitles.setPadding(padX, padY, padX, padY);
+            }
+        } else {
+            if (playerView != null) {
+                playerView.setUseController(true);
+            }
+            applySubtitleStyle();
+
+            int orientation = getResources().getConfiguration().orientation;
+            if (orientation == Configuration.ORIENTATION_PORTRAIT) {
+                if (layoutPortraitBottom != null) {
+                    layoutPortraitBottom.setVisibility(View.VISIBLE);
+                }
+            }
+            applySystemUiVisibility();
+            updatePipParams();
+        }
+    }
+
+    @Override
     protected void onPause() {
         super.onPause();
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && isInPictureInPictureMode()) {
+            return;
+        }
         if (isHoldingSpeed) stopHoldingSpeed();
         if (isHoldingRewind) stopHoldingRewind();
         isVideoPlaying = false;
@@ -3796,8 +3901,22 @@ public class PlayerActivity extends Activity {
     }
 
     @Override
+    protected void onStop() {
+        super.onStop();
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && isInPictureInPictureMode()) {
+            return;
+        }
+        if (player != null) {
+            player.pause();
+        }
+    }
+
+    @Override
     protected void onResume() {
         super.onResume();
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && isInPictureInPictureMode()) {
+            return;
+        }
         applySystemUiVisibility();
         SharedPreferences sp = getSharedPreferences("tatap_player_prefs", MODE_PRIVATE);
         isGeneralHapticEnabled = !TvFocusHelper.isTv(this) && sp.getBoolean("pref_general_haptic", sp.getBoolean("pref_haptic", true));
@@ -3820,6 +3939,12 @@ public class PlayerActivity extends Activity {
             } catch (Throwable ignored) {}
             backInvokedCallback = null;
         }
+        if (pipReceiver != null) {
+            try {
+                unregisterReceiver(pipReceiver);
+            } catch (Throwable ignored) {}
+            pipReceiver = null;
+        }
         recordWatchProgress(true);
         handler.removeCallbacks(subtitleSyncRunnable);
         handler.removeCallbacks(preResolveRunnable);
@@ -3829,6 +3954,149 @@ public class PlayerActivity extends Activity {
         if (player != null) {
             player.release();
             player = null;
+        }
+    }
+
+    public boolean isPipSupported() {
+        return !TvFocusHelper.isTv(this)
+                && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
+                && getPackageManager().hasSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE);
+    }
+
+    public void enterPipMode() {
+        if (!isPipSupported() || player == null) return;
+
+        if (playerView != null) {
+            playerView.hideController();
+        }
+        if (layoutTopBar != null) layoutTopBar.setVisibility(View.GONE);
+        if (layoutPortraitBottom != null) layoutPortraitBottom.setVisibility(View.GONE);
+        if (btnScreenLock != null) btnScreenLock.setVisibility(View.GONE);
+        if (btnScreenUnlock != null) btnScreenUnlock.setVisibility(View.GONE);
+        if (btnSkipOpEd != null) btnSkipOpEd.setVisibility(View.GONE);
+        if (hudOsd != null) hudOsd.setVisibility(View.GONE);
+        if (hudHoldSpeed != null) hudHoldSpeed.setVisibility(View.GONE);
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            try {
+                PictureInPictureParams params = buildPipParams();
+                if (params != null) {
+                    enterPictureInPictureMode(params);
+                }
+            } catch (Throwable t) {
+                Toast.makeText(this, "Gagal masuk mode PiP: " + t.getMessage(), Toast.LENGTH_SHORT).show();
+            }
+        }
+    }
+
+    private PictureInPictureParams buildPipParams() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return null;
+
+        PictureInPictureParams.Builder builder = new PictureInPictureParams.Builder();
+
+        // 1. Native Video Aspect Ratio
+        Rational rational = new Rational(16, 9);
+        if (player != null && player.getVideoSize() != null && player.getVideoSize().width > 0 && player.getVideoSize().height > 0) {
+            int w = player.getVideoSize().width;
+            int h = player.getVideoSize().height;
+            float ratio = (float) w / (float) h;
+            if (ratio >= 0.418410f && ratio <= 2.39f) {
+                rational = new Rational(w, h);
+            }
+        }
+        builder.setAspectRatio(rational);
+
+        // 2. Source Rect Hint
+        if (playerView != null) {
+            Rect sourceRect = new Rect();
+            playerView.getGlobalVisibleRect(sourceRect);
+            if (!sourceRect.isEmpty()) {
+                builder.setSourceRectHint(sourceRect);
+            }
+        }
+
+        // 3. Android 12+ (API 31) Auto-Enter and Seamless Resize
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            builder.setAutoEnterEnabled(player != null && player.isPlaying());
+            builder.setSeamlessResizeEnabled(true);
+        }
+
+        // 4. Remote Actions
+        ArrayList<RemoteAction> actions = new ArrayList<>();
+
+        // Action 1: Mundur 10 detik
+        Intent rewindIntent = new Intent(ACTION_PIP_CONTROL).putExtra(EXTRA_PIP_ACTION, PIP_ACTION_REWIND);
+        rewindIntent.setPackage(getPackageName());
+        PendingIntent rewindPendingIntent = PendingIntent.getBroadcast(this, PIP_ACTION_REWIND, rewindIntent, PendingIntent.FLAG_UPDATE_CURRENT | (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M ? PendingIntent.FLAG_IMMUTABLE : 0));
+        Icon rewindIcon = Icon.createWithResource(this, R.drawable.ic_replay_10);
+        actions.add(new RemoteAction(rewindIcon, "Mundur 10d", "Mundur 10 detik", rewindPendingIntent));
+
+        // Action 2: Play / Pause
+        boolean isPlaying = (player != null && player.isPlaying());
+        Intent playPauseIntent = new Intent(ACTION_PIP_CONTROL).putExtra(EXTRA_PIP_ACTION, PIP_ACTION_PLAY_PAUSE);
+        playPauseIntent.setPackage(getPackageName());
+        PendingIntent playPausePendingIntent = PendingIntent.getBroadcast(this, PIP_ACTION_PLAY_PAUSE, playPauseIntent, PendingIntent.FLAG_UPDATE_CURRENT | (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M ? PendingIntent.FLAG_IMMUTABLE : 0));
+        Icon playPauseIcon = Icon.createWithResource(this, isPlaying ? R.drawable.ic_pause : R.drawable.ic_play);
+        actions.add(new RemoteAction(playPauseIcon, isPlaying ? "Jeda" : "Putar", isPlaying ? "Jeda video" : "Putar video", playPausePendingIntent));
+
+        // Action 3: Maju 10 detik
+        Intent forwardIntent = new Intent(ACTION_PIP_CONTROL).putExtra(EXTRA_PIP_ACTION, PIP_ACTION_FORWARD);
+        forwardIntent.setPackage(getPackageName());
+        PendingIntent forwardPendingIntent = PendingIntent.getBroadcast(this, PIP_ACTION_FORWARD, forwardIntent, PendingIntent.FLAG_UPDATE_CURRENT | (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M ? PendingIntent.FLAG_IMMUTABLE : 0));
+        Icon forwardIcon = Icon.createWithResource(this, R.drawable.ic_forward_10);
+        actions.add(new RemoteAction(forwardIcon, "Maju 10d", "Maju 10 detik", forwardPendingIntent));
+
+        builder.setActions(actions);
+
+        return builder.build();
+    }
+
+    private void updatePipParams() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && isPipSupported()) {
+            try {
+                PictureInPictureParams params = buildPipParams();
+                if (params != null) {
+                    setPictureInPictureParams(params);
+                }
+            } catch (Throwable ignored) {}
+        }
+    }
+
+    private void registerPipReceiver() {
+        if (pipReceiver == null && isPipSupported()) {
+            pipReceiver = new BroadcastReceiver() {
+                @Override
+                public void onReceive(Context context, Intent intent) {
+                    if (intent == null || !ACTION_PIP_CONTROL.equals(intent.getAction())) return;
+                    int action = intent.getIntExtra(EXTRA_PIP_ACTION, 0);
+                    if (player == null) return;
+                    switch (action) {
+                        case PIP_ACTION_REWIND:
+                            long newRewindPos = Math.max(0, player.getCurrentPosition() - 10000);
+                            player.seekTo(newRewindPos);
+                            break;
+                        case PIP_ACTION_PLAY_PAUSE:
+                            if (player.isPlaying()) {
+                                player.pause();
+                            } else {
+                                player.play();
+                            }
+                            updatePipParams();
+                            break;
+                        case PIP_ACTION_FORWARD:
+                            long duration = player.getDuration();
+                            long newForwardPos = (duration > 0) ? Math.min(duration, player.getCurrentPosition() + 10000) : player.getCurrentPosition() + 10000;
+                            player.seekTo(newForwardPos);
+                            break;
+                    }
+                }
+            };
+            IntentFilter filter = new IntentFilter(ACTION_PIP_CONTROL);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                registerReceiver(pipReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
+            } else {
+                registerReceiver(pipReceiver, filter);
+            }
         }
     }
 

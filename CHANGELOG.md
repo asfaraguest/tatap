@@ -76,6 +76,16 @@ Kenaikan digit PATCH diterapkan secara mutlak sesuai kaidah Semantic Versioning 
      - Tombol menu (`btn_toggle_menu`): dimensi kotak simetris `38dp x 38dp`, top margin `8dp`, dan padding horizontal `(38dp - 15dp) / 2 = 11.5dp` berpusat di `24dp`.
    - Mengunci preservasi padding rel pada `setTabAppearance` di `MainActivity.java` sehingga saat tab berganti status (aktif/inaktif) saat sidebar menciut, padding simetris dan pemusatan ikon tetap utuh 100%.
    - Menambahkan pengujian regresi otomatis `test_tv_sidebar_collapsed_icons_centered` di `tests/test_android_tv_sidebar_autohide.py`.
+15. **Picture-in-Picture (PiP) Eksklusif Android Mobile:**
+   - Menghadirkan dukungan penuh mode Picture-in-Picture (PiP) pada `PlayerActivity.java` untuk perangkat Android Mobile (ponsel dan tablet).
+   - Menambahkan atribut `android:supportsPictureInPicture="true"` pada `AndroidManifest.xml`.
+   - **Seamless Auto-Enter & Gesture Support:** Mengintegrasikan `onUserLeaveHint()` dan `setAutoEnterEnabled(true)` (Android 12+ / API 31+) sehingga saat pengguna melakukan gesture swipe ke beranda (*Home*) atau menekan tombol Home saat video diputar, aplikasi bertransisi halus secara otomatis ke jendela mengambang (*floating window*).
+   - **Tombol Kontrol Manual:** Menambahkan tombol "PiP" berikon vektor pada bilah atas landscape (`btn_pip`) dan bilah kontrol portrait (`btn_portrait_pip`).
+   - **3 Remote Actions Interaktif:** Menyediakan tombol aksi interaktif pada jendela PiP (Mundur 10 detik, Play / Pause dinamis, dan Maju 10 detik) yang dikelola via `BroadcastReceiver` berizin `RECEIVER_NOT_EXPORTED` (Android 13+).
+   - **Subtitle Mini Proporsional:** Menyesuaikan ukuran font dan margin subtitle custom overlay saat berada dalam mode PiP (`10sp`, margin `4dp`) agar teks tetap terbaca jelas tanpa menutupi video, dan secara otomatis memulihkan preferensi ukuran subtitle pengguna saat kembali ke layar penuh.
+   - **Lifecycle Guards:** Melindungi `onPause()` dan `onStop()` dengan pengecekan `isInPictureInPictureMode()` agar pemutaran video dan sinkronisasi subtitle tidak terhenti saat sistem Android memanggil lifecycle background.
+   - **Isolasi Android TV:** PiP dinonaktifkan secara ketat pada platform Android TV (`TvFocusHelper.isTv(this)`) untuk menjaga integritas antarmuka 10-Foot UI Leanback.
+   - **Automated Regression Suite (`tests/test_android_pip.py`):** Menambahkan test suite otomatis yang memvalidasi deklarasi manifest, aset vektor PiP, tombol layout, lifecycle hooks, dan guard PiP.
 
 ## [2.12.0] - 2026-10-22
 

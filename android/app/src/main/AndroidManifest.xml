@@ -40,6 +40,7 @@
             android:name=".PlayerActivity"
             android:exported="false"
             android:screenOrientation="user"
+            android:supportsPictureInPicture="true"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden" />
 
         <provider

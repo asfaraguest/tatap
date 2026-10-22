@@ -280,6 +280,26 @@
                 android:fontFamily="sans-serif" />
         </LinearLayout>
 
+        <!-- Tombol Picture-in-Picture (Mobile Only) -->
+        <Button
+            android:id="@+id/btn_pip"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:layout_marginEnd="8dp"
+            android:paddingHorizontal="10dp"
+            android:text="PiP"
+            android:textSize="@dimen/text_caption"
+            android:fontFamily="sans-serif-medium"
+            android:textColor="@color/text_primary"
+            app:icon="@drawable/ic_pip"
+            app:iconTint="@color/text_primary"
+            app:iconSize="15dp"
+            app:strokeColor="#33FFFFFF"
+            app:strokeWidth="1dp"
+            app:cornerRadius="8dp"
+            android:backgroundTint="#1E2433"
+            android:visibility="gone" />
+
         <!-- Tombol Skala Layar / Mode Fullscreen (Fit, Zoom, Fill) -->
         <Button
             android:id="@+id/btn_aspect"
@@ -528,6 +548,25 @@
                     app:cornerRadius="6dp"
                     app:strokeColor="#2D3748"
                     app:strokeWidth="1dp" />
+
+                <Button
+                    android:id="@+id/btn_portrait_pip"
+                    android:layout_width="wrap_content"
+                    android:layout_height="32dp"
+                    android:layout_marginEnd="6dp"
+                    android:paddingHorizontal="10dp"
+                    android:text="PiP"
+                    android:textSize="@dimen/text_badge"
+                    android:fontFamily="sans-serif-medium"
+                    android:textColor="@color/text_primary"
+                    app:icon="@drawable/ic_pip"
+                    app:iconTint="@color/text_primary"
+                    app:iconSize="13dp"
+                    android:backgroundTint="#1A202C"
+                    app:cornerRadius="6dp"
+                    app:strokeColor="#2D3748"
+                    app:strokeWidth="1dp"
+                    android:visibility="gone" />
 
                 <Button
                     android:id="@+id/btn_portrait_fullscreen"
