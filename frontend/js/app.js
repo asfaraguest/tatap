@@ -528,7 +528,7 @@ function loadPrefs(){
 }
 
 function updateBookmarkBtn(isBookmarked){
-  var btn = $("tm-bookmark-btn");
+  var btn = $("tm-bookmark-btn") || $("bookmarkBtn");
   if(!btn) return;
   btn.classList.toggle("bookmarked", !!isBookmarked);
   var starSvg = isBookmarked ? '<svg class="ui-icon"><use href="#icon-star-filled"/></svg>' : '<svg class="ui-icon"><use href="#icon-star"/></svg>';
@@ -548,7 +548,7 @@ function checkModalBookmark(slug){
 function toggleModalBookmark(){
   var slug = cur.slug;
   if(!slug) return;
-  var btn = $("tm-bookmark-btn");
+  var btn = $("tm-bookmark-btn") || $("bookmarkBtn");
   var currentlyBookmarked = btn && btn.classList.contains("bookmarked");
   var nextState = !currentlyBookmarked;
   updateBookmarkBtn(nextState);
@@ -569,9 +569,21 @@ function toggleModalBookmark(){
       if(window.Tui && window.Tui.state && window.Tui.state.view === "favorit"){
         window.Tui.setView("favorit");
       }
+      // Unbookmark Subtitle Auto-Recovery:
+      // Jika saat unbookmark episode sedang aktif dengan cur.mode === "sub" tetapi subtitle kosong (cur.cues.length === 0),
+      // panggil ulang pemuatan episode/subtitle dengan parameter forceRefresh=true (refresh=1)
+      var pm = $("player-modal");
+      if(pm && !pm.classList.contains("hidden") && cur.mode === "sub" && (!cur.cues || cur.cues.length === 0) && cur.ep){
+        var curTime = 0;
+        var v = $("vid");
+        if(v && !isNaN(v.currentTime)) curTime = v.currentTime;
+        openPlayer(cur.ep, curTime, true);
+      }
     });
   }
 }
+var toggleBookmark = toggleModalBookmark;
+window.toggleBookmark = toggleModalBookmark;
 
 function renderDetailMeta(meta){
   var box = $("tm-detail-meta");
@@ -723,6 +735,13 @@ function openTitle(slug,title,poster,type,epsCounter,meta){
   cur.watched={};
   cur.activeEpRange=null;
   cur.meta=meta||null;
+  cur.res=null; // Bersihkan stream cache lama agar snapshot bookmark tidak menimpa state stream
+  if(meta && meta.sub){
+    cur.subCount = meta.sub; // Simpan metadata jumlah episode subbed ke properti terpisah
+  }
+  if(!cur.mode || (cur.mode !== "dub" && cur.mode !== "sub")){
+    cur.mode = "sub";
+  }
   setPlaySpeed(1.0, false);
   renderSourceUI();
   $("tm-title").textContent=title;
@@ -1286,8 +1305,13 @@ function openPlayer(ep, resumeTime, forceRefresh){
       };
     }
     renderVariants();
-    cur.activeSub = pickSubtitleUrl(r.data.subtitles || [], cur.subLang);
-    renderSubtitles(r.data.subtitles || [], cur.activeSub);
+    var subs = (r.data.subtitles && Array.isArray(r.data.subtitles)) ? r.data.subtitles : [];
+    if(!subs.length && r.data.sub && typeof r.data.sub === "string" && !/^\d+$/.test(r.data.sub.trim())){
+      subs = [{url: r.data.sub, lang: r.data.sub_lang || "English", label: r.data.sub_lang || "English", default: true}];
+      r.data.subtitles = subs;
+    }
+    cur.activeSub = pickSubtitleUrl(subs, cur.subLang);
+    renderSubtitles(subs, cur.activeSub);
     if(cur.activeSub){
       prefetchSubtitleTrack(cur.activeSub, r.data.referer);
     }
@@ -2014,7 +2038,9 @@ function switchSubtitleTrack(url, langCode){
     clearTimeout(cur._subUpgradeTimer);
     cur._subUpgradeTimer = null;
   }
-  if(!url)return;
+  if(!url || typeof url !== "string") return;
+  var cleanSubUrl = url.trim();
+  if(/^\d+$/.test(cleanSubUrl)) return;
   var originalUrl = url;
   var trackMode = "none";
   if(url.indexOf("gtx+:")===0){
@@ -2326,7 +2352,8 @@ function playUrl(url,referrer,sub,subRef,resumeTime,token){
   }catch(e){}
   // Bersihkan <track> lama lalu pasang track subtitle aktif (live switch).
   // Fungsi switchSubtitleTrack() menhandle Off (hapus semua) dan replace.
-  switchSubtitleTrack(sub || null);
+  var validSub = (typeof sub === "string" && !/^\d+$/.test(sub.trim())) ? sub : null;
+  switchSubtitleTrack(validSub);
   $("pm-spinner").classList.remove("hidden");
   $("pm-status").textContent="buffering...";
   var onCan=function(){
@@ -2554,7 +2581,8 @@ function switchQ(q){
     if(cur.res.variants[i].q.toLowerCase()===qLow){
       cur.res.picked=cur.res.variants[i];
       renderVariants();
-      playUrl(cur.res.variants[i].url,cur.res.referer,cur.activeSub||cur.res.sub,cur.res.referer,curTime);
+      var validFallbackSub = (cur.res && cur.res.sub && typeof cur.res.sub === "string" && !/^\d+$/.test(cur.res.sub.trim())) ? cur.res.sub : null;
+      playUrl(cur.res.variants[i].url,cur.res.referer,cur.activeSub||validFallbackSub,cur.res.referer,curTime);
       toast("Resolusi: "+cur.res.variants[i].q.toUpperCase());
       return;
     }

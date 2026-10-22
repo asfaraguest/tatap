@@ -43,6 +43,12 @@ Kenaikan digit MINOR diterapkan secara mutlak sesuai kaidah Semantic Versioning 
    - Menambahkan fallback franchise relation langsung dari scraper HiAnime ketika AniList mengalami pemadaman (403 disabled) atau limitasi koneksi.
    - Menyelaraskan filter katalog musim lampau (`sy` dan `ey`) dan pagination agar selalu menyajikan total halaman akurat.
 
+6. **Perbaikan Subtitle Anime Favorit (Bookmark) Tidak Muncul Permanen:**
+   - **Invalidasi Cache SQLite Otomatis**: Menambahkan `clear_episode_cache_for_slug` pada `database/__init__.py` dan mengintegrasikannya ke `add_bookmark` serta `remove_bookmark` agar status favorit baru selalu membersihkan cache episode yang berpotensi cacat.
+   - **Pencegahan Negative Subtitle Caching & Bypass Cache Stale**: Menambahkan parameter `refresh` dan route alias `/api/episode` pada `backend/main.py`. Mengabaikan cache hit dan scraping ulang jika `mode == 'sub'` namun entri cache tidak memiliki softsub yang valid, menghapus fallback buta ke cache 'dub', menolak penyimpanan ke `episode_cache` jika subtitle kosong, dan membersihkan in-memory failover cache saat bookmark diubah.
+   - **Isolasi State Web Player**: Memisahkan metadata jumlah episode bookmark (`cur.subCount`) dari track subtitle pemutar (`cur.activeSub`, `cur.res`, `cur.cues`), memuat detail lengkap anime saat membuka dari favorit, dan mengaktifkan auto-recovery `refresh=1` jika unbookmark terjadi saat pemutar aktif dengan subtitle kosong.
+   - **Android Native Intent & ExoPlayer Auto-Retry**: Memastikan `AnimeAdapter` dan `DetailActivity` selalu meneruskan extra `mode = 'sub'` yang valid, serta mengimplementasikan satu kali auto-retry dengan query `&refresh=1` pada `PlayerActivity` jika respons `mode='sub'` mengembalikan array subtitle kosong.
+
 ## [2.11.0] - 2026-10-21
 
 ### Justifikasi SemVer 2.0.0 (MINOR: 2.10.2 -> 2.11.0)

@@ -37,8 +37,9 @@ async def test_resolve_force_refresh(monkeypatch):
     master = "https://example.com/stale_master.m3u8"
     variants = [{"q": "HD", "url": master}]
     
-    # Pre-populate stale cache
-    await set_episode_cache(slug, ep, mode, master, variants, None, None, "https://example.com/", "StaleServer")
+    # Pre-populate stale cache with valid subtitles
+    await set_episode_cache(slug, ep, mode, master, variants, "https://example.com/sub.vtt", "English", "https://example.com/", "StaleServer",
+                            subtitles=[{"url": "https://example.com/sub.vtt", "lang": "en"}])
     
     # When force=False, returns cached
     res_cached = await main.resolve(slug=slug, ep=ep, mode=mode, q="best", source="hianime", force=False)
@@ -54,8 +55,8 @@ async def test_resolve_force_refresh(monkeypatch):
         return {
             "master": new_master,
             "variants": [{"q": "1080p", "url": new_master}],
-            "sub": None, "sub_lang": None, "referer": "https://fresh.example.com/",
-            "server": "FreshZoko", "subtitles": [], "intro": {"start": 0, "end": 0}, "outro": {"start": 0, "end": 0}
+            "sub": "https://fresh.example.com/sub.vtt", "sub_lang": "en", "referer": "https://fresh.example.com/",
+            "server": "FreshZoko", "subtitles": [{"url": "https://fresh.example.com/sub.vtt", "lang": "en"}], "intro": {"start": 0, "end": 0}, "outro": {"start": 0, "end": 0}
         }
     monkeypatch.setattr(hi, "hianime_episodes", fake_hianime_episodes)
     monkeypatch.setattr(hi, "hianime_m3u8", fake_hianime_m3u8)

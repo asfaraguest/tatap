@@ -13,7 +13,10 @@ from database import (
     remove_bookmark,
     get_bookmarks,
     is_bookmarked,
-    clear_bookmarks
+    clear_bookmarks,
+    get_episode_cache,
+    set_episode_cache,
+    clear_episode_cache_for_slug
 )
 
 @pytest.mark.asyncio
@@ -52,3 +55,56 @@ async def test_bookmark_lifecycle():
     assert await is_bookmarked("test-frieren-slug") is False
     bookmarks_after = await get_bookmarks(limit=10)
     assert not any(b.get("slug") == "test-frieren-slug" for b in bookmarks_after)
+
+
+@pytest.mark.asyncio
+async def test_bookmark_invalidates_episode_cache():
+    await init_db()
+    slug = "test-cache-invalidation-slug"
+
+    # Pre-kondisi: buat entri episode cache
+    await set_episode_cache(
+        slug=slug,
+        ep=1,
+        mode="sub",
+        master="https://cdn.example.com/master.m3u8",
+        variants=[{"q": "HD", "url": "https://cdn.example.com/ep1.mp4"}],
+        sub="https://cdn.example.com/ep1.vtt",
+        sub_lang="English",
+        referer="https://example.com",
+        server="megacloud",
+        subtitles=[{"url": "https://cdn.example.com/ep1.vtt", "lang": "English", "label": "English"}]
+    )
+    # Verifikasi cache hit
+    cached = await get_episode_cache(slug, 1, "sub")
+    assert cached is not None
+    assert cached["master"] == "https://cdn.example.com/master.m3u8"
+
+    # 1. Menambahkan bookmark harus menginvalidasi episode_cache untuk slug tersebut
+    await add_bookmark(slug, "Test Title", poster="", type="TV", sub="12", eps="12", score=8.5)
+    assert await get_episode_cache(slug, 1, "sub") is None
+
+    # Simpan kembali cache untuk pengujian penghapusan bookmark
+    await set_episode_cache(
+        slug=slug,
+        ep=1,
+        mode="sub",
+        master="https://cdn.example.com/master.m3u8",
+        variants=[],
+        sub="https://cdn.example.com/ep1.vtt",
+        sub_lang="English",
+        referer="https://example.com",
+        server="megacloud"
+    )
+    assert await get_episode_cache(slug, 1, "sub") is not None
+
+    # 2. Menghapus bookmark (unbookmark) harus menginvalidasi episode_cache
+    await remove_bookmark(slug)
+    assert await get_episode_cache(slug, 1, "sub") is None
+
+    # 3. Verifikasi helper clear_episode_cache_for_slug secara langsung
+    await set_episode_cache(slug=f"hianime:{slug}", ep=2, mode="sub", master="http://m.m3u8", variants=[], sub="", sub_lang="", referer="", server="")
+    assert await get_episode_cache(f"hianime:{slug}", 2, "sub") is not None
+    cleared = await clear_episode_cache_for_slug(slug)
+    assert cleared >= 1
+    assert await get_episode_cache(f"hianime:{slug}", 2, "sub") is None

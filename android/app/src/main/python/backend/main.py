@@ -6,7 +6,7 @@ from fastapi.responses import JSONResponse, FileResponse, Response, StreamingRes
 from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
 from config import APP_PORT, APP_HOST, HI_BASE, HI_UA
-from database import init_db, get_search_cache, set_search_cache, get_episode_cache, set_episode_cache, delete_episode_cache, add_history, get_history, clear_history, save_progress, get_progress, clear_progress, add_bookmark, remove_bookmark, get_bookmarks, is_bookmarked, clear_bookmarks, get_setting, set_setting, get_browse_cache, set_browse_cache, get_slug_map, set_slug_map, get_subtitle_cache, set_subtitle_cache, delete_subtitle_cache, get_today_char_count, add_today_char_count
+from database import init_db, get_search_cache, set_search_cache, get_episode_cache, set_episode_cache, delete_episode_cache, clear_episode_cache_for_slug, get_cached_episode, cache_episode, add_history, get_history, clear_history, save_progress, get_progress, clear_progress, add_bookmark, remove_bookmark, get_bookmarks, is_bookmarked, clear_bookmarks, get_setting, set_setting, get_browse_cache, set_browse_cache, get_slug_map, set_slug_map, get_subtitle_cache, set_subtitle_cache, delete_subtitle_cache, get_today_char_count, add_today_char_count
 from api import hianime as hi
 from api import anilist as al
 from api import otakudesu as otaku
@@ -1294,27 +1294,54 @@ async def anime_relations_endpoint(slug: str, title: str = Query("")):
         return fail(str(e))
 
 
+def _has_valid_subtitles(ep_data: dict) -> bool:
+    """Periksa apakah data episode memiliki daftar track subtitle yang valid (bukan angka/kosong)."""
+    if not isinstance(ep_data, dict):
+        return False
+    subs = ep_data.get("subtitles")
+    if isinstance(subs, list) and len(subs) > 0:
+        for s in subs:
+            if isinstance(s, dict):
+                u = str(s.get("url") or "").strip()
+                if u.startswith("http://") or u.startswith("https://") or u.startswith("/"):
+                    return True
+    sub = str(ep_data.get("sub") or "").strip()
+    if sub.startswith("http://") or sub.startswith("https://") or sub.startswith("/"):
+        return True
+    return False
+
+
 @app.get("/api/stream/resolve")
-async def resolve(slug: str = Query(""), ep: int = Query(1), mode: str = Query("sub"), q: str = Query("best"), source: str = Query(""), force: bool = Query(False)):
+@app.get("/api/episode")
+async def resolve(slug: str = Query(""), ep: int = Query(1), mode: str = Query("sub"), q: str = Query("best"), source: str = Query(""), force: bool = Query(False), refresh: bool = Query(False)):
     try:
-        if "hentai" in (slug or "").lower():
+        slug_str = str(slug or "") if isinstance(slug, str) else ""
+        if "hentai" in slug_str.lower():
             return fail("Konten genre Hentai diblokir")
-        mode = "dub" if mode.lower() == "dub" else "sub"
+        mode = "dub" if str(mode).lower() == "dub" else "sub"
+        def _is_truthy(v):
+            return v is True or (isinstance(v, str) and v.strip().lower() in ("true", "1", "yes"))
+        should_refresh = _is_truthy(force) or _is_truthy(refresh)
         pref_source = (await get_setting("preferred_source", "hianime")).lower()
         title_failover = _ANIME_FAILOVER_CACHE.get(slug)
         active_source = (source or title_failover or pref_source or "hianime").lower()
 
         # Cache key mencakup source agar stream tidak tertukar
         cache_slug = f"{active_source}:{slug}" if active_source != "hianime" else slug
-        if force:
+        if should_refresh:
             await delete_episode_cache(cache_slug, ep)
             hit = None
         else:
             hit = await get_episode_cache(cache_slug, ep, mode)
-            if not hit and mode == "sub":
-                hit = await get_episode_cache(cache_slug, ep, "dub")
-            elif not hit and mode == "dub":
-                hit = await get_episode_cache(cache_slug, ep, "sub")
+            if mode == "sub":
+                # Cegah negative caching dan kontaminasi dub cache pada mode sub.
+                # Jika cache hit tidak memiliki subtitle valid, bersihkan dan anggap cache miss.
+                if hit and not _has_valid_subtitles(hit):
+                    await delete_episode_cache(cache_slug, ep, mode="sub")
+                    hit = None
+            elif mode == "dub":
+                if not hit:
+                    hit = await get_episode_cache(cache_slug, ep, "sub")
         async def _check_and_prewarm(ep_data):
             try:
                 sub_lang = (await get_setting("sub_lang", "Indonesian")).strip().lower()
@@ -1575,18 +1602,22 @@ async def resolve(slug: str = Query(""), ep: int = Query(1), mode: str = Query("
                 outro=got["outro"]
             )
 
-        # Simpan cache episode
-        await set_episode_cache(cache_slug, ep, mode, got["master"], got["variants"],
-                                got.get("sub"), got.get("sub_lang"),
-                                got.get("referer"), got.get("server"),
-                                subtitles=got["subtitles"],
-                                intro=got["intro"], outro=got["outro"])
-        if actual_mode != mode:
-            await set_episode_cache(cache_slug, ep, actual_mode, got["master"], got["variants"],
+        # Simpan cache episode (Cegah negative subtitle caching jika mode sub namun subtitle kosong)
+        can_cache_sub = (mode != "sub") or _has_valid_subtitles(got)
+        if can_cache_sub:
+            await set_episode_cache(cache_slug, ep, mode, got["master"], got["variants"],
                                     got.get("sub"), got.get("sub_lang"),
                                     got.get("referer"), got.get("server"),
                                     subtitles=got["subtitles"],
                                     intro=got["intro"], outro=got["outro"])
+        if actual_mode != mode:
+            can_cache_actual = (actual_mode != "sub") or _has_valid_subtitles(got)
+            if can_cache_actual:
+                await set_episode_cache(cache_slug, ep, actual_mode, got["master"], got["variants"],
+                                        got.get("sub"), got.get("sub_lang"),
+                                        got.get("referer"), got.get("server"),
+                                        subtitles=got["subtitles"],
+                                        intro=got["intro"], outro=got["outro"])
         await _check_and_prewarm(got)
         return ok(got)
     except Exception as e:
@@ -2560,6 +2591,7 @@ async def save_bookmark(body: dict = None):
     slug = (body.get("slug") or body.get("id") or "").strip()
     if not slug:
         return err("Slug wajib diisi", 400)
+    _ANIME_FAILOVER_CACHE.pop(slug, None)
     await add_bookmark(
         slug=slug,
         title=body.get("title", ""),
@@ -2573,11 +2605,14 @@ async def save_bookmark(body: dict = None):
 
 @app.delete("/api/bookmarks/{slug}")
 async def delete_one_bookmark(slug: str):
-    await remove_bookmark(slug)
+    slug_clean = (slug or "").strip()
+    _ANIME_FAILOVER_CACHE.pop(slug_clean, None)
+    await remove_bookmark(slug_clean)
     return ok(True)
 
 @app.delete("/api/bookmarks")
 async def del_all_bookmarks():
+    _ANIME_FAILOVER_CACHE.clear()
     await clear_bookmarks()
     return ok(True)
 

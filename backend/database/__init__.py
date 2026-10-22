@@ -43,6 +43,14 @@ async def init_db():
             await db.execute("ALTER TABLE episode_cache ADD COLUMN outro TEXT DEFAULT '{}'")
         except Exception:
             pass
+        try:
+            # Sanitasi entri cache basi/cacat di mode sub tanpa softsub yang valid
+            await db.execute("""DELETE FROM episode_cache 
+                WHERE mode = 'sub' 
+                  AND (sub IS NULL OR sub = '' OR (sub NOT LIKE 'http%' AND sub NOT LIKE '/%')) 
+                  AND (subtitles IS NULL OR subtitles = '[]' OR subtitles = '')""")
+        except Exception:
+            pass
         await db.execute("""CREATE TABLE IF NOT EXISTS watch_history(
             id INTEGER PRIMARY KEY AUTOINCREMENT, slug TEXT, title TEXT,
             episode INTEGER, mode TEXT DEFAULT 'sub', progress INTEGER DEFAULT 0,
@@ -193,6 +201,20 @@ async def set_episode_cache(slug, ep, mode, master, variants, sub, sub_lang, ref
              referer or "", server or "", subs_json, intro_json, outro_json, _now()))
         await db.commit()
 
+async def clear_episode_cache_for_slug(slug: str) -> int:
+    """Hapus seluruh entri di episode_cache yang berkaitan dengan slug tersebut."""
+    if not slug:
+        return 0
+    clean = slug.strip()
+    async with _connect_db() as db:
+        cur = await db.execute("DELETE FROM episode_cache WHERE slug = ? OR slug LIKE ? OR slug LIKE ?",
+                              (clean, f"{clean}:%", f"%:{clean}"))
+        await db.commit()
+        return cur.rowcount
+
+get_cached_episode = get_episode_cache
+cache_episode = set_episode_cache
+
 async def add_history(slug, title, episode, mode="sub", progress=0, poster="", type=""):
     async with _connect_db() as db:
         if not poster and slug:
@@ -287,21 +309,29 @@ async def clear_progress(slug: str, episode: int = None):
         await db.commit()
 
 async def add_bookmark(slug: str, title: str, poster: str = "", type: str = "", sub: str = "", eps: str = "", score: float = 0.0):
-    """Tambah atau update bookmark favorit anime."""
+    """Tambah atau update bookmark favorit anime.
+    Otomatis membersihkan episode_cache yang berpotensi cacat untuk slug tersebut.
+    """
     if not slug:
         return
+    clean = slug.strip()
     async with _connect_db() as db:
         await db.execute("""INSERT OR REPLACE INTO bookmarks(slug, title, poster, type, sub, eps, score, created_at)
             VALUES(?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)""",
-            (slug, title, poster or "", type or "", sub or "", eps or "", float(score or 0.0)))
+            (clean, title, poster or "", type or "", sub or "", eps or "", float(score or 0.0)))
+        await db.execute("DELETE FROM episode_cache WHERE slug = ? OR slug LIKE ? OR slug LIKE ?",
+                         (clean, f"{clean}:%", f"%:{clean}"))
         await db.commit()
 
 async def remove_bookmark(slug: str):
-    """Hapus bookmark berdasarkan slug."""
+    """Hapus bookmark berdasarkan slug dan bersihkan episode_cache terkait."""
     if not slug:
         return
+    clean = slug.strip()
     async with _connect_db() as db:
-        await db.execute("DELETE FROM bookmarks WHERE slug=?", (slug,))
+        await db.execute("DELETE FROM bookmarks WHERE slug=?", (clean,))
+        await db.execute("DELETE FROM episode_cache WHERE slug = ? OR slug LIKE ? OR slug LIKE ?",
+                         (clean, f"{clean}:%", f"%:{clean}"))
         await db.commit()
 
 async def get_bookmarks(limit: int = 200):

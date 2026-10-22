@@ -115,3 +115,58 @@ def test_api_sub_custom_empty_error():
     data = resp.json()
     assert data["success"] is False
     assert "kosong" in data["error"].lower()
+
+
+@pytest.mark.asyncio
+async def test_episode_resolve_bypass_negative_and_refresh():
+    """Uji bypass cache beracun (tanpa subtitle di mode sub), endpoint /api/episode alias, dan parameter refresh=True."""
+    from database import set_episode_cache, get_episode_cache, init_db
+
+    await init_db()
+    test_slug = "test-negative-sub-slug"
+
+    # 1. Simpan entri cache beracun dengan subtitles: [] dan sub: "28" (bentrokan metadata bookmark)
+    await set_episode_cache(
+        slug=test_slug,
+        ep=1,
+        mode="sub",
+        master="https://cdn.example.com/stream.m3u8",
+        variants=[],
+        sub="28",
+        sub_lang="",
+        referer="",
+        server="test",
+        subtitles=[]
+    )
+    # Pastikan tersimpan di DB
+    cached = await get_episode_cache(test_slug, 1, "sub")
+    assert cached is not None
+    assert cached["sub"] == "28"
+
+    # 2. Panggil GET /api/episode (alias resolver). Resolver harus mendeteksi cache beracun tersebut,
+    # menghapusnya dari episode_cache, dan bypass ke live scraper (yang akan mengembalikan response)
+    resp = client.get(f"/api/episode?slug={test_slug}&ep=1&mode=sub")
+    assert resp.status_code == 200
+    # Cache beracun di DB wajib sudah dihapus
+    cleaned = await get_episode_cache(test_slug, 1, "sub")
+    # Jika scraper gagal karena mock/network, cleaned bernilai None (karena negative caching dicegah)
+    if cleaned is not None:
+        # Jika tersimpan, pastikan memiliki subtitle valid
+        assert cleaned["sub"] != "28"
+
+    # 3. Uji parameter refresh=True / refresh=1 pada /api/stream/resolve
+    await set_episode_cache(
+        slug=test_slug,
+        ep=2,
+        mode="sub",
+        master="https://cdn.example.com/stream2.m3u8",
+        variants=[],
+        sub="https://cdn.example.com/sub2.vtt",
+        sub_lang="en",
+        referer="",
+        server="test",
+        subtitles=[{"url": "https://cdn.example.com/sub2.vtt", "lang": "en"}]
+    )
+    assert await get_episode_cache(test_slug, 2, "sub") is not None
+    resp_refresh = client.get(f"/api/stream/resolve?slug={test_slug}&ep=2&mode=sub&refresh=1")
+    assert resp_refresh.status_code == 200

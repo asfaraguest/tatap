@@ -235,6 +235,7 @@ public class PlayerActivity extends Activity {
     private String activeEngine = "gtx"; // "gtx" | "gtx+" | "aigtx" | "ai" | "raw"
     private boolean subEnabled = true;
     private String activeStreamMode = "sub"; // "sub" | "dub"
+    private String requestMode = "sub";
     private String customSubtitleName = "";
     private String customSubtitleUrl = "";
     private static final int REQUEST_CODE_PICK_SUBTITLE = 8769;
@@ -434,6 +435,8 @@ public class PlayerActivity extends Activity {
         setContentView(R.layout.activity_player);
 
         slug = getIntent().getStringExtra("slug");
+        String passedMode = getIntent().getStringExtra("mode");
+        requestMode = (passedMode != null && !passedMode.isEmpty() && "dub".equalsIgnoreCase(passedMode)) ? "dub" : "sub";
         ep = getIntent().getIntExtra("ep", 1);
         title = getIntent().getStringExtra("title");
         ArrayList<Integer> passedList = getIntent().getIntegerArrayListExtra("episode_list");
@@ -2280,9 +2283,10 @@ public class PlayerActivity extends Activity {
                 SharedPreferences sp = getSharedPreferences("tatap_player_prefs", Context.MODE_PRIVATE);
                 activeQuality = sp.getString("pref_quality", "best");
 
-                String u = "http://127.0.0.1:8767/api/stream/resolve?slug=" + URLEncoder.encode(slug != null ? slug : "", "UTF-8")
-                        + "&ep=" + ep + "&mode=sub&q=" + URLEncoder.encode(activeQuality != null ? activeQuality : "best", "UTF-8")
-                        + (forceRefresh ? "&force=true" : "");
+                String effectiveMode = (requestMode != null && !requestMode.isEmpty()) ? requestMode : "sub";
+                String u = "http://127.0.0.1:8767/api/episode?slug=" + URLEncoder.encode(slug != null ? slug : "", "UTF-8")
+                        + "&ep=" + ep + "&mode=" + URLEncoder.encode(effectiveMode, "UTF-8") + "&q=" + URLEncoder.encode(activeQuality != null ? activeQuality : "best", "UTF-8")
+                        + (forceRefresh ? "&refresh=1&force=true" : "");
                 HttpURLConnection conn = (HttpURLConnection) new URL(u).openConnection();
                 conn.setConnectTimeout(15000);
                 conn.setReadTimeout(45000);
@@ -2341,6 +2345,21 @@ public class PlayerActivity extends Activity {
 
                     // Simpan subtitle tracks yang tersedia
                     JSONArray subArr = data.optJSONArray("subtitles");
+                    String singleSub = data.optString("sub", "");
+                    boolean hasValidSubs = (subArr != null && subArr.length() > 0)
+                            || (!singleSub.isEmpty() && (singleSub.startsWith("http://") || singleSub.startsWith("https://") || singleSub.startsWith("/")));
+
+                    // Jika mode adalah "sub" namun subtitle kosong dan belum di-refresh,
+                    // lakukan sekali retry otomatis ke resolver dengan refresh=1 sebelum memasang MediaItem / SubtitleConfiguration
+                    if ("sub".equalsIgnoreCase(effectiveMode) && !hasValidSubs && !forceRefresh) {
+                        runOnUiThread(() -> {
+                            if (resolveId == currentResolveLoadId) {
+                                resolveAndPlayStream(resolveId, true);
+                            }
+                        });
+                        return;
+                    }
+
                     subtitleTracks.clear();
                     String foundEnSub = "";
                     String foundExactEnSub = "";

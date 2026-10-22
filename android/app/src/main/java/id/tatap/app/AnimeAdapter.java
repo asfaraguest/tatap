@@ -213,7 +213,16 @@ public class AnimeAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
         holder.itemView.setOnClickListener(v -> {
             HapticHelper.performClick(v);
             Intent intent = new Intent(context, DetailActivity.class);
-            intent.putExtra("slug", slug);
+            String itemSlug = slug;
+            if (itemSlug == null || itemSlug.isEmpty()) {
+                itemSlug = item.optString("id", "");
+            }
+            String rawMode = item.optString("mode", "sub");
+            if (!"dub".equalsIgnoreCase(rawMode)) {
+                rawMode = "sub";
+            }
+            intent.putExtra("slug", itemSlug);
+            intent.putExtra("mode", rawMode);
             intent.putExtra("title", title);
             intent.putExtra("poster", poster);
             intent.putExtra("type", type);

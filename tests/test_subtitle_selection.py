@@ -127,3 +127,23 @@ def test_normalize_subtitles_avoid_arabic_as_default():
     def_track = next(t for t in normalized if t.get("default"))
     assert def_track["label"] == "French"
     assert def_track["lang"] == "fr"
+
+
+def test_has_valid_subtitles_validator():
+    """Memastikan _has_valid_subtitles mendeteksi subtitle cacat/angka (seperti bookmark '28') dan mengenali URL valid."""
+    from main import _has_valid_subtitles
+
+    # Kasus invalid / poisoned:
+    assert _has_valid_subtitles({}) is False
+    assert _has_valid_subtitles({"subtitles": []}) is False
+    assert _has_valid_subtitles({"subtitles": [], "sub": ""}) is False
+    assert _has_valid_subtitles({"subtitles": [], "sub": "28"}) is False # Bentrokan jumlah episode bookmark
+    assert _has_valid_subtitles({"subtitles": [{"url": ""}], "sub": None}) is False
+    assert _has_valid_subtitles({"subtitles": None, "sub": "12/24"}) is False
+
+    # Kasus valid:
+    assert _has_valid_subtitles({"subtitles": [{"url": "https://cdn.example.com/sub.vtt", "lang": "en"}]}) is True
+    assert _has_valid_subtitles({"subtitles": [{"url": "http://127.0.0.1:8767/api/player/sub"}]}) is True
+    assert _has_valid_subtitles({"subtitles": [{"url": "/api/player/sub?url=abc"}]}) is True
+    assert _has_valid_subtitles({"sub": "https://cdn.example.com/ep1.vtt"}) is True
+    assert _has_valid_subtitles({"sub": "/api/player/sub?url=xyz"}) is True

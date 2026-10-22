@@ -422,12 +422,12 @@ var Tui = (function () {
               if(e.key==="Enter"||e.key===" "){
                 e.preventDefault();
                 if(typeof App==="undefined"){log("App belum siap, coba lagi","err");return;}
-                App.openTitle(a.id,a.title,a.poster,a.type,a.eps_counter,a);
+                App.openTitle(a.id||a.slug,a.title,a.poster,a.type,a.eps_counter,a);
               }
             });
             d.addEventListener("click",function(){
               if(typeof App==="undefined"){log("App belum siap, coba lagi","err");return;}
-              App.openTitle(a.id,a.title,a.poster,a.type,a.eps_counter,a);
+              App.openTitle(a.id||a.slug,a.title,a.poster,a.type,a.eps_counter,a);
             });
             frag.appendChild(d);
           } else {
@@ -498,12 +498,12 @@ var Tui = (function () {
               if(e.key==="Enter"||e.key===" "){
                 e.preventDefault();
                 if(typeof App==="undefined"){log("App belum siap, coba lagi","err");return;}
-                App.openTitle(a.id,a.title,a.poster,a.type,a.eps_counter,a);
+                App.openTitle(a.id||a.slug,a.title,a.poster,a.type,a.eps_counter,a);
               }
             });
             d2.addEventListener("click",function(){
               if(typeof App==="undefined"){log("App belum siap, coba lagi","err");return;}
-              App.openTitle(a.id,a.title,a.poster,a.type,a.eps_counter,a);
+              App.openTitle(a.id||a.slug,a.title,a.poster,a.type,a.eps_counter,a);
             });
             frag.appendChild(d2);
           }
@@ -524,7 +524,7 @@ var Tui = (function () {
             grid.appendChild(h);
             return;
           }
-          if(S.view==="riwayat"){
+          if(S.view==="riwayat" || S.view==="favorit"){
             if(!a.id) a.id = a.slug;
             if(!a.badge && a.episode) a.badge = String(a.episode);
           }
@@ -540,7 +540,7 @@ var Tui = (function () {
             if(e.key==="Enter"||e.key===" "){
               e.preventDefault();
               if(!isUnavail){
-                App.openTitle(a.id,a.title,a.poster,a.type,a.eps_counter,a);
+                App.openTitle(a.id||a.slug,a.title,a.poster,a.type,a.eps_counter,a);
               }
             }
           });
@@ -648,7 +648,7 @@ var Tui = (function () {
           d.appendChild(body);
 
           if(!isUnavail){
-            d.addEventListener("click",function(){App.openTitle(a.id,a.title,a.poster,a.type,a.eps_counter,a);});
+            d.addEventListener("click",function(){App.openTitle(a.id||a.slug,a.title,a.poster,a.type,a.eps_counter,a);});
           }
           grid.appendChild(d);
         })(S.items[j],j);
@@ -796,8 +796,9 @@ var Tui = (function () {
     if(!S.items.length||S.sel<0)return;
     var a=S.items[S.sel];
     if(!a||a.is_header)return;
-    if(!a.id){log("judul ini belum tersedia di hianime","err");return;}
-    App.openTitle(a.id,a.title,a.poster,a.type,a.eps_counter,a);
+    var targetId = a.id || a.slug;
+    if(!targetId){log("judul ini belum tersedia di hianime","err");return;}
+    App.openTitle(targetId,a.title,a.poster,a.type,a.eps_counter,a);
   }
 
   function startSearch(q){

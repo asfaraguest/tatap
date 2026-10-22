@@ -53,6 +53,7 @@ public class DetailActivity extends Activity {
     private String status;
     private String source;
     private String genresStr;
+    private String mode = "sub";
     private double score = 0.0;
 
     private TextView tvTitle, tvTitleFull, tvSlug, tvTypeBadge;
@@ -100,6 +101,8 @@ public class DetailActivity extends Activity {
         setContentView(R.layout.activity_detail);
 
         slug = getIntent().getStringExtra("slug");
+        String passedMode = getIntent().getStringExtra("mode");
+        mode = (passedMode != null && !passedMode.isEmpty() && "dub".equalsIgnoreCase(passedMode)) ? "dub" : "sub";
         title = getIntent().getStringExtra("title");
         poster = getIntent().getStringExtra("poster");
         type = getIntent().getStringExtra("type");
@@ -290,6 +293,7 @@ public class DetailActivity extends Activity {
         Intent intent = new Intent(DetailActivity.this, PlayerActivity.class);
         intent.putExtra("slug", slug);
         intent.putExtra("ep", ep);
+        intent.putExtra("mode", mode != null ? mode : "sub");
         intent.putExtra("title", title);
         intent.putExtra("poster", poster);
         intent.putExtra("type", type);
