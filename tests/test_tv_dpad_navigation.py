@@ -137,3 +137,32 @@ def test_tv_sidebar_bottom_controls_dpad_chain():
     assert 'android:id="@+id/btn_status_power"' in content
     assert 'android:nextFocusUp="@+id/btn_tab_genre"' in content
     assert 'android:id="@+id/btn_toggle_menu"' in content
+
+
+def test_tv_catalog_pagination_dpad_navigation_and_isolation():
+    """Memastikan navigasi D-Pad ke kontrol pagination (btnNextPage & btnPrevPage) pada katalog Android TV terintersepsi rapi dan 100% terisolasi."""
+    activity_java = MAIN_ACTIVITY.read_text(encoding="utf-8")
+
+    # 1. DPAD_DOWN dari kartu terbawah di rvGrid menuju pagination
+    assert "keyCode == KeyEvent.KEYCODE_DPAD_DOWN && TvFocusHelper.isTv(this)" in activity_java
+    assert "FocusFinder.getInstance().findNextFocus(rvGrid, focused, View.FOCUS_DOWN)" in activity_java
+    assert "btnNextPage.requestFocus()" in activity_java
+    assert "btnPrevPage.requestFocus()" in activity_java
+
+    # 2. DPAD_RIGHT dari kartu paling terakhir menuju btnNextPage
+    assert "keyCode == KeyEvent.KEYCODE_DPAD_RIGHT && TvFocusHelper.isTv(this)" in activity_java
+    assert "pos == adapter.getItemCount() - 1" in activity_java
+
+    # 3. DPAD_UP dari pagination kembali ke baris terbawah rvGrid (tanpa jump reset ke pos 0)
+    assert "keyCode == KeyEvent.KEYCODE_DPAD_UP && TvFocusHelper.isTv(this)" in activity_java
+    assert "glm.findLastVisibleItemPosition()" in activity_java
+
+    # 4. DPAD_LEFT dari pagination kembali ke active tab sidebar
+    assert "keyCode == KeyEvent.KEYCODE_DPAD_LEFT && TvFocusHelper.isTv(this)" in activity_java
+    assert "activeTab.requestFocus()" in activity_java
+
+    # 5. Dynamic setFocusable synchronization strictly isolated on TV
+    assert "if (TvFocusHelper.isTv(MainActivity.this))" in activity_java
+    assert "btnNextPage.setFocusable(canNext);" in activity_java
+    assert "btnPrevPage.setFocusable(currentPage > 1);" in activity_java
+

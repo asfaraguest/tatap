@@ -66,6 +66,16 @@ def _host_from(url):
 
 
 _BLOCKED_DPI_HOSTS = {"hls.dramahot.top", "drama1.cfd", "hls1.drama1.cfd", "puterin.biz", "putarin.xyz", "stream121.space"}
+_BLOCKED_DPI_KEYWORDS = ("dramahot", "drama1", "zokoanime", "puterin", "putarin", "stream121")
+
+
+def _is_dpi_blocked_host(host: str) -> bool:
+    if not host:
+        return False
+    h = host.lower()
+    if h in _BLOCKED_DPI_HOSTS:
+        return True
+    return any(k in h for k in _BLOCKED_DPI_KEYWORDS)
 
 
 def _probe_master(master_url, referer):
@@ -81,7 +91,7 @@ def _probe_master(master_url, referer):
                **({"Referer": referer} if referer else {})}
     
     # Jika host terdeteksi diblokir DPI ISP, gunakan TLS desync langsung
-    if host in _BLOCKED_DPI_HOSTS:
+    if _is_dpi_blocked_host(host):
         try:
             from api.desync import tls_desync_request
             content = tls_desync_request(master_url, headers=headers, timeout=8.0)
@@ -1002,7 +1012,7 @@ def _fetch_media(url: str, referer: str = None, timeout: int = 10) -> str:
     - Host terblokir ISP: bypass via TLS desync tanpa VPN."""
     host = _host_from(url)
     headers = {"User-Agent": HI_UA, **({"Referer": referer} if referer else {})}
-    if host in _BLOCKED_DPI_HOSTS:
+    if _is_dpi_blocked_host(host):
         try:
             from api.desync import tls_desync_request
             b = tls_desync_request(url, headers=headers, timeout=timeout)
@@ -1097,7 +1107,7 @@ def _validate_sub_url(sub_url: str, referer: str):
         if any(k in host for k in ("megaplay", "broforgotsave", "stellarfrontier", "megacloud", "akamaized", "rabbitstream")):
             return sub_url
         headers = {"User-Agent": HI_UA, **({"Referer": referer} if referer else {})}
-        if host in _BLOCKED_DPI_HOSTS:
+        if _is_dpi_blocked_host(host):
             from api.desync import tls_desync_request
             b = tls_desync_request(sub_url, headers=headers, timeout=4.0)
             if b and len(b) >= 10:

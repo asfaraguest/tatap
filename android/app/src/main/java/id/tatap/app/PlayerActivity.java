@@ -261,6 +261,8 @@ public class PlayerActivity extends Activity {
     private boolean isHlsMode = false;
     private boolean hasFallbackAttempted = false;
     private boolean hasAutoRetriedStream = false;
+    private int consecutiveRecoveryAttempts = 0;
+    private static final int MAX_RECOVERY_ATTEMPTS = 2;
     private int currentResolveLoadId = 0;
 
     private boolean isHlsStream(String url) {
@@ -1093,6 +1095,9 @@ public class PlayerActivity extends Activity {
                         }
                     }
                 } else if (playbackState == Player.STATE_READY) {
+                    consecutiveRecoveryAttempts = 0;
+                    hasAutoRetriedStream = false;
+                    hasFallbackAttempted = false;
                     if (layoutBuffering != null) {
                         layoutBuffering.setVisibility(View.GONE);
                     }
@@ -1161,16 +1166,10 @@ public class PlayerActivity extends Activity {
 
             @Override
             public void onPlayerError(PlaybackException error) {
-                if (!hasFallbackAttempted && player != null && rawStreamUrl != null && !rawStreamUrl.isEmpty()) {
-                    hasFallbackAttempted = true;
-                    isHlsMode = !isHlsMode;
-                    runOnUiThread(() -> applyCurrentStream());
-                    return;
-                }
-                if (!hasAutoRetriedStream) {
-                    hasAutoRetriedStream = true;
+                if (consecutiveRecoveryAttempts < MAX_RECOVERY_ATTEMPTS) {
+                    consecutiveRecoveryAttempts++;
                     runOnUiThread(() -> {
-                        Toast.makeText(PlayerActivity.this, "Stream terputus upstream, memulihkan tautan...", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(PlayerActivity.this, "Stream terputus upstream, memulihkan tautan (" + consecutiveRecoveryAttempts + "/" + MAX_RECOVERY_ATTEMPTS + ")...", Toast.LENGTH_SHORT).show();
                         resolveAndPlayStream(currentResolveLoadId, true);
                     });
                     return;
@@ -1183,7 +1182,7 @@ public class PlayerActivity extends Activity {
                 if (cause != null && cause.getMessage() != null) {
                     msg += " (" + cause.getMessage() + ")";
                 }
-                Toast.makeText(PlayerActivity.this, "Player error: " + msg, Toast.LENGTH_LONG).show();
+                Toast.makeText(PlayerActivity.this, "Gagal memutar stream setelah pemulihan. Silakan ganti server atau resolusi.", Toast.LENGTH_LONG).show();
             }
         });
 
@@ -2390,8 +2389,11 @@ public class PlayerActivity extends Activity {
 
                     isHlsMode = isHlsStream(masterUrl) || isHlsStream(streamUrl)
                             || (!streamVariants.isEmpty() && isHlsStream(streamVariants.get(0).optString("url", "")));
-                    hasFallbackAttempted = false;
-                    hasAutoRetriedStream = false;
+                    if (!forceRefresh) {
+                        consecutiveRecoveryAttempts = 0;
+                        hasFallbackAttempted = false;
+                        hasAutoRetriedStream = false;
+                    }
 
                     // Simpan subtitle tracks yang tersedia
                     JSONArray subArr = data.optJSONArray("subtitles");
@@ -2571,12 +2573,13 @@ public class PlayerActivity extends Activity {
                             || msg.toLowerCase().contains("time")
                             || msg.toLowerCase().contains("504")
                             || msg.toLowerCase().contains("502");
-                    if (isTimeout && !hasAutoRetriedStream) {
+                    if (isTimeout && consecutiveRecoveryAttempts < MAX_RECOVERY_ATTEMPTS) {
+                        consecutiveRecoveryAttempts++;
                         hasAutoRetriedStream = true;
                         if (layoutBuffering != null) {
                             layoutBuffering.setVisibility(View.VISIBLE);
                             if (tvBufferingText != null) {
-                                tvBufferingText.setText("MENGHUBUNGKAN ULANG...");
+                                tvBufferingText.setText("MENGHUBUNGKAN ULANG (" + consecutiveRecoveryAttempts + "/" + MAX_RECOVERY_ATTEMPTS + ")...");
                                 tvBufferingText.setVisibility(View.VISIBLE);
                             }
                         }
@@ -4607,6 +4610,7 @@ public class PlayerActivity extends Activity {
         subtitleTracks.clear();
         hasFallbackAttempted = false;
         hasAutoRetriedStream = false;
+        consecutiveRecoveryAttempts = 0;
         introStartMs = 0;
         introEndMs = 0;
         outroStartMs = 0;

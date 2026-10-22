@@ -13,6 +13,25 @@ Format versi menggunakan skema `MAJOR.MINOR.PATCH`:
 - **MINOR (x.Y.0):** Penambahan fitur atau kapabilitas baru yang tetap kompatibel ke belakang (*backward-compatible new features*). Digit PATCH direset ke 0.
 - **PATCH (x.y.Z):** Perbaikan bug, peningkatan stabilitas, atau perbaikan internal tanpa penambahan fitur baru (*backward-compatible bug fixes*).
 
+## [2.11.1] - 2026-10-22
+
+### Justifikasi SemVer 2.0.0 (PATCH: 2.11.0 -> 2.11.1)
+Kenaikan digit PATCH diterapkan secara mutlak sesuai kaidah Semantic Versioning 2.0.0 dan Direktif #3 [`AGENTS.md`](AGENTS.md) karena rilis ini berfokus pada perbaikan bug kritis, pemulihan konektivitas streaming CDN, pencegahan infinite recovery looping, serta perbaikan navigasi remote D-Pad pada seluruh katalog Android TV tanpa memperkenalkan modul arsitektur baru atau modifikasi yang merusak kompatibilitas ke belakang (*backward-compatible bug fixes & stability patches*):
+
+1. **Navigasi D-Pad Pagination Android TV 10-Foot UI (`MainActivity.java`):**
+   - Mengintersepsi `KEYCODE_DPAD_DOWN` pada kartu baris terbawah `rvGrid` untuk mengalirkan fokus secara mulus ke tombol `btnNextPage` ("Berikutnya") dan `btnPrevPage` ("Sebelumnya"). Mengatasi masalah *directional beam miss* akibat grid 6-kolom dan floating pagination bar di tengah layar.
+   - Menambahkan navigasi `KEYCODE_DPAD_RIGHT` pada kartu paling terakhir dalam adapter untuk langsung menjangkau `btnNextPage`.
+   - Mengintersepsi `KEYCODE_DPAD_UP` dari tombol pagination agar kembali ke baris terbawah `rvGrid` tanpa mereset posisi scroll ke kartu teratas (posisi 0).
+   - Menghubungkan `KEYCODE_DPAD_LEFT` dari tombol pagination langsung kembali ke sidebar tab aktif (`getActiveTabButton()`).
+   - Sinkronisasi dinamis atribut `isFocusable` tombol `btnNextPage` dan `btnPrevPage` sesuai state aktif, mencegah cursor D-Pad terjebak pada tombol ghost nonaktif di Halaman 1 atau halaman terakhir.
+   - **Isolasi Penuh 100%:** Seluruh perubahan dibungkus dalam pengecekan `TvFocusHelper.isTv(...)`, menjamin nol dampak atau regresi pada Android Mobile dan Web Desktop.
+2. **Resiliensi CDN 403 & Pencegahan Infinite Stream Recovery Loop:**
+   - Menambahkan bypass Cloudflare DoH (`1.1.1.1`) publik pada `is_safe_ssrf_ip()` untuk mengeliminasi false positive anti-SSRF DNS poisoning pada domain MegaPlay/HiAnime.
+   - Mengintegrasikan referer dan origin wildcard/domain matching untuk host CDN baru (`eclipseharbor.space`, `embermeadow.world`, `hls1.drama1.cfd`).
+   - Membatasi batas maksimum percobaan pemulihan stream Android (`MAX_RECOVERY_ATTEMPTS = 2`) di `PlayerActivity.java` untuk memutus infinite loop auto-retry saat CDN downstream mengembalikan HTTP 403 permanen.
+   - Menurunkan TTL `episode_cache` basis data menjadi 2 jam agar URL CDN yang kadaluwarsa tersegarkan secara otomatis.
+   - Menjaga paritas ganda Chaquopy (`android/app/src/main/python/backend/`).
+
 ## [2.11.0] - 2026-10-22
 
 ### Justifikasi SemVer 2.0.0 (MINOR: 2.10.0 -> 2.11.0)

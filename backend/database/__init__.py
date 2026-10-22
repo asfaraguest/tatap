@@ -130,7 +130,7 @@ async def set_search_cache(query: str, payload):
                          (query, json.dumps(payload), _now()))
         await db.commit()
 
-async def get_episode_cache(slug: str, ep: int, mode: str, ttl=12*3600):
+async def get_episode_cache(slug: str, ep: int, mode: str, ttl=2*3600):
     async with _connect_db() as db:
         db.row_factory = aiosqlite.Row
         async with db.execute("SELECT * FROM episode_cache WHERE slug=? AND ep=? AND mode=?",

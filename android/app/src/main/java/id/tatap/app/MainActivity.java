@@ -987,6 +987,11 @@ public class MainActivity extends Activity {
         if (btnTabGenre != null) TvFocusHelper.attachFocusScale(btnTabGenre, 1.06f, 6f);
         TvFocusHelper.attachFocusScale(btnPrevPage, 1.1f, 6f);
         TvFocusHelper.attachFocusScale(btnNextPage, 1.1f, 6f);
+        if (TvFocusHelper.isTv(this)) {
+            btnPrevPage.setEnabled(false);
+            btnPrevPage.setFocusable(false);
+            btnPrevPage.setAlpha(0.4f);
+        }
         TvFocusHelper.attachFocusScale(btnEmptyRetry, 1.08f, 6f);
         TvFocusHelper.attachFocusScale(btnClearFilter, 1.1f, 6f);
         TvFocusHelper.attachFocusScale(btnClearHistoryAll, 1.1f, 6f);
@@ -1038,13 +1043,129 @@ public class MainActivity extends Activity {
                 return true;
             } else if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT && TvFocusHelper.isTv(this)) {
                 View focused = getCurrentFocus();
-                if (focused != null && rvGrid != null && (focused == rvGrid || rvGrid.indexOfChild(focused) >= 0 || focused.getParent() == rvGrid)) {
-                    View foundLeft = FocusFinder.getInstance().findNextFocus(rvGrid, focused, View.FOCUS_LEFT);
-                    if (foundLeft == null) {
+                if (focused != null) {
+                    if (rvGrid != null && isViewDescendantOf(focused, rvGrid)) {
+                        View foundLeft = FocusFinder.getInstance().findNextFocus(rvGrid, focused, View.FOCUS_LEFT);
+                        if (foundLeft == null) {
+                            TextView activeTab = getActiveTabButton();
+                            if (activeTab != null) {
+                                activeTab.requestFocus();
+                                return true;
+                            }
+                        }
+                    } else if (focused == btnNextPage) {
+                        if (btnPrevPage != null && btnPrevPage.isEnabled() && btnPrevPage.isFocusable()) {
+                            btnPrevPage.requestFocus();
+                            return true;
+                        } else {
+                            TextView activeTab = getActiveTabButton();
+                            if (activeTab != null) {
+                                activeTab.requestFocus();
+                                return true;
+                            }
+                        }
+                    } else if (focused == btnPrevPage || isViewDescendantOf(focused, layoutPagination)) {
                         TextView activeTab = getActiveTabButton();
                         if (activeTab != null) {
                             activeTab.requestFocus();
                             return true;
+                        }
+                    }
+                }
+            } else if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT && TvFocusHelper.isTv(this)) {
+                View focused = getCurrentFocus();
+                if (focused != null) {
+                    if (focused == btnPrevPage) {
+                        if (btnNextPage != null && btnNextPage.isEnabled() && btnNextPage.isFocusable()) {
+                            btnNextPage.requestFocus();
+                            return true;
+                        }
+                    } else if (rvGrid != null && isViewDescendantOf(focused, rvGrid)) {
+                        View foundRight = FocusFinder.getInstance().findNextFocus(rvGrid, focused, View.FOCUS_RIGHT);
+                        if (foundRight == null) {
+                            View itemRoot = rvGrid.findContainingItemView(focused);
+                            int pos = (itemRoot != null) ? rvGrid.getChildAdapterPosition(itemRoot) : -1;
+                            if (pos >= 0 && adapter != null && pos == adapter.getItemCount() - 1) {
+                                if (layoutPagination != null && layoutPagination.getVisibility() == View.VISIBLE) {
+                                    if (btnNextPage != null && btnNextPage.isEnabled() && btnNextPage.isFocusable()) {
+                                        btnNextPage.requestFocus();
+                                        return true;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            } else if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN && TvFocusHelper.isTv(this)) {
+                View focused = getCurrentFocus();
+                if (focused != null && rvGrid != null && isViewDescendantOf(focused, rvGrid)) {
+                    View foundDown = FocusFinder.getInstance().findNextFocus(rvGrid, focused, View.FOCUS_DOWN);
+                    if (foundDown == null) {
+                        if (layoutPagination != null && layoutPagination.getVisibility() == View.VISIBLE) {
+                            View itemRoot = rvGrid.findContainingItemView(focused);
+                            int pos = (itemRoot != null) ? rvGrid.getChildAdapterPosition(itemRoot) : -1;
+                            int spanIndex = 0;
+                            int spanCount = 1;
+                            if (rvGrid.getLayoutManager() instanceof GridLayoutManager) {
+                                GridLayoutManager glm = (GridLayoutManager) rvGrid.getLayoutManager();
+                                spanCount = glm.getSpanCount();
+                                if (pos >= 0) {
+                                    spanIndex = glm.getSpanSizeLookup().getSpanIndex(pos, spanCount);
+                                }
+                            }
+                            boolean nextEnabled = (btnNextPage != null && btnNextPage.isEnabled() && btnNextPage.isFocusable());
+                            boolean prevEnabled = (btnPrevPage != null && btnPrevPage.isEnabled() && btnPrevPage.isFocusable());
+
+                            View target = null;
+                            if (spanIndex < spanCount / 2) {
+                                if (prevEnabled) {
+                                    target = btnPrevPage;
+                                } else if (nextEnabled) {
+                                    target = btnNextPage;
+                                }
+                            } else {
+                                if (nextEnabled) {
+                                    target = btnNextPage;
+                                } else if (prevEnabled) {
+                                    target = btnPrevPage;
+                                }
+                            }
+
+                            if (target != null) {
+                                target.requestFocus();
+                                return true;
+                            }
+                        }
+                    }
+                }
+            } else if (keyCode == KeyEvent.KEYCODE_DPAD_UP && TvFocusHelper.isTv(this)) {
+                View focused = getCurrentFocus();
+                if (focused != null && (focused == btnNextPage || focused == btnPrevPage || isViewDescendantOf(focused, layoutPagination))) {
+                    if (rvGrid != null && rvGrid.getVisibility() == View.VISIBLE && rvGrid.getLayoutManager() instanceof GridLayoutManager) {
+                        GridLayoutManager glm = (GridLayoutManager) rvGrid.getLayoutManager();
+                        int lastPos = glm.findLastVisibleItemPosition();
+                        if (lastPos != RecyclerView.NO_POSITION && adapter != null && lastPos < adapter.getItemCount()) {
+                            int targetPos = lastPos;
+                            if (focused == btnPrevPage) {
+                                int spanCount = glm.getSpanCount();
+                                int spanIndex = glm.getSpanSizeLookup().getSpanIndex(lastPos, spanCount);
+                                targetPos = Math.max(0, lastPos - spanIndex);
+                            }
+                            RecyclerView.ViewHolder vh = rvGrid.findViewHolderForAdapterPosition(targetPos);
+                            if (vh != null && vh.itemView != null) {
+                                vh.itemView.requestFocus();
+                                return true;
+                            } else {
+                                rvGrid.scrollToPosition(targetPos);
+                                final int fTarget = targetPos;
+                                rvGrid.post(() -> {
+                                    RecyclerView.ViewHolder delayedVh = rvGrid.findViewHolderForAdapterPosition(fTarget);
+                                    if (delayedVh != null && delayedVh.itemView != null) {
+                                        delayedVh.itemView.requestFocus();
+                                    }
+                                });
+                                return true;
+                            }
                         }
                     }
                 }
@@ -2686,6 +2807,9 @@ public class MainActivity extends Activity {
         }
         btnPrevPage.setEnabled(currentPage > 1);
         btnPrevPage.setAlpha(currentPage > 1 ? 1.0f : 0.4f);
+        if (TvFocusHelper.isTv(this)) {
+            btnPrevPage.setFocusable(currentPage > 1);
+        }
 
         String title;
         String endpoint;
@@ -2913,10 +3037,16 @@ public class MainActivity extends Activity {
             }
             btnNextPage.setEnabled(canNext);
             btnNextPage.setAlpha(canNext ? 1.0f : 0.4f);
+            if (TvFocusHelper.isTv(MainActivity.this)) {
+                btnNextPage.setFocusable(canNext);
+            }
         }
         if (btnPrevPage != null) {
             btnPrevPage.setEnabled(currentPage > 1);
             btnPrevPage.setAlpha(currentPage > 1 ? 1.0f : 0.4f);
+            if (TvFocusHelper.isTv(MainActivity.this)) {
+                btnPrevPage.setFocusable(currentPage > 1);
+            }
         }
         if (tvPageIndicator != null) {
             if (totalPages > 1) {

@@ -1846,6 +1846,19 @@ def _validate_external_proxy_url(url: str) -> None:
             ip_str = sockaddr[0]
             ip = _ipa.ip_address(ip_str)
             if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_multicast or ip.is_reserved or ip.is_unspecified:
+                # ISP DNS Poisoning bypass:
+                # Bila DNS ISP lokal meresolusi domain publik ke IP sinkhole privat (10.x / 127.x / 0.0.0.0),
+                # verifikasi ulang menggunakan DoH publik (_resolve_host).
+                # Jika DoH meresolusi ke IP publik asli, izinkan (bukan serangan SSRF lokal).
+                try:
+                    from api.desync import _resolve_host
+                    real_ip = _resolve_host(hostname)
+                    if real_ip and real_ip != hostname:
+                        rip = _ipa.ip_address(real_ip)
+                        if not (rip.is_private or rip.is_loopback or rip.is_link_local or rip.is_multicast or rip.is_reserved or rip.is_unspecified):
+                            continue
+                except Exception:
+                    pass
                 raise HTTPException(status_code=403, detail=f"Resolusi domain mengarah ke IP privat/lokal ({ip_str})")
     except (_sock.gaierror, _sock.herror):
         pass
@@ -1897,21 +1910,22 @@ async def proxy_video(url: str = Query(""), referer: str = Query("")):
     media_type = "application/vnd.apple.mpegurl" if is_m3u8 else "video/mp2t"
 
     if not referer:
-        if any(h in url for h in ("dramahot.top", "drama1.cfd", "zokoanime")):
+        u_low = url.lower()
+        if any(h in u_low for h in ("dramahot", "drama1", "zokoanime")):
             referer = "https://zokoanime.video/"
-        elif any(h in url for h in ("megacloud", "rapid-cloud")):
-            referer = "https://megacloud.blog/"
-        elif any(h in url for h in ("puterin.biz", "putarin.xyz", "stream121.space")):
+        elif any(h in u_low for h in ("puterin", "putarin", "stream121")):
             referer = "https://puterin.biz/"
-        elif any(h in url for h in ("phantomharbor", "nexabloom", "silverorbit", "megaplay", "vidtube", "vidplay", "shiora.top", "imgnex.top", "hiddenvertex", "broforgotsave")):
-            referer = "https://megaplay.buzz/"
-        elif any(h in url for h in ("anichan.to", "toroplay.cymru")):
+        elif any(h in u_low for h in ("anichan", "toroplay")):
             referer = "https://anichan.to/"
+        elif any(h in u_low for h in ("phantomharbor", "nexabloom", "silverorbit", "megaplay", "vidtube", "vidplay",
+                                      "shiora", "imgnex", "hiddenvertex", "broforgotsave", "eclipseharbor",
+                                      "embermeadow", "megacloud", "rapid-cloud", "rabbitstream", "dokicloud")) or "/anime/" in u_low:
+            referer = "https://megaplay.buzz/"
 
     # Jika host terdeteksi diblokir DPI ISP, gunakan TLS desync murni (aman dari Sangfor)
-    from api.hianime import _host_from, _BLOCKED_DPI_HOSTS
+    from api.hianime import _host_from, _is_dpi_blocked_host
     host = _host_from(url)
-    if host in _BLOCKED_DPI_HOSTS:
+    if _is_dpi_blocked_host(host):
         return _SR(_pipe_desync_video(url, referer), media_type=media_type,
                    headers={"Access-Control-Allow-Origin": "*"})
 
@@ -1958,8 +1972,18 @@ async def _pipe_desync_video(url: str, referer: str):
     """Streaming video via TLS Client Hello Desynchronization (Direct TCP 443 tanpa VPN)."""
     from api.desync import tls_desync_request, tls_desync_stream
     import asyncio
+    import re as _re
     
-    headers = {"Referer": referer} if referer else {}
+    headers = {
+        "User-Agent": HI_UA,
+        "Accept": "*/*",
+        "Accept-Language": "en-US,en;q=0.9,id;q=0.8",
+    }
+    if referer:
+        headers["Referer"] = referer
+        orig = _re.sub(r"^(https?://[^/]+).*", r"\1", referer)
+        if orig:
+            headers["Origin"] = orig
     loop = asyncio.get_running_loop()
     
     # Playlist m3u8: baca penuh dan rewrite URL agar segmen tetap lewat proxy Tatap
@@ -2003,17 +2027,30 @@ def _get_video_client(url: str):
 async def _pipe_video(url: str, referer: str):
     import urllib.parse as _up
     import asyncio as _asyncio
+    import re as _re
     from api.hianime import STRIP_BYTES as _SB, STRIP_RE as _SR2
     c = _get_video_client(url)
 
-    headers = {"User-Agent": HI_UA}
+    headers = {
+        "User-Agent": HI_UA,
+        "Accept": "*/*",
+        "Accept-Language": "en-US,en;q=0.9,id;q=0.8",
+    }
     if referer:
         headers["Referer"] = referer
+        orig = _re.sub(r"^(https?://[^/]+).*", r"\1", referer)
+        if orig:
+            headers["Origin"] = orig
 
     for attempt in range(2):
         try:
             async with c.stream("GET", url, headers=headers) as r:
                 if r.status_code >= 400:
+                    if r.status_code in (401, 403) and attempt == 0:
+                        await _asyncio.sleep(0.2)
+                        from api.hianime import _host_from, _BLOCKED_DPI_HOSTS
+                        _BLOCKED_DPI_HOSTS.add(_host_from(url))
+                        continue
                     raise HTTPException(status_code=502, detail=f"upstream {r.status_code}")
                 ctype = r.headers.get("content-type", "")
                 is_playlist = _is_m3u8_url(url, ctype)
@@ -2040,8 +2077,19 @@ async def _pipe_video(url: str, referer: str):
                     if chunk:
                         yield chunk
                 return
-        except HTTPException:
-            raise
+        except HTTPException as he:
+            if attempt == 0 and ("403" in str(he.detail) or "502" in str(he.detail)):
+                await _asyncio.sleep(0.2)
+                continue
+            try:
+                from api.hianime import _host_from, _BLOCKED_DPI_HOSTS
+                host = _host_from(url)
+                _BLOCKED_DPI_HOSTS.add(host)
+                async for chunk in _pipe_desync_video(url, referer):
+                    yield chunk
+                return
+            except Exception:
+                raise he
         except Exception as e:
             if attempt == 0:
                 await _asyncio.sleep(0.3)
@@ -2071,7 +2119,7 @@ async def _fetch_sub_text(target_url, ref):
 
     # Domain-specific smart prioritization (Megaplay CDN butuh origin megaplay)
     t_low = target_url.lower()
-    if any(k in t_low for k in ("toroplay", "anichan", "broforgotsave", "stellarfrontier", "megaplay", "megacloud")):
+    if any(k in t_low for k in ("toroplay", "anichan", "broforgotsave", "stellarfrontier", "megaplay", "megacloud", "eclipseharbor", "embermeadow", "nexabloom")) or "/anime/" in t_low:
         candidates.extend(["https://megaplay.buzz/", "https://anichan.to/", "https://megaplay.top/", "https://megacloud.tv/"])
     if any(k in t_low for k in ("dramahot", "zokoanime")):
         candidates.extend(["https://zokoanime.video/", "https://dramahot.top/"])
