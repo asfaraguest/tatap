@@ -424,13 +424,16 @@ public class MainActivity extends Activity {
                 etSearch.setHint("Cari anime...");
                 layoutSearchBox.setPadding(dpToPx(10), 0, dpToPx(10), 0);
                 etSearch.setPadding(0, 0, 0, 0);
+                etSearch.setCompoundDrawablePadding(dpToPx(6));
                 if (btnClearSearch != null) {
                     btnClearSearch.setVisibility(etSearch.getText().length() > 0 ? View.VISIBLE : View.GONE);
                 }
             } else {
                 etSearch.setHint("");
                 layoutSearchBox.setPadding(0, 0, 0, 0);
-                etSearch.setPadding(dpToPx(12), 0, 0, 0);
+                int searchPad = (dpToPx(48) - dpToPx(15)) / 2;
+                etSearch.setPadding(searchPad, 0, searchPad, 0);
+                etSearch.setCompoundDrawablePadding(0);
                 if (btnClearSearch != null) {
                     btnClearSearch.setVisibility(View.GONE);
                 }
@@ -439,16 +442,19 @@ public class MainActivity extends Activity {
 
         // 3. Navigation Tabs
         TextView[] tvTabs = new TextView[]{btnTabMusim, btnTabAiring, btnTabJadwal, btnTabRiwayat, btnTabFavorit, btnTabKatalog, btnTabGenre};
+        int tabPad = (dpToPx(48) - dpToPx(15)) / 2;
         for (TextView tab : tvTabs) {
             if (tab == null) continue;
             if (expand) {
                 tab.setText(getTabTitleString(tab));
                 tab.setGravity(Gravity.CENTER_VERTICAL | Gravity.START);
                 tab.setPadding(dpToPx(10), 0, dpToPx(10), 0);
+                tab.setCompoundDrawablePadding(dpToPx(8));
             } else {
                 tab.setText("");
-                tab.setGravity(Gravity.CENTER);
-                tab.setPadding(0, 0, 0, 0);
+                tab.setGravity(Gravity.CENTER_VERTICAL | Gravity.START);
+                tab.setPadding(tabPad, 0, tabPad, 0);
+                tab.setCompoundDrawablePadding(0);
             }
         }
 
@@ -460,6 +466,7 @@ public class MainActivity extends Activity {
 
                 LinearLayout.LayoutParams lpPower = new LinearLayout.LayoutParams(dpToPx(36), dpToPx(36));
                 btnStatusPower.setLayoutParams(lpPower);
+                btnStatusPower.setPadding(dpToPx(8), dpToPx(8), dpToPx(8), dpToPx(8));
 
                 LinearLayout.LayoutParams lpMenu = new LinearLayout.LayoutParams(0, dpToPx(36), 1.0f);
                 lpMenu.setMarginStart(dpToPx(8));
@@ -467,6 +474,7 @@ public class MainActivity extends Activity {
                 btnToggleMenu.setText("Menu");
                 btnToggleMenu.setGravity(Gravity.CENTER);
                 btnToggleMenu.setPadding(0, 0, 0, 0);
+                btnToggleMenu.setCompoundDrawablePadding(dpToPx(4));
 
                 btnStatusPower.setNextFocusRightId(R.id.btn_toggle_menu);
                 btnStatusPower.setNextFocusDownId(R.id.btn_status_power);
@@ -478,17 +486,20 @@ public class MainActivity extends Activity {
                 layoutTvBottomControls.setOrientation(LinearLayout.VERTICAL);
                 layoutTvBottomControls.setGravity(Gravity.CENTER_HORIZONTAL);
 
-                LinearLayout.LayoutParams lpPower = new LinearLayout.LayoutParams(dpToPx(36), dpToPx(36));
+                LinearLayout.LayoutParams lpPower = new LinearLayout.LayoutParams(dpToPx(38), dpToPx(38));
                 lpPower.gravity = Gravity.CENTER_HORIZONTAL;
                 btnStatusPower.setLayoutParams(lpPower);
+                btnStatusPower.setPadding(dpToPx(9), dpToPx(9), dpToPx(9), dpToPx(9));
 
-                LinearLayout.LayoutParams lpMenu = new LinearLayout.LayoutParams(dpToPx(36), dpToPx(36));
+                LinearLayout.LayoutParams lpMenu = new LinearLayout.LayoutParams(dpToPx(38), dpToPx(38));
                 lpMenu.gravity = Gravity.CENTER_HORIZONTAL;
-                lpMenu.topMargin = dpToPx(6);
+                lpMenu.topMargin = dpToPx(8);
                 btnToggleMenu.setLayoutParams(lpMenu);
                 btnToggleMenu.setText("");
-                btnToggleMenu.setGravity(Gravity.CENTER);
-                btnToggleMenu.setPadding(0, 0, 0, 0);
+                int menuPad = (dpToPx(38) - dpToPx(15)) / 2;
+                btnToggleMenu.setPadding(menuPad, 0, menuPad, 0);
+                btnToggleMenu.setCompoundDrawablePadding(0);
+                btnToggleMenu.setGravity(Gravity.CENTER_VERTICAL | Gravity.START);
 
                 btnStatusPower.setNextFocusDownId(R.id.btn_toggle_menu);
                 btnStatusPower.setNextFocusRightId(R.id.rv_anime_grid);
@@ -2252,8 +2263,10 @@ public class MainActivity extends Activity {
         }
         if (isVerticalSidebar) {
             tab.setText(isTvSidebarExpanded ? getTabTitleString(tab) : "");
-            tab.setGravity(isTvSidebarExpanded ? (Gravity.CENTER_VERTICAL | Gravity.START) : Gravity.CENTER);
-            tab.setPadding(isTvSidebarExpanded ? dpToPx(10) : 0, 0, isTvSidebarExpanded ? dpToPx(10) : 0, 0);
+            tab.setGravity(Gravity.CENTER_VERTICAL | Gravity.START);
+            int tabPad = isTvSidebarExpanded ? dpToPx(10) : (dpToPx(48) - dpToPx(15)) / 2;
+            tab.setPadding(tabPad, 0, tabPad, 0);
+            tab.setCompoundDrawablePadding(isTvSidebarExpanded ? dpToPx(8) : 0);
         }
     }
 

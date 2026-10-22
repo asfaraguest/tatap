@@ -87,3 +87,21 @@ def test_main_activity_autohide_and_expand_methods():
     assert "dpToPx(210)" in content, "Expanded width must be 210dp"
     assert "dpToPx(64)" in content, "Collapsed rail width must be 64dp"
     assert "addOnGlobalFocusChangeListener" in content, "Must use OnGlobalFocusChangeListener for reactive D-Pad focus"
+
+
+def test_tv_sidebar_collapsed_icons_centered():
+    """Memastikan icon pada sidebar TV saat collapsed (rail 64dp) terpusat rapi di midline 24dp."""
+    with open(MAIN_ACTIVITY, "r", encoding="utf-8") as f:
+        content = f.read()
+
+    # Search icon centering in rail
+    assert "int searchPad = (dpToPx(48) - dpToPx(15)) / 2;" in content
+    # Tab icons centering in rail
+    assert "int tabPad = (dpToPx(48) - dpToPx(15)) / 2;" in content
+    # Bottom controls square bounds & centering in rail
+    assert "LinearLayout.LayoutParams lpPower = new LinearLayout.LayoutParams(dpToPx(38), dpToPx(38));" in content
+    assert "LinearLayout.LayoutParams lpMenu = new LinearLayout.LayoutParams(dpToPx(38), dpToPx(38));" in content
+    assert "int menuPad = (dpToPx(38) - dpToPx(15)) / 2;" in content
+    # Tab appearance preservation when collapsed
+    assert "int tabPad = isTvSidebarExpanded ? dpToPx(10) : (dpToPx(48) - dpToPx(15)) / 2;" in content
+

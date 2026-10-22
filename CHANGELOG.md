@@ -66,6 +66,16 @@ Kenaikan digit PATCH diterapkan secara mutlak sesuai kaidah Semantic Versioning 
    - Menjamin modal video player (`#player-modal`) tetap 100% hitam pekat (`#000000 !important`) di semua tema demi pengalaman teatrikal maksimal.
 13. **Automated Regression Suite (`tests/test_web_bottom_bar_and_light_theme.py`):**
    - Menambahkan test suite otomatis yang memverifikasi Mac Wallpaper SVG, CSS variables, ketiadaan batasan 1560px pada bottom bar, ketiadaan duplikasi blok CSS, zero backdrop blur tax, dan integritas pemutar video bioskop.
+14. **Perapian Presisi Ikon Sidebar Android TV Mode Collapsed (Rail 64dp Midline Alignment):**
+   - Mengatasi masalah ikon yang berantakan dan tidak sejajar saat sidebar TV menciut (*collapsed rail 64dp*).
+   - Menyelaraskan seluruh 11 elemen vertikal sidebar ke garis sumbu tengah (*midline*) tepat di `x = 24dp` pada kontainer konten 48dp:
+     - Logo brand "T" (`tv_app_logo`): 24dp.
+     - Ikon pencarian (`etSearch`): padding horizontal `(48dp - 15dp) / 2 = 16.5dp` dan `compoundDrawablePadding(0)`.
+     - 7 Ikon Tab Navigasi (`btn_tab_*`): padding horizontal simetris `(48dp - 15dp) / 2 = 16.5dp` dan `compoundDrawablePadding(0)`.
+     - Tombol status server (`btn_status_power`): dimensi kotak simetris `38dp x 38dp` dengan internal icon padding `9dp`.
+     - Tombol menu (`btn_toggle_menu`): dimensi kotak simetris `38dp x 38dp`, top margin `8dp`, dan padding horizontal `(38dp - 15dp) / 2 = 11.5dp` berpusat di `24dp`.
+   - Mengunci preservasi padding rel pada `setTabAppearance` di `MainActivity.java` sehingga saat tab berganti status (aktif/inaktif) saat sidebar menciut, padding simetris dan pemusatan ikon tetap utuh 100%.
+   - Menambahkan pengujian regresi otomatis `test_tv_sidebar_collapsed_icons_centered` di `tests/test_android_tv_sidebar_autohide.py`.
 
 ## [2.12.0] - 2026-10-22
 
