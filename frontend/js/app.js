@@ -3264,7 +3264,42 @@ App = {
   }
 };
 
+var TatapTheme = (function(){
+  function getTheme(){
+    return localStorage.getItem("tatap_theme") || "dark";
+  }
+  function setTheme(t){
+    var theme = (t === "light") ? "light" : "dark";
+    localStorage.setItem("tatap_theme", theme);
+    document.documentElement.setAttribute("data-theme", theme);
+    document.body.setAttribute("data-theme", theme);
+
+    var isLight = theme === "light";
+    var popIcon = $("pop-theme-icon");
+    if(popIcon) popIcon.innerHTML = '<use href="#icon-' + (isLight ? 'moon' : 'sun') + '"/>';
+    var popLabel = $("pop-theme-label");
+    if(popLabel) popLabel.textContent = isLight ? "Mode Gelap" : "Mode Terang";
+
+    var drawerIcon = $("drawer-theme-icon");
+    if(drawerIcon) drawerIcon.innerHTML = '<use href="#icon-' + (isLight ? 'moon' : 'sun') + '"/>';
+    var drawerLabel = $("drawer-theme-label");
+    if(drawerLabel) drawerLabel.textContent = isLight ? "Mode Gelap" : "Mode Terang";
+    var drawerBadge = $("drawer-theme-badge");
+    if(drawerBadge) drawerBadge.textContent = isLight ? "Terang" : "Gelap";
+
+    var metaTheme = document.querySelector('meta[name="theme-color"]');
+    if(metaTheme) metaTheme.setAttribute("content", isLight ? "#f5f5f7" : "#07080a");
+    return theme;
+  }
+  function toggle(){
+    return setTheme(getTheme() === "light" ? "dark" : "light");
+  }
+  return { get: getTheme, set: setTheme, toggle: toggle };
+})();
+window.TatapTheme = TatapTheme;
+
 function init(){
+  TatapTheme.set(TatapTheme.get());
   loadPrefs();
   try{
     var sz=localStorage.getItem("tatap_subsize");
@@ -3478,6 +3513,12 @@ function init(){
     var b = $("drawer-src-badge");
     if(b) b.textContent = cur.source === "otakudesu" ? "Otakudesu" : "HiAnime";
   });
+  var popTheme = $("pop-toggle-theme");
+  if(popTheme) popTheme.addEventListener("click", function(){
+    closePopover();
+    var t = TatapTheme.toggle();
+    toast(t === "light" ? "Mode Terang Aktif" : "Mode Gelap Aktif", 1200);
+  });
   var popUpdate = $("pop-update");
   if(popUpdate) popUpdate.addEventListener("click", function(){
     closePopover();
@@ -3492,7 +3533,7 @@ function init(){
     if(hb && typeof HELP_TEXT !== "undefined") hb.textContent = HELP_TEXT;
   });
 
-  // Global ⌘K / Ctrl+K spotlight shortcut
+  // Global ⌘K / Ctrl+K spotlight shortcut & ⌘T theme toggle
   window.addEventListener("keydown", function(e){
     if((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k"){
       e.preventDefault();
@@ -3502,6 +3543,10 @@ function init(){
         cmd.focus();
         cmd.select();
       }
+    } else if((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "t"){
+      e.preventDefault();
+      var t = TatapTheme.toggle();
+      toast(t === "light" ? "Mode Terang Aktif" : "Mode Gelap Aktif", 1200);
     } else if(e.key === "Escape"){
       closePopover();
     }
@@ -3587,6 +3632,13 @@ function init(){
     if(ho) ho.classList.remove("hidden");
     var hb = $("help-body");
     if(hb && window.Tui) hb.textContent = window.Tui.cmdUsage();
+  });
+
+  var drawerToggleTheme = $("drawer-toggle-theme");
+  if(drawerToggleTheme) drawerToggleTheme.addEventListener("click", function(){
+    closeDrawer();
+    var t = TatapTheme.toggle();
+    toast(t === "light" ? "Mode Terang Aktif" : "Mode Gelap Aktif", 1200);
   });
 
   var drawerUpd = $("drawer-update");

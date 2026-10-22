@@ -32,6 +32,13 @@ Kenaikan digit PATCH diterapkan secara mutlak sesuai kaidah Semantic Versioning 
 5. **Poles Tampilan Detail Anime (Indikator Nomor Saja):**
    - Menghilangkan badge teks status yang menumpuk pada kartu episode di `DetailActivity.java` dan `item_episode.xml`.
    - Menstandarkan tombol episode menjadi nomor murni terpusat dengan palet status Apple Flat UI (System Blue tinted untuk episode terakhir diputar, muted dark untuk yang sudah ditonton, dan clean elevated surface untuk yang belum).
+6. **Penyempurnaan Web & Desktop UI, Search & Bottom Bar, Ikon Gear, dan Dual Theme (Terang & Gelap):**
+   - **Perbaikan Input Spasi Search Bar:** Menghilangkan *event bubbling* pada `#search-input-wrap` yang memicu `e.preventDefault()`, mengisolasi input `#cmd` via `e.stopPropagation()`, serta melepas atribut statis `readonly` pada HTML.
+   - **Perbaikan Backspace Blur Bug:** Memisahkan penanganan `Escape` dan `Backspace` pada `term.js:onKey(e)` sehingga menekan backspace saat mengetik di kotak pencarian tidak lagi melepas fokus kursor.
+   - **Tombol Clear & Preservasi Kata Kunci:** Menambahkan tombol clear (`✕`) pada search bar untuk menghapus teks secara instan, serta mempertahankan kata kunci pencarian di dalam input saat submit pencarian judul anime.
+   - **Penggantian Ikon Menu Kanan Atas:** Mengganti ikon elipsis 3 titik (`#icon-more-options`) dengan ikon roda gigi (*gear/settings*) bergaya Apple Flat UI dengan animasi rotasi halus 45 derajat saat hover.
+   - **Dual Theme Engine (Apple Light & Obsidian Dark):** Menyediakan sistem pergantian tema 2 mode (Terang & Gelap) dengan persistensi `localStorage`, atribut dinamis `data-theme="light"|"dark"`, pencegahan kedipan (*zero flicker init*), dan integrasi pada Popover menu (`⌘T`), Drawer navigasi, serta perintah terminal (`:tema` / `:theme`).
+   - **Desain Presisi Bottom Bar & Header:** Menyelaraskan gradien warna elegan pada `.tui-head`, `.bottom-bar`, dan `.apple-popover` dengan palet warna teroptimasi untuk mode terang maupun gelap tanpa membebani performa CPU perangkat *low-end* (zero blur tax) dan tanpa merusak kontras panggung pemutar video bioskop.
 
 ## [2.12.0] - 2026-10-22
 

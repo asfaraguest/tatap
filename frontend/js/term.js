@@ -29,7 +29,7 @@ var Tui = (function () {
   function saveCmdHist(h){try{localStorage.setItem("tatap_hist",JSON.stringify(h.slice(0,50)));}catch(e){}}
 
   function cmdUsage(){
-    return "perintah:\n  cari <judul> | :musim | :lanjutan | :favorit | :katalog\n  :terbaru | :season <winter|spring|summer|fall> <tahun>\n  :switch [hianime|otaku] (ganti sumber video HiAnime / Otakudesu)\n  :filter [key=val...] | :filter reset\n  :genre <slug|title> | :genre | :genre --list | :genre reset\n  :update (cek versi rilis terbaru secara on-demand)\n  :apikey <key> | :ollama <key> | :groq <key> | :gemini <key> | :model <nama> | :apiurl <url>\n  :logs | :crt on|off|toggle | :ambient on|off|toggle\n  :riwayat | :favorit | :status | :bantuan | :q";
+    return "perintah:\n  cari <judul> | :musim | :lanjutan | :favorit | :katalog\n  :terbaru | :season <winter|spring|summer|fall> <tahun>\n  :switch [hianime|otaku] (ganti sumber video HiAnime / Otakudesu)\n  :filter [key=val...] | :filter reset\n  :genre <slug|title> | :genre | :genre --list | :genre reset\n  :tema [toggle|terang|gelap] (ganti mode terang / gelap Apple)\n  :update (cek versi rilis terbaru secara on-demand)\n  :apikey <key> | :ollama <key> | :groq <key> | :gemini <key> | :model <nama> | :apiurl <url>\n  :logs | :crt on|off|toggle | :ambient on|off|toggle\n  :riwayat | :favorit | :status | :bantuan | :q";
   }
 
   function applyFilter(){
@@ -1313,27 +1313,49 @@ var Tui = (function () {
           }
         }
         break;
+      case "tema":case "theme":case "mode":
+        if(window.TatapTheme && window.TatapTheme.toggle){
+          var newTh = window.TatapTheme.toggle();
+          log("Tema beralih ke: " + (newTh === "light" ? "Mode Terang (Apple Light)" : "Mode Gelap (Obsidian Dark)"), "ok");
+        }
+        break;
       case "bantuan":case "help":case "?":
         $("help-overlay").classList.remove("hidden");
         $("help-body").textContent=cmdUsage();
         break;
       case "q":case "clear":
-        $("cmd").value="";clearLog();break;
+        $("cmd").value="";updateSearchClearBtn();clearLog();break;
       default:
         if(cmd.indexOf(":")===0){log("perintah tak dikenal: "+cmd+"  (ketik :bantuan)","err");}
         else{startSearch(s);}
     }
   }
 
+  function updateSearchClearBtn(){
+    var btn=$("search-clear-btn");
+    var inp=$("cmd");
+    if(!btn||!inp)return;
+    if(inp.value.length>0){
+      btn.classList.remove("hidden");
+    }else{
+      btn.classList.add("hidden");
+    }
+  }
+
   function onKey(e){
     var t=(e.target.tagName||"");
     var typing = t==="INPUT"||t==="SELECT"||t==="TEXTAREA";
-    if(e.key==="Escape" || e.key==="Backspace"){
-      if(!typing && window.TvNavigationManager && window.TvNavigationManager.handleBack(e)){return;}
+    if(e.key==="Escape"){
       if(isModalOpen()){App.onKeyPlayer(e);return;}
       if(typing){$("cmd").blur();S.promptFoc=false;return;}
       if(S.sel>=0){S.sel=-1;renderSel();return;}
-      $("cmd").value="";clearLog();e.preventDefault();return;
+      $("cmd").value="";updateSearchClearBtn();clearLog();e.preventDefault();return;
+    }
+    if(e.key==="Backspace"){
+      if(!typing && window.TvNavigationManager && window.TvNavigationManager.handleBack(e)){return;}
+      if(isModalOpen()){App.onKeyPlayer(e);return;}
+      if(!typing && S.sel>=0){S.sel=-1;renderSel();return;}
+      if(typing) return; // Mengizinkan penghapusan teks normal tanpa blur
     }
     if(isModalOpen()){App.onKeyPlayer(e);return;}
     if(e.key==="/"){e.preventDefault();focusPrompt();return;}
@@ -1391,11 +1413,17 @@ var Tui = (function () {
     var inp=$("cmd");inp.focus();
   }
   function submitPrompt(){
-    var inp=$("cmd");var raw=inp.value.trim();inp.value="";
+    var inp=$("cmd");var raw=inp.value.trim();
     if(!raw)return;
     log("tatap$ "+raw);
-    if(raw.indexOf(":")===0){handleCommand(raw.slice(1));}
-    else{handleCommand("cari "+raw);}
+    if(raw.indexOf(":")===0){
+      inp.value="";
+      updateSearchClearBtn();
+      handleCommand(raw.slice(1));
+    } else {
+      updateSearchClearBtn();
+      handleCommand("cari "+raw);
+    }
   }
 
   var _hIdx=0,_hPos=0;
@@ -1527,6 +1555,7 @@ var Tui = (function () {
   function boot(){
     var inp=$("cmd");
     inp.addEventListener("keydown",function(e){
+      e.stopPropagation();
       if(e.key==="Enter"){e.preventDefault();_hPos=loadCmdHist().length;submitPrompt();}
       else if(e.key==="Escape"){inp.blur();S.promptFoc=false;}
       else if(e.key==="ArrowDown"){
@@ -1553,16 +1582,35 @@ var Tui = (function () {
     });
     inp.addEventListener("focus",onPromptFocus);
     inp.addEventListener("blur",onPromptBlur);
-    inp.addEventListener("input",function(){if(inp.value.indexOf(":")===0){/* could show command hints */}});
+    inp.addEventListener("input",function(){
+      updateSearchClearBtn();
+      if(inp.value.indexOf(":")===0){/* could show command hints */}
+    });
     document.addEventListener("keydown",onKey);
+
+    var clearBtn = $("search-clear-btn");
+    if(clearBtn){
+      clearBtn.addEventListener("click", function(e){
+        e.stopPropagation();
+        inp.value = "";
+        updateSearchClearBtn();
+        clearLog();
+        inp.focus();
+        if(S.view === "cari"){
+          setView("musim");
+        }
+      });
+    }
 
     var searchWrap = $("search-input-wrap");
     if(searchWrap){
-      searchWrap.addEventListener("click", function(){
+      searchWrap.addEventListener("click", function(e){
+        if(e.target === clearBtn || (clearBtn && clearBtn.contains(e.target))) return;
         if(window.TvNavigationManager) window.TvNavigationManager.enterSearchTypingMode();
         else focusPrompt();
       });
       searchWrap.addEventListener("keydown", function(e){
+        if(e.target === inp || (e.target && e.target.tagName === "INPUT")) return;
         if(e.key === "Enter" || e.key === " "){
           e.preventDefault();
           if(window.TvNavigationManager) window.TvNavigationManager.enterSearchTypingMode();
@@ -1780,5 +1828,5 @@ var Tui = (function () {
     setView("katalog");
   }
 
-  return {boot:boot,log:log,clearLog:clearLog,setView:setView,loadView:loadView,moveSel:moveSel,renderSel:renderSel,openSelected:openSelected,startSearch:startSearch,doSearch:doSearch,renderResults:renderResults,renderPager:renderPager,renderRecents:renderRecents,cmdUsage:cmdUsage,openGenreModal:openGenreModal,closeGenreModal:closeGenreModal,openCatalogFilterModal:openCatalogFilterModal,closeCatalogFilterModal:closeCatalogFilterModal,getGridCols:getGridCols,applyGenreFilter:function(genreOrSlug){applyGenreFilter(slugifyGenre(genreOrSlug));},slugifyGenre:slugifyGenre,view:function(){return S.view;},state:function(){return S;}};
+  return {boot:boot,log:log,clearLog:clearLog,setView:setView,loadView:loadView,moveSel:moveSel,renderSel:renderSel,openSelected:openSelected,startSearch:startSearch,doSearch:doSearch,renderResults:renderResults,renderPager:renderPager,renderRecents:renderRecents,cmdUsage:cmdUsage,openGenreModal:openGenreModal,closeGenreModal:closeGenreModal,openCatalogFilterModal:openCatalogFilterModal,closeCatalogFilterModal:closeCatalogFilterModal,getGridCols:getGridCols,applyGenreFilter:function(genreOrSlug){applyGenreFilter(slugifyGenre(genreOrSlug));},slugifyGenre:slugifyGenre,view:function(){return S.view;},state:function(){return S;},updateSearchClearBtn:updateSearchClearBtn};
 })();

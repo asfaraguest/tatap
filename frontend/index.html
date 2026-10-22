@@ -1,14 +1,20 @@
 <!DOCTYPE html>
-<html lang="id" style="background:#000000;color:#f0f3f6;">
+<html lang="id">
 <head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#000000">
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#07080a">
 <title>Tatap — nonton santai di lokal</title>
+<script>
+  (function(){
+    var t = localStorage.getItem("tatap_theme") || "dark";
+    document.documentElement.setAttribute("data-theme", t);
+  })();
+</script>
 <link rel="stylesheet" href="/css/style.css">
 <link rel="icon" type="image/x-icon" href="/favicon.ico">
 <link rel="icon" type="image/png" sizes="192x192" href="/assets/icon-192.png">
 <link rel="apple-touch-icon" href="/assets/icon-512.png">
 </head>
-<body class="no-crt" style="background:#000000;color:#f0f3f6;">
+<body class="no-crt">
 <svg xmlns="http://www.w3.org/2000/svg" style="display:none" id="tatap-icons">
   <defs>
     <!-- Brand Mark: Sleek Geometric Viewfinder Eye (Tatap) -->
@@ -19,6 +25,15 @@
     <!-- Menu: 3 sleek horizontal bars -->
     <symbol id="icon-menu" viewBox="0 0 24 24">
       <path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/>
+    </symbol>
+    <!-- Gear / Settings (Apple Flat UI) -->
+    <symbol id="icon-gear" viewBox="0 0 24 24">
+      <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" stroke="currentColor" stroke-width="2" fill="none"/>
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+    </symbol>
+    <!-- Moon / Dark Mode -->
+    <symbol id="icon-moon" viewBox="0 0 24 24">
+      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
     </symbol>
     <!-- Close: clean X -->
     <symbol id="icon-close" viewBox="0 0 24 24">
@@ -232,8 +247,8 @@
     <button class="nav-tab-btn" data-view="favorit" id="tab-nav-favorit" tabindex="0">Favorit</button>
   </nav>
   <div class="head-actions">
-    <button id="btn-drawer-head" class="icon-btn header-drawer-btn" title="Opsi &amp; Menu" aria-label="Menu" tabindex="0">
-      <span class="drawer-btn-icon"><svg class="ui-icon"><use href="#icon-more-options"/></svg></span>
+    <button id="btn-drawer-head" class="icon-btn header-drawer-btn" title="Pengaturan &amp; Menu" aria-label="Pengaturan" tabindex="0">
+      <span class="drawer-btn-icon"><svg class="ui-icon"><use href="#icon-gear"/></svg></span>
     </button>
   </div>
 </header>
@@ -260,6 +275,15 @@
       <svg class="ui-icon"><use href="#icon-switch"/></svg>
       <span class="popover-item-label">Sumber Video</span>
       <span class="popover-value" id="pop-src-badge">HiAnime</span>
+    </button>
+  </div>
+  <div class="popover-divider"></div>
+  <div class="popover-section">
+    <div class="popover-section-label">TAMPILAN</div>
+    <button class="popover-item" id="pop-toggle-theme" role="menuitem" tabindex="0">
+      <svg class="ui-icon" id="pop-theme-icon"><use href="#icon-sun"/></svg>
+      <span class="popover-item-label" id="pop-theme-label">Mode Terang</span>
+      <span class="popover-shortcut">⌘T</span>
     </button>
   </div>
   <div class="popover-divider"></div>
@@ -387,6 +411,15 @@
           <span class="drawer-item-icon"><svg class="ui-icon"><use href="#icon-help"/></svg></span>
           <span class="drawer-item-label">Daftar Perintah Terminal</span>
           <span class="drawer-item-badge">:bantuan</span>
+        </button>
+      </div>
+
+      <div class="drawer-group">
+        <div class="drawer-group-label">TAMPILAN &amp; TEMA</div>
+        <button class="drawer-item" id="drawer-toggle-theme">
+          <span class="drawer-item-icon"><svg class="ui-icon" id="drawer-theme-icon"><use href="#icon-sun"/></svg></span>
+          <span class="drawer-item-label" id="drawer-theme-label">Mode Terang</span>
+          <span class="drawer-item-badge" id="drawer-theme-badge">Gelap</span>
         </button>
       </div>
 
@@ -615,9 +648,12 @@
 
 <footer class="bottom-bar">
   <div class="bottom-search-row">
-    <div class="search-input-wrap" id="search-input-wrap" tabindex="0" role="searchbox" aria-label="Cari anime">
+    <div class="search-input-wrap" id="search-input-wrap" role="search" aria-label="Cari anime">
       <svg class="ui-icon search-lead-icon" aria-hidden="true"><use href="#icon-search"/></svg>
       <input id="cmd" autocomplete="off" spellcheck="false" autocapitalize="off" placeholder="Cari anime, genre, atau tekan ⌘K untuk perintah..." readonly>
+      <button type="button" id="search-clear-btn" class="search-clear-btn hidden" title="Hapus pencarian (Esc)" aria-label="Hapus teks">
+        <svg class="ui-icon"><use href="#icon-close"/></svg>
+      </button>
       <kbd class="search-kbd-hint" title="Pintasan keyboard: ⌘K atau /">⌘K</kbd>
     </div>
   </div>
