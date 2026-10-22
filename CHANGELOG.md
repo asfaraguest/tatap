@@ -37,11 +37,13 @@ Kenaikan digit MINOR diterapkan secara mutlak sesuai kaidah Semantic Versioning 
    - Menyembunyikan konten bertag *ecchi*, *erotica*, dan *magical-sex-shift* dari katalog dan pencarian saat Safe Mode aktif (default: ON).
    - Opsi beralih status secara instan via perintah `:safemode on|off` di terminal/search bar.
    - Menjaga blacklist Hentai 100% permanen di semua layer backend dan UI (Master Directive #4).
-7. **Pengayaan Metadata Season & Tahun Rilis Multiplatform:**
-   - **Pencarian Anime (`/api/search`)**: Memperkaya hasil pencarian dengan `season` (contoh: `"Fall 2023"`) dan `year` (contoh: `2023`) secara asinkron via AniList GraphQL concurrent search matching.
+7. **Pengayaan & Presisi Tinggi Metadata Season & Tahun Rilis Multiplatform:**
+   - **Eliminasi Total False Matching (Tahun 1917 & 2021):** Mengganti formula overlap parsial lama dengan **Jaccard Token Similarity** ($\ge 0.70$) disertai pustaka pembersihan stopwords generik, isolasi nomor season (*Season 2/II tidak akan tertukar dengan S1*), dan *Subtitle Arc Penalty*. Mengeliminasi anomali tahun 1917 (dari *The Dull Sword*) dan tahun 2021 (dari *Long Sword*) pada kueri kata generik seperti `sword`.
+   - **Pencarian Anime (`/api/search`)**: Memperkaya hasil pencarian dengan `season` (contoh: `"Fall 2023"`) dan `year` (contoh: `2023`) secara asinkron via AniList GraphQL concurrent search matching dan pengecekan lokal `browse_cache`.
    - **Detail Anime (`hianime_details`)**: Fallback ekstraksi musim dan tahun rilis dari baris `Aired:` saat `Premiered:` tidak tersedia.
    - **Tampilan Web & Desktop (`term.js`, `app.js`)**: Menampilkan musim & tahun pada baris pencarian (`tr-meta`) menggantikan raw slug ID, pada kisi kartu poster (`poster-meta`), dan info baris detail (`#tm-info-line`).
    - **Tampilan Android Mobile & TV (`AnimeAdapter.java`, `DetailActivity.java`)**: Menampilkan musim & tahun pada kartu anime (`tvMeta`) dan info baris detail (`tvInfoLine`).
+   - **Pembersihan Cache Pencarian (`search_cache`)**: Mengosongkan rekor cache pencarian lama di basis data SQLite agar hasil pencarian lama yang keliru langsung tersegarkan.
 8. **Pola Wallpaper Mac (macOS Ambient Waves & Topographic Contours):**
    - Pola gelombang kurva Sonoma/Ventura/Monterey di `#bg-glow` berbasis SVG vektor dan pure CSS radial mesh tanpa dependensi gambar raster eksternal.
 9. **Penyempurnaan Palet Warna Soft Modern (Eliminasi AI-Slop) & Perbaikan Layout:**

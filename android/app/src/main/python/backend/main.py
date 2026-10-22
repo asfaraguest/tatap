@@ -281,37 +281,100 @@ async def health():
             reachable = False
     return ok({"hianime": HI_BASE, "reachable": reachable})
 
-def _enrich_search_results_with_metadata(items: list, al_meta_list: list):
-    """Perkaya item hasil pencarian dengan metadata season dan tahun dari AniList jika cocok."""
+_META_STOPWORDS = {
+    'the', 'a', 'an', 'of', 'in', 'to', 'and', 'und', 'der', 'die', 'das',
+    'no', 'wa', 'ga', 'ni', 'de', 'part', 'season', 'arc', 'cour', 'hen',
+    'chapter', 'edition', 'series', 'ver', 'version'
+}
+
+def _extract_season_from_title(t: str) -> int:
+    t = (t or '').lower()
+    m = re.search(r'\b(?:season|s)\s*(\d+)\b', t)
+    if m:
+        try:
+            return int(m.group(1))
+        except ValueError:
+            pass
+    m_roman = re.search(r'\b(ii|iii|iv|v|vi)\b', t)
+    if m_roman:
+        return {'ii': 2, 'iii': 3, 'iv': 4, 'v': 5, 'vi': 6}.get(m_roman.group(1), 1)
+    return 1
+
+def _clean_title_tokens_for_meta(t: str) -> set:
+    t = (t or '').lower()
+    t = re.sub(r'[^a-zA-Z0-9\s]', ' ', t)
+    return {w for w in t.split() if w and w not in _META_STOPWORDS}
+
+def _calculate_title_match_score(target: str, candidate: str) -> float:
+    # 1. Exact normalized alphanumeric match
+    norm_t = re.sub(r'[^a-zA-Z0-9]', '', target.lower())
+    norm_c = re.sub(r'[^a-zA-Z0-9]', '', candidate.lower())
+    if norm_t and norm_t == norm_c:
+        return 1.0
+
+    # 2. Season isolation (mencegah Season 2 match ke Season 1)
+    s_t = _extract_season_from_title(target)
+    s_c = _extract_season_from_title(candidate)
+    if (s_t > 1 or s_c > 1) and s_t != s_c:
+        return 0.0
+
+    tok_t = _clean_title_tokens_for_meta(target)
+    tok_c = _clean_title_tokens_for_meta(candidate)
+    if not tok_t or not tok_c:
+        return 0.0
+
+    common = tok_t & tok_c
+    if not common:
+        return 0.0
+
+    union = tok_t | tok_c
+    jaccard = len(common) / len(union)
+
+    # 3. Subtitle / Arc penalty: jika salah satu memiliki kata penting yang tidak dimiliki yang lain
+    if (tok_t - tok_c) and (len(common) / len(tok_t) < 0.85):
+        return jaccard * 0.5
+    if (tok_c - tok_t) and (len(common) / len(tok_c) < 0.85):
+        return jaccard * 0.5
+
+    return jaccard
+
+async def _enrich_search_results_with_metadata(items: list, al_meta_list: list):
+    """Perkaya item hasil pencarian dengan metadata season dan tahun akurat tanpa salah mencocokkan."""
     if not items:
         return
     for it in items:
         if it.get("season") and it.get("year"):
             continue
+
+        slug = it.get("id") or it.get("slug") or ""
+        # 1. Cek detail lokal dari browse_cache jika pernah dibuka
+        if slug:
+            try:
+                cached = await get_browse_cache(f"detail_v2|{slug}")
+                if cached and cached.get("year"):
+                    it["year"] = cached["year"]
+                    it["season"] = cached.get("season") or str(cached["year"])
+                    continue
+            except Exception:
+                pass
+
+        # 2. Cocokkan dengan AniList secara presisi (Jaccard >= 0.70)
         title = (it.get("title") or "").strip()
-        if not title:
-            continue
-        t_clean = re.sub(r'[^a-zA-Z0-9\s]', ' ', title.lower()).split()
-        t_set = set(t_clean)
         best_match = None
         best_score = 0.0
-        if al_meta_list and t_set:
+        if al_meta_list and title:
             for al_m in al_meta_list:
                 t_obj = al_m.get("title") or {}
-                al_titles = [t_obj.get("romaji"), t_obj.get("english"), t_obj.get("native")]
+                al_titles = [t_obj.get("english"), t_obj.get("romaji"), t_obj.get("native")]
                 for at in al_titles:
                     if not at:
                         continue
-                    at_clean = re.sub(r'[^a-zA-Z0-9\s]', ' ', at.lower()).split()
-                    at_set = set(at_clean)
-                    if not at_set:
-                        continue
-                    common = t_set & at_set
-                    overlap = len(common) / min(len(t_set), len(at_set))
-                    if overlap > best_score:
-                        best_score = overlap
+                    score = _calculate_title_match_score(title, at)
+                    if score > best_score:
+                        best_score = score
                         best_match = al_m
-        if best_match and best_score >= 0.35:
+
+        if best_match and best_score >= 0.70:
             s_name = (best_match.get("season") or "").title()
             s_year = best_match.get("seasonYear") or (best_match.get("startDate") or {}).get("year") or 0
             if s_name and s_year:
@@ -323,8 +386,9 @@ def _enrich_search_results_with_metadata(items: list, al_meta_list: list):
             elif s_name:
                 it["season"] = s_name
 
+        # 3. Cek tahun parentesis eksplisit di judul (misal '(2023)')
         if not it.get("year"):
-            m_yr = re.search(r'\b(19\d\d|20\d\d)\b', title)
+            m_yr = re.search(r'[\(\[]\s*(19\d\d|20\d\d)\s*[\)\]]', title)
             if m_yr:
                 it["year"] = int(m_yr.group(1))
                 if not it.get("season"):
@@ -400,7 +464,7 @@ async def search(q: str = Query(""), page: int = Query(1, ge=1, le=100), limit: 
         if paged_res.get("results"):
             try:
                 al_meta_list = await al_meta_task
-                _enrich_search_results_with_metadata(paged_res["results"], al_meta_list)
+                await _enrich_search_results_with_metadata(paged_res["results"], al_meta_list)
             except Exception:
                 pass
             
