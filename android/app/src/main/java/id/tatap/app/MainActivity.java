@@ -730,6 +730,11 @@ public class MainActivity extends Activity {
                     if (raw.startsWith(":") || raw.startsWith("/")) {
                         executeCommand(raw.substring(1).trim());
                     } else {
+                        if (isSafeModeEnabled() && isVulgarKeyword(raw)) {
+                            showCommandOutput("> tatap$ Kata kunci dibatasi dalam Mode Aman. Matikan dengan :safemode off", true);
+                            Toast.makeText(this, "Pencarian dibatasi dalam Mode Aman (:safemode off)", Toast.LENGTH_SHORT).show();
+                            return true;
+                        }
                         currentView = "cari";
                         currentSearchQuery = raw;
                         currentPage = 1;
@@ -1291,6 +1296,11 @@ public class MainActivity extends Activity {
             case "cari":
             case "search":
                 if (!args.isEmpty()) {
+                    if (isSafeModeEnabled() && isVulgarKeyword(args)) {
+                        showCommandOutput("> tatap$ :cari [Dibatasi: Mode Aman aktif. Matikan dengan :safemode off]", true);
+                        Toast.makeText(this, "Pencarian dibatasi dalam Mode Aman (:safemode off)", Toast.LENGTH_SHORT).show();
+                        break;
+                    }
                     currentView = "cari";
                     currentSearchQuery = args;
                     currentPage = 1;
@@ -1383,6 +1393,12 @@ public class MainActivity extends Activity {
                 handleHapticCommand(args);
                 break;
 
+            case "safemode":
+            case "safe":
+            case "aman":
+                handleSafeModeCommand(args);
+                break;
+
             default:
                 showCommandOutput("> tatap$ Perintah tidak dikenal: :" + cmd + " (Ketik :help)", true);
                 break;
@@ -1439,6 +1455,96 @@ public class MainActivity extends Activity {
         Toast.makeText(this, "Getaran Sentuh UI: " + (target ? "Aktif" : "Mati"), Toast.LENGTH_SHORT).show();
     }
 
+    public boolean isSafeModeEnabled() {
+        SharedPreferences sp = getSharedPreferences("tatap_player_prefs", MODE_PRIVATE);
+        return sp.getBoolean("pref_safemode", true);
+    }
+
+    public boolean isVulgarKeyword(String text) {
+        if (text == null) return false;
+        String t = text.toLowerCase().trim();
+        String[] vulgar = new String[]{"ecchi", "erotica", "hentai", "magical-sex-shift", "oppai"};
+        for (String v : vulgar) {
+            if (t.contains(v)) return true;
+        }
+        return false;
+    }
+
+    public boolean isAdultAnime(JSONObject anime) {
+        if (anime == null) return false;
+        if (anime.optBoolean("is_adult", false) || anime.optBoolean("isAdult", false) || anime.optBoolean("nsfw", false)) {
+            return true;
+        }
+        String rating = anime.optString("rating", "").toLowerCase();
+        if (rating.contains("rx") || rating.contains("18+")) {
+            return true;
+        }
+        String title = anime.optString("title", "").toLowerCase();
+        String slug = anime.optString("slug", anime.optString("id", "")).toLowerCase();
+        JSONArray genresArr = anime.optJSONArray("genres");
+        List<String> genres = new ArrayList<>();
+        if (genresArr != null) {
+            for (int i = 0; i < genresArr.length(); i++) {
+                genres.add(genresArr.optString(i, "").toLowerCase());
+            }
+        }
+        String genresStr = anime.optString("genre", anime.optString("genres", "")).toLowerCase();
+
+        String[] blockedTags = new String[]{"ecchi", "erotica", "hentai", "magical-sex-shift"};
+        for (String tag : blockedTags) {
+            if (title.contains(tag) || slug.contains(tag) || genresStr.contains(tag)) {
+                return true;
+            }
+            for (String g : genres) {
+                if (g.contains(tag)) return true;
+            }
+        }
+        return false;
+    }
+
+    private void handleSafeModeCommand(String args) {
+        SharedPreferences sp = getSharedPreferences("tatap_player_prefs", MODE_PRIVATE);
+        String trimmed = (args != null) ? args.trim().toLowerCase() : "";
+        boolean current = sp.getBoolean("pref_safemode", true);
+        boolean target;
+        if ("on".equalsIgnoreCase(trimmed) || "aktif".equalsIgnoreCase(trimmed) || "1".equals(trimmed)) {
+            target = true;
+        } else if ("off".equalsIgnoreCase(trimmed) || "mati".equalsIgnoreCase(trimmed) || "0".equals(trimmed)) {
+            target = false;
+        } else {
+            target = !current;
+        }
+        sp.edit().putBoolean("pref_safemode", target).apply();
+        if (target && btnToggleMenu != null) {
+            HapticHelper.performHeavyClick(btnToggleMenu);
+        }
+        tabDataCache.clear();
+        syncBackendSafeMode(target);
+        String statusStr = target ? "AKTIF" : "MATI";
+        showCommandOutput("> tatap$ :safemode " + (target ? "on" : "off") + " [Mode Aman: " + statusStr + (target ? " - Konten vulgar/ecchi disembunyikan" : " - Konten ecchi/dewasa diizinkan") + "]", false);
+        Toast.makeText(this, "Mode Aman: " + (target ? "Aktif" : "Mati"), Toast.LENGTH_SHORT).show();
+        fetchData();
+    }
+
+    private void syncBackendSafeMode(boolean enabled) {
+        new Thread(() -> {
+            try {
+                URL url = new URL("http://127.0.0.1:8767/api/settings");
+                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                conn.setRequestMethod("POST");
+                conn.setRequestProperty("Content-Type", "application/json");
+                conn.setDoOutput(true);
+                conn.setConnectTimeout(4000);
+                JSONObject body = new JSONObject();
+                body.put("safe_mode", enabled ? "1" : "0");
+                byte[] out = body.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8);
+                conn.getOutputStream().write(out);
+                conn.getResponseCode();
+                conn.disconnect();
+            } catch (Exception ignored) {}
+        }).start();
+    }
+
     private void handleSeasonFilterCommand(String[] parts) {
         // Format: :season <winter|spring|summer|fall> [tahun]
         if (parts.length >= 2) {
@@ -1468,8 +1574,14 @@ public class MainActivity extends Activity {
     }
 
     private void setGenreFilter(String genreSlugOrTitle) {
+        String slug = genreSlugOrTitle.toLowerCase().trim().replace(" ", "-");
+        if (isSafeModeEnabled() && (slug.contains("ecchi") || slug.contains("erotica") || slug.contains("magical-sex-shift") || slug.contains("hentai"))) {
+            showCommandOutput("> tatap$ Genre ini disembunyikan dalam Mode Aman. Matikan dengan :safemode off", true);
+            Toast.makeText(this, "Genre disembunyikan dalam Mode Aman (:safemode off)", Toast.LENGTH_SHORT).show();
+            return;
+        }
         currentView = "genre";
-        currentGenre = genreSlugOrTitle.toLowerCase().trim().replace(" ", "-");
+        currentGenre = slug;
         currentPage = 1;
         updateTabButtons();
         updateActiveFilterBar();
@@ -1526,7 +1638,7 @@ public class MainActivity extends Activity {
         new Thread(() -> {
             List<GenreItem> list = new ArrayList<>();
             try {
-                HttpURLConnection conn = (HttpURLConnection) new URL("http://127.0.0.1:8767/api/genres").openConnection();
+                HttpURLConnection conn = (HttpURLConnection) new URL("http://127.0.0.1:8767/api/genres?safe_mode=" + (isSafeModeEnabled() ? "1" : "0")).openConnection();
                 conn.setConnectTimeout(6000);
                 BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream()));
                 StringBuilder sb = new StringBuilder();
@@ -1537,12 +1649,21 @@ public class MainActivity extends Activity {
                 JSONObject res = new JSONObject(sb.toString());
                 if (res.optBoolean("success")) {
                     JSONArray arr = res.getJSONObject("data").getJSONArray("list");
+                    boolean safe = isSafeModeEnabled();
                     for (int i = 0; i < arr.length(); i++) {
                         JSONObject g = arr.getJSONObject(i);
                         String slug = g.optString("slug", "");
                         String title = g.optString("title", "");
                         if ("hentai".equalsIgnoreCase(slug) || title.toLowerCase().contains("hentai")) {
                             continue;
+                        }
+                        if (safe) {
+                            String sl = slug.toLowerCase();
+                            String tl = title.toLowerCase();
+                            if (sl.contains("ecchi") || sl.contains("erotica") || sl.contains("magical-sex-shift") ||
+                                tl.contains("ecchi") || tl.contains("erotica")) {
+                                continue;
+                            }
                         }
                         list.add(new GenreItem(title, slug));
                     }
@@ -1781,6 +1902,41 @@ public class MainActivity extends Activity {
             showTranslateLogsDialog();
         });
 
+        View itemSafeMode = dialog.findViewById(R.id.cmd_item_safemode);
+        if (itemSafeMode != null) {
+            TextView tvBadge = dialog.findViewById(R.id.tv_safemode_badge);
+            TextView tvDesc = dialog.findViewById(R.id.tv_safemode_desc);
+            SharedPreferences sp = getSharedPreferences("tatap_player_prefs", MODE_PRIVATE);
+            Runnable updateSafeModeUI = () -> {
+                boolean isEnabled = sp.getBoolean("pref_safemode", true);
+                if (tvBadge != null) {
+                    tvBadge.setText(isEnabled ? "AKTIF" : "MATI");
+                    tvBadge.setTextColor(isEnabled ? 0xFF38BDF8 : 0xFFEF4444);
+                }
+                if (tvDesc != null) {
+                    tvDesc.setText(isEnabled
+                        ? "Mode Aman AKTIF: Konten vulgar & ecchi disembunyikan dari katalog & pencarian (ketuk untuk matikan)"
+                        : "Mode Aman MATI: Konten ecchi & dewasa diizinkan tampil (ketuk untuk aktifkan)");
+                }
+            };
+            updateSafeModeUI.run();
+
+            itemSafeMode.setOnClickListener(v -> {
+                boolean current = sp.getBoolean("pref_safemode", true);
+                boolean newSafeMode = !current;
+                sp.edit().putBoolean("pref_safemode", newSafeMode).apply();
+                updateSafeModeUI.run();
+                if (newSafeMode) {
+                    HapticHelper.performHeavyClick(v);
+                }
+                tabDataCache.clear();
+                syncBackendSafeMode(newSafeMode);
+                showCommandOutput("> tatap$ :safemode " + (newSafeMode ? "on" : "off") + " [Mode Aman: " + (newSafeMode ? "AKTIF" : "MATI") + "]", false);
+                Toast.makeText(this, "Mode Aman: " + (newSafeMode ? "Aktif" : "Mati"), Toast.LENGTH_SHORT).show();
+                fetchData();
+            });
+        }
+
         View itemHaptic = dialog.findViewById(R.id.cmd_item_haptic);
         if (itemHaptic != null) {
             TextView tvBadge = dialog.findViewById(R.id.tv_haptic_badge);
@@ -1833,7 +1989,7 @@ public class MainActivity extends Activity {
             R.id.cmd_item_ping, R.id.cmd_item_ai, R.id.cmd_item_apikey,
             R.id.cmd_item_gemini, R.id.cmd_item_groq, R.id.cmd_item_ollama,
             R.id.cmd_item_model, R.id.cmd_item_logs,
-            R.id.cmd_item_haptic, R.id.cmd_item_update, R.id.cmd_item_clear
+            R.id.cmd_item_safemode, R.id.cmd_item_haptic, R.id.cmd_item_update, R.id.cmd_item_clear
         };
         for (int id : cmdItemIds) {
             View item = dialog.findViewById(id);
@@ -2576,12 +2732,20 @@ public class MainActivity extends Activity {
             endpoint = "/api/search?q=" + URLEncoder.encode(currentSearchQuery) + "&page=" + currentPage + "&limit=24";
         }
 
+        final boolean safeModeActive = isSafeModeEnabled();
+        final String finalEndpoint;
+        if (!endpoint.contains("?")) {
+            finalEndpoint = endpoint + "?safe_mode=" + (safeModeActive ? "1" : "0");
+        } else {
+            finalEndpoint = endpoint + "&safe_mode=" + (safeModeActive ? "1" : "0");
+        }
+
         tvSectionTitle.setText(title);
         if (layoutPagination != null) {
             layoutPagination.setVisibility("riwayat".equals(currentView) || "jadwal".equals(currentView) || "favorit".equals(currentView) ? View.GONE : View.VISIBLE);
         }
 
-        final String cacheKey = currentView + ":" + currentPage + ":" + currentGenre + ":" + currentSeasonName + ":" + currentSeasonYear + ":" + currentScheduleDay + ":" + filterCatalogSort + ":" + filterCatalogYear + ":" + filterCatalogSeason + ":" + filterCatalogMonth + ":" + filterCatalogType + ":" + filterCatalogStatus;
+        final String cacheKey = currentView + ":" + currentPage + ":" + currentGenre + ":" + currentSeasonName + ":" + currentSeasonYear + ":" + currentScheduleDay + ":" + filterCatalogSort + ":" + filterCatalogYear + ":" + filterCatalogSeason + ":" + filterCatalogMonth + ":" + filterCatalogType + ":" + filterCatalogStatus + ":safe=" + (safeModeActive ? "1" : "0");
         final boolean canCache = !"cari".equals(currentView) && !"riwayat".equals(currentView) && !"favorit".equals(currentView);
 
         // 1. Cek In-Memory Cache untuk peralihan instan (<1ms)
@@ -2603,7 +2767,7 @@ public class MainActivity extends Activity {
 
         new Thread(() -> {
             try {
-                String u = "http://127.0.0.1:8767" + endpoint;
+                String u = "http://127.0.0.1:8767" + finalEndpoint;
                 HttpURLConnection conn = (HttpURLConnection) new URL(u).openConnection();
                 conn.setConnectTimeout(12000);
                 conn.setReadTimeout(15000);
@@ -2629,8 +2793,13 @@ public class MainActivity extends Activity {
                     if (arr == null) arr = new JSONArray();
 
                     List<JSONObject> list = new ArrayList<>();
+                    boolean safeMode = isSafeModeEnabled();
                     for (int i = 0; i < arr.length(); i++) {
-                        list.add(arr.getJSONObject(i));
+                        JSONObject it = arr.getJSONObject(i);
+                        if (safeMode && isAdultAnime(it)) {
+                            continue;
+                        }
+                        list.add(it);
                     }
 
                     final int count = list.size();

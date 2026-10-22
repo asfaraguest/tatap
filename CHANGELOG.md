@@ -116,6 +116,21 @@ Kenaikan digit PATCH diterapkan secara mutlak sesuai kaidah Semantic Versioning 
    - **Penyelarasan Horizontal Guides dengan Top Bar & Bottom Bar:** Menstandarkan padding horizontal `main` menggunakan `var(--pad-x)` murni di semua resolusi desktop (menggantikan pembatasan kaku `max-width: 1560px` pada 1024px yang sebelumnya menyebabkan indentasi ganjil 90px pada konten katalog dibanding logo TATAP dan kotak pencarian), dengan batas maksimal `1680px` pada layar ultra-wide (>= 1600px).
    - **Harmonisasi Spacing Empty State & Pager:** Menyelaraskan padding dan margin vertikal pada `.empty` (`clamp(22px, 3.5vw, 36px) 14px`) dan `.pager` (`clamp(22px, 2.5vw, 32px) 0 clamp(16px, 2vw, 24px)`) agar ritme visual konsisten di semua status pemuatan katalog.
 
+18. **Fitur Safe Mode (Mode Aman) Terisolasi pada Platform Android (Mobile & Android TV):**
+   - **Penyaringan Konten Vulgar & Ecchi Dinamis:**
+     - **Safe Mode ON (Default/Bawaan):** Menyembunyikan seluruh konten vulgar, genre dewasa, ecchi, erotica, dan magical-sex-shift dari penjelajahan katalog umum, penyaring genre (`dialog_genre_selector`), metadata chip genre di `DetailActivity`, serta pemfilteran kata kunci pencarian.
+     - **Safe Mode OFF:** Memberikan fleksibilitas bagi pengguna dewasa untuk menonaktifkan Mode Aman, mengizinkan katalog dan genre ecchi/erotica tampil secara normal.
+   - **Kepatuhan Mutlak Master Directive #4 (Zero-Tolerance Blacklist Hentai):**
+     - Konten dan kata kunci genre Hentai tetap diblokir 100% secara permanen di seluruh level arsitektur (backend scraper, browse, search, dan antarmuka UI) baik saat Safe Mode berstatus AKTIF maupun MATI.
+   - **Terminal Command & Interaksi UI Android TV/Mobile:**
+     - Mendukung perintah terminal cepat `:safemode` (serta alias `:safe`, `:aman`) dengan argumen opsional `on`/`off` atau ketuk langsung untuk toggle.
+     - Menambahkan item perintah visual `:safemode` pada `dialog_command_help.xml` lengkap dengan status badge dinamis (`AKTIF` `#38BDF8` / `MATI` `#EF4444`), deskripsi interaktif, dan penanganan fokus spasial remote TV (`TvFocusHelper`).
+   - **Sinkronisasi Otomatis Backend Chaquopy & Java State:**
+     - Pengaturan tersimpan persisten di `SharedPreferences` (`tatap_player_prefs`, key `pref_safemode`) dan secara otomatis tersinkronisasi ke backend FastAPI lokal via `POST /api/settings` (`safe_mode: "1"|"0"`).
+     - Menghapus cache tab memory (`tabDataCache.clear()`) seketika saat status Safe Mode berganti agar tampilan katalog langsung diperbarui tanpa perlu memuat ulang aplikasi.
+   - **Automated Regression Suite (`tests/test_safe_mode.py`):**
+     - Menambahkan rangkaian automated test yang memverifikasi helper `_parse_safe_mode`, endpoint API `/api/settings`, filtering genre `/api/genres`, pencarian `/api/search`, deklarasi XML layout Android, dan integrasi di `MainActivity.java` serta `DetailActivity.java`.
+
 ## [2.12.0] - 2026-10-22
 
 ### Justifikasi SemVer 2.0.0 (MINOR: 2.11.0 -> 2.12.0)

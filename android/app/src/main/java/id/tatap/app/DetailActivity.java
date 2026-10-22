@@ -498,11 +498,18 @@ public class DetailActivity extends Activity {
             if (genresData != null && !genresData.trim().isEmpty()) {
                 try {
                     List<String> genreList = new ArrayList<>();
+                    boolean safeMode = getSharedPreferences("tatap_player_prefs", Context.MODE_PRIVATE).getBoolean("pref_safemode", true);
                     if (genresData.startsWith("[")) {
                         JSONArray jArr = new JSONArray(genresData);
                         for (int i = 0; i < jArr.length(); i++) {
                             String g = jArr.optString(i, "").trim();
                             if (!g.isEmpty() && !"hentai".equalsIgnoreCase(g)) {
+                                if (safeMode) {
+                                    String gl = g.toLowerCase();
+                                    if (gl.contains("ecchi") || gl.contains("erotica") || gl.contains("magical-sex-shift")) {
+                                        continue;
+                                    }
+                                }
                                 genreList.add(g);
                             }
                         }
@@ -510,6 +517,12 @@ public class DetailActivity extends Activity {
                         for (String g : genresData.split(",")) {
                             String trimmed = g.trim();
                             if (!trimmed.isEmpty() && !"hentai".equalsIgnoreCase(trimmed)) {
+                                if (safeMode) {
+                                    String gl = trimmed.toLowerCase();
+                                    if (gl.contains("ecchi") || gl.contains("erotica") || gl.contains("magical-sex-shift")) {
+                                        continue;
+                                    }
+                                }
                                 genreList.add(trimmed);
                             }
                         }

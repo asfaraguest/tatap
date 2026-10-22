@@ -331,6 +331,60 @@
                     android:fontFamily="sans-serif" />
             </LinearLayout>
 
+            <!-- Item: :safemode -->
+            <LinearLayout
+                android:id="@+id/cmd_item_safemode"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_command_tag"
+                android:orientation="vertical"
+                android:padding="8dp"
+                android:layout_marginBottom="6dp"
+                android:focusable="true"
+                android:clickable="true">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text=":safemode"
+                        android:textColor="@color/text_accent"
+                        android:textSize="@dimen/text_code"
+                        android:textStyle="bold"
+                        android:fontFamily="monospace" />
+
+                    <TextView
+                        android:id="@+id/tv_safemode_badge"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="AKTIF"
+                        android:textColor="@color/text_accent"
+                        android:textSize="@dimen/text_badge"
+                        android:fontFamily="sans-serif-medium"
+                        android:background="@drawable/bg_badge_score"
+                        android:paddingStart="6dp"
+                        android:paddingEnd="6dp"
+                        android:paddingTop="2dp"
+                        android:paddingBottom="2dp" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/tv_safemode_desc"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Sembunyikan konten vulgar, ecchi &amp; dewasa dari katalog dan pencarian (ketuk untuk on/off)"
+                    android:textColor="@color/text_muted"
+                    android:textSize="@dimen/text_caption"
+                    android:fontFamily="sans-serif"
+                    android:layout_marginTop="2dp" />
+            </LinearLayout>
+
             <!-- Item: :haptic (Auto-toggle ON/OFF) -->
             <LinearLayout
                 android:id="@+id/cmd_item_haptic"

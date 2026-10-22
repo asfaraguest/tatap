@@ -62,6 +62,18 @@ def fail(msg):
 def _clean(s: str) -> str:
     return html.unescape(s or "").strip()
 
+def _parse_safe_mode(val) -> int:
+    if isinstance(val, int):
+        return val
+    if isinstance(val, str):
+        val = val.strip().lower()
+        if val in ("0", "false", "off", "mati"):
+            return 0
+        return 1
+    if hasattr(val, "default"):
+        return _parse_safe_mode(val.default)
+    return 1
+
 @app.get("/api/ping")
 async def ping():
     return ok({"status": "running"})
@@ -270,13 +282,19 @@ async def health():
     return ok({"hianime": HI_BASE, "reachable": reachable})
 
 @app.get("/api/search")
-async def search(q: str = Query(""), page: int = Query(1, ge=1, le=100), limit: int = 24, source: str = Query("")):
+async def search(q: str = Query(""), page: int = Query(1, ge=1, le=100), limit: int = 24, source: str = Query(""), safe_mode: int = Query(1)):
     q = (q if isinstance(q, str) else "").strip()
     if not q:
         return fail("missing q")
     if q.lower() == "hentai" or "hentai" in q.lower().split():
         return ok({"results": [], "page": page, "total_pages": 1, "has_next": False, "cached": False})
     
+    safe_mode_int = _parse_safe_mode(safe_mode)
+    if safe_mode_int == 1:
+        vulgar_words = {"ecchi", "erotica", "hentai", "magical-sex-shift"}
+        if any(w in q.lower() for w in vulgar_words):
+            return ok({"results": [], "page": page, "total_pages": 1, "has_next": False, "cached": False})
+
     src = (source if isinstance(source, str) else "").strip().lower()
     c_page = page if isinstance(page, int) and page >= 1 else 1
     c_limit = limit if isinstance(limit, int) and limit >= 1 else 24
@@ -286,10 +304,23 @@ async def search(q: str = Query(""), page: int = Query(1, ge=1, le=100), limit: 
         if hit:
             if isinstance(hit, dict) and any(bool(x.get("poster")) for x in hit.get("results", [])):
                 hit_copy = dict(hit)
+                if safe_mode_int == 1 and hit_copy.get("results"):
+                    adult_tags = ("ecchi", "erotica", "hentai", "magical-sex-shift")
+                    hit_copy["results"] = [
+                        it for it in hit_copy["results"]
+                        if not any(tag in (it.get("id") or "").lower() or tag in (it.get("title") or "").lower() for tag in adult_tags)
+                    ]
                 hit_copy["cached"] = True
                 return ok(hit_copy)
             elif isinstance(hit, list) and any(bool(x.get("poster")) for x in hit):
-                return ok({"results": hit, "page": c_page, "total_pages": 1, "has_next": False, "cached": True})
+                results = list(hit)
+                if safe_mode_int == 1:
+                    adult_tags = ("ecchi", "erotica", "hentai", "magical-sex-shift")
+                    results = [
+                        it for it in results
+                        if not any(tag in (it.get("id") or "").lower() or tag in (it.get("title") or "").lower() for tag in adult_tags)
+                    ]
+                return ok({"results": results, "page": c_page, "total_pages": 1, "has_next": False, "cached": True})
         
         loop = asyncio.get_running_loop()
         paged_res = None
@@ -319,6 +350,13 @@ async def search(q: str = Query(""), page: int = Query(1, ge=1, le=100), limit: 
         paged_res["cached"] = False
         if paged_res.get("results"):
             await set_search_cache(cache_key, paged_res)
+        if safe_mode_int == 1 and paged_res.get("results"):
+            adult_tags = ("ecchi", "erotica", "hentai", "magical-sex-shift")
+            paged_res = dict(paged_res)
+            paged_res["results"] = [
+                it for it in paged_res["results"]
+                if not any(tag in (it.get("id") or "").lower() or tag in (it.get("title") or "").lower() for tag in adult_tags)
+            ]
         return ok(paged_res)
     except Exception as e:
         return fail(str(e))
@@ -328,37 +366,54 @@ async def filters():
     return ok(hi.FILTERS)
 
 @app.get("/api/catalog")
-async def catalog(page: int = Query(1, ge=1, le=100)):
+async def catalog(page: int = Query(1, ge=1, le=100), safe_mode: int = Query(1)):
     """Katalog umum: semua judul, default urut populer."""
     try:
         import json as _json
         key = f"catalog|page={page}"
         hit = await get_browse_cache(key)
         if hit:
-            hit["cached"] = True
-            return ok(hit)
-        loop = asyncio.get_running_loop()
-        res = await loop.run_in_executor(None, lambda: hi.browse({}, page))
-        await set_browse_cache(key, res)
-        res["cached"] = False
+            res = dict(hit)
+            res["cached"] = True
+        else:
+            loop = asyncio.get_running_loop()
+            res = await loop.run_in_executor(None, lambda: hi.browse({}, page))
+            await set_browse_cache(key, res)
+            res = dict(res)
+            res["cached"] = False
+        safe_mode_int = _parse_safe_mode(safe_mode)
+        if safe_mode_int == 1 and res and res.get("items"):
+            adult_tags = ("ecchi", "erotica", "magical-sex-shift")
+            res["items"] = [
+                it for it in res["items"]
+                if not any(tag in (it.get("id") or "").lower() or tag in (it.get("title") or "").lower() for tag in adult_tags)
+            ]
         return ok(res)
     except Exception as e:
         return fail(str(e))
 
 @app.get("/api/genres")
-async def genres():
+async def genres(safe_mode: int = 1):
     """Daftar genre dari hianime /browse sidebar. Cache 24 jam."""
     try:
         key = "genres|list"
         hit = await get_browse_cache(key, ttl=24*3600)
         if hit and hit.get("list"):
-            filtered = [g for g in hit["list"] if (g.get("slug") or "").lower() != "hentai" and "hentai" not in (g.get("title") or "").lower()]
-            return ok({"list": filtered, "cached": True})
-        loop = asyncio.get_running_loop()
-        out = await loop.run_in_executor(None, hi.scrape_genres)
-        filtered = [g for g in out if (g.get("slug") or "").lower() != "hentai" and "hentai" not in (g.get("title") or "").lower()]
-        await set_browse_cache(key, {"list": filtered})
-        return ok({"list": filtered, "cached": False})
+            base_list = hit["list"]
+            cached = True
+        else:
+            loop = asyncio.get_running_loop()
+            out = await loop.run_in_executor(None, hi.scrape_genres)
+            base_list = out
+            await set_browse_cache(key, {"list": out})
+            cached = False
+
+        filtered = [g for g in base_list if (g.get("slug") or "").lower() != "hentai" and "hentai" not in (g.get("title") or "").lower()]
+        safe_mode_int = _parse_safe_mode(safe_mode)
+        if safe_mode_int == 1:
+            adult_tags = {"ecchi", "erotica", "magical-sex-shift"}
+            filtered = [g for g in filtered if (g.get("slug") or "").lower() not in adult_tags and not any(tag in (g.get("title") or "").lower() for tag in adult_tags)]
+        return ok({"list": filtered, "cached": cached})
     except Exception as e:
         return fail(str(e))
 
@@ -1031,15 +1086,20 @@ async def browse_ep(
     sy: str = Query(""), sm: str = Query(""), ey: str = Query(""), em: str = Query(""),
     year: str = Query(""), month: str = Query(""),
     page: int = Query(1, ge=1, le=100),
+    safe_mode: int = Query(1),
 ):
     """Filter bebas — semua parameter sesuai form filter (mendukung cross-filter sort, year, month)."""
     try:
         def _to_str(val):
             return val.strip() if isinstance(val, str) else ""
 
+        safe_mode_int = _parse_safe_mode(safe_mode)
         c_genre = _to_str(genre)
         if c_genre.lower() == "hentai" or "hentai" in c_genre.lower():
             return ok({"items": [], "page": 1, "total_pages": 1, "params": {"genre": "hentai"}, "cached": False})
+
+        if safe_mode_int == 1 and c_genre.lower() in ("ecchi", "erotica", "magical-sex-shift"):
+            return ok({"items": [], "page": 1, "total_pages": 1, "params": {"genre": c_genre}, "cached": False})
 
         c_sy = _to_str(sy)
         c_ey = _to_str(ey)
@@ -1084,6 +1144,12 @@ async def browse_ep(
         res = await loop.run_in_executor(None, lambda: hi.browse(params, c_page))
         await set_browse_cache(key, res)
         res["cached"] = False
+        if safe_mode_int == 1 and res and res.get("items"):
+            adult_tags = ("ecchi", "erotica", "magical-sex-shift")
+            res["items"] = [
+                it for it in res["items"]
+                if not any(tag in (it.get("id") or "").lower() or tag in (it.get("title") or "").lower() for tag in adult_tags)
+            ]
         return ok(res)
     except Exception as e:
         return fail(str(e))
@@ -2638,6 +2704,7 @@ async def get_set():
         "translate_apikey": await get_setting("translate_apikey", ""),
         "translate_model": await get_setting("translate_model", "gemini-2.0-flash"),
         "translate_apiurl": await get_setting("translate_apiurl", "https://generativelanguage.googleapis.com/v1beta/openai"),
+        "safe_mode": await get_setting("safe_mode", "1"),
     })
 
 @app.post("/api/settings")
@@ -2657,7 +2724,7 @@ async def set_set(body: dict = None):
                 if not body.get("translate_apiurl"):
                     body["translate_apiurl"] = inferred_url
 
-    for k in ("quality", "mode", "player", "sub_lang", "preferred_source",
+    for k in ("quality", "mode", "player", "sub_lang", "preferred_source", "safe_mode",
               "translate_apikey", "translate_model", "translate_apiurl"):
         if k in body:
             await set_setting(k, body[k])
