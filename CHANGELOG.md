@@ -50,6 +50,22 @@ Kenaikan digit PATCH diterapkan secara mutlak sesuai kaidah Semantic Versioning 
    - Menyesuaikan orientasi kontrol bawah (`btn_status_power` dan `btn_toggle_menu`) menjadi vertikal saat collapsed dan horizontal saat expanded dengan rantai fokus remote D-Pad yang mengalir mulus tanpa hambatan.
 9. **Automated Regression Suite (`tests/test_android_tv_sidebar_autohide.py`):**
    - Menambahkan test suite otomatis yang menguji ketiadaan duplicate ImageSpan pada vertical sidebar, integritas ID layout TV, nilai default dimensi rel `64dp` dan `210dp`, serta sinkronisasi paritas 100% kedua layout TV.
+10. **Background Pattern Wallpaper Mac (macOS Wave Ribbons, Ambient Mesh & Topographic Contours):**
+   - Menghadirkan pola wallpaper khas macOS (Sonoma/Ventura/Monterey/Sequoia) di `#bg-glow` menggunakan SVG vektor resolusi independen dan pure CSS multi-radial gradient mesh.
+   - Menggunakan 3 lapisan pita gelombang melengkung (*cubic bezier waves*) dan garis kontur topografi (*topographic contour lines*) yang halus dan dinamis.
+   - Adaptasi palet warna penuh: Mode Gelap (*Obsidian & Midnight Cyan/Indigo Glow*) dan Mode Terang (*Apple Studio Silver & Soft Sky/Lavender Ribbon Waves*).
+   - Menjaga filosofi *zero-bloat*, performa tinggi dengan hardware acceleration GPU, dan zero CPU overhead tanpa aset gambar raster eksternal.
+11. **Full-Width Layout `<footer class="bottom-bar">`:**
+   - Menghilangkan pembatasan `max-width: 1560px` pada `.bottom-search-row` dan `.statusbar` sehingga membentang penuh 100% (*edge-to-edge*) di semua resolusi layar lebar desktop, selaras dengan `.tui-head`.
+   - Menjaga kontainer konten `main` tetap terpusat dengan padding responsif yang konsisten.
+12. **Penyempurnaan Menyeluruh Apple Light Theme (`[data-theme="light"]`):**
+   - Memperbaiki latar belakang header dan footer di mode terang agar selaras dengan palet Apple Light Theme tanpa warna hitam pekat.
+   - Memperbaiki latar belakang kotak pencarian `.search-input-wrap` dan teks `#cmd` agar memiliki kontras tinggi dan mudah dibaca di atas tema terang.
+   - Memperbaiki `.apple-popover`, `.drawer-content`, badge status, genre pill, dan tombol chip aktif di mode terang.
+   - Membersihkan duplikasi 150+ baris CSS di akhir berkas `frontend/css/style.css`.
+   - Menjamin modal video player (`#player-modal`) tetap 100% hitam pekat (`#000000 !important`) di semua tema demi pengalaman teatrikal maksimal.
+13. **Automated Regression Suite (`tests/test_web_bottom_bar_and_light_theme.py`):**
+   - Menambahkan test suite otomatis yang memverifikasi Mac Wallpaper SVG, CSS variables, ketiadaan batasan 1560px pada bottom bar, ketiadaan duplikasi blok CSS, zero backdrop blur tax, dan integritas pemutar video bioskop.
 
 ## [2.12.0] - 2026-10-22
 

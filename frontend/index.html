@@ -228,7 +228,34 @@
   </defs>
 </svg>
 <div id="crt" aria-hidden="true"></div>
-<div id="bg-glow" aria-hidden="true"></div>
+<div id="bg-glow" aria-hidden="true">
+  <svg class="mac-wallpaper-svg" viewBox="0 0 1920 1080" fill="none" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none">
+    <defs>
+      <linearGradient id="macWaveGrad1" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="var(--mac-wave-1)" />
+        <stop offset="100%" stop-color="var(--mac-wave-1-end)" />
+      </linearGradient>
+      <linearGradient id="macWaveGrad2" x1="100%" y1="0%" x2="0%" y2="100%">
+        <stop offset="0%" stop-color="var(--mac-wave-2)" />
+        <stop offset="100%" stop-color="var(--mac-wave-2-end)" />
+      </linearGradient>
+      <linearGradient id="macWaveGrad3" x1="0%" y1="100%" x2="100%" y2="0%">
+        <stop offset="0%" stop-color="var(--mac-wave-3)" />
+        <stop offset="100%" stop-color="transparent" />
+      </linearGradient>
+    </defs>
+    <!-- macOS Fluid Ribbon Waves -->
+    <path d="M0 340 C 380 180, 720 540, 1160 360 C 1520 220, 1740 380, 1920 290 L 1920 1080 L 0 1080 Z" fill="url(#macWaveGrad1)" />
+    <path d="M0 720 C 460 580, 840 920, 1340 680 C 1680 520, 1820 640, 1920 560 L 1920 1080 L 0 1080 Z" fill="url(#macWaveGrad2)" />
+    <path d="M0 0 L 1920 0 L 1920 180 C 1580 320, 1260 140, 880 260 C 480 380, 220 120, 0 200 Z" fill="url(#macWaveGrad3)" />
+    <!-- Topographic Contour Lines -->
+    <path d="M0 320 C 380 160, 720 520, 1160 340 C 1520 200, 1740 360, 1920 270" stroke="var(--mac-contour-1)" stroke-width="1.2" stroke-linecap="round" />
+    <path d="M0 360 C 380 200, 720 560, 1160 380 C 1520 240, 1740 400, 1920 310" stroke="var(--mac-contour-1)" stroke-width="1" stroke-dasharray="5 5" opacity="0.6" />
+    <path d="M0 700 C 460 560, 840 900, 1340 660 C 1680 500, 1820 620, 1920 540" stroke="var(--mac-contour-2)" stroke-width="1.2" stroke-linecap="round" />
+    <path d="M0 740 C 460 600, 840 940, 1340 700 C 1680 540, 1820 660, 1920 580" stroke="var(--mac-contour-2)" stroke-width="1" stroke-dasharray="5 5" opacity="0.6" />
+    <path d="M0 220 C 220 140, 480 400, 880 280 C 1260 160, 1580 340, 1920 200" stroke="var(--mac-contour-3)" stroke-width="1" stroke-linecap="round" />
+  </svg>
+</div>
 
 <header class="tui-head">
   <div class="head-brand" id="head-brand" title="Kembali ke Beranda (Katalog Anime)" role="button" tabindex="0" aria-label="Tatap Beranda">
