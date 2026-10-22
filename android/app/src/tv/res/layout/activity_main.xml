@@ -16,13 +16,14 @@
         android:layout_height="match_parent"
         android:orientation="vertical"
         android:background="@color/bg_surface"
-        android:paddingStart="24dp"
-        android:paddingEnd="14dp"
+        android:paddingStart="16dp"
+        android:paddingEnd="12dp"
         android:paddingTop="20dp"
         android:paddingBottom="16dp">
 
         <!-- App Brand Logo (Apple Flat Logotype) -->
         <LinearLayout
+            android:id="@+id/layout_tv_brand"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
@@ -42,6 +43,7 @@
                 android:textStyle="bold" />
 
             <TextView
+                android:id="@+id/tv_badge_tv"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="8dp"
@@ -256,7 +258,7 @@
                     android:nextFocusRight="@+id/rv_anime_grid"
                     android:gravity="center_vertical"
                     android:paddingHorizontal="10dp"
-                    android:drawableStart="@drawable/ic_filter"
+                    android:drawableStart="@drawable/ic_tab_genre"
                     android:drawablePadding="8dp"
                     android:text="Genre"
                     android:textColor="@color/text_muted"
@@ -267,6 +269,7 @@
 
         <!-- Bottom Controls: Server Status & Menu (Apple Flat Row) -->
         <LinearLayout
+            android:id="@+id/layout_tv_bottom_controls"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"

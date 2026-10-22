@@ -40,6 +40,17 @@ Kenaikan digit PATCH diterapkan secara mutlak sesuai kaidah Semantic Versioning 
    - **Dual Theme Engine (Apple Light & Obsidian Dark):** Menyediakan sistem pergantian tema 2 mode (Terang & Gelap) dengan persistensi `localStorage`, atribut dinamis `data-theme="light"|"dark"`, pencegahan kedipan (*zero flicker init*), dan integrasi pada Popover menu (`⌘T`), Drawer navigasi, serta perintah terminal (`:tema` / `:theme`).
    - **Desain Presisi Bottom Bar & Header:** Menyelaraskan gradien warna elegan pada `.tui-head`, `.bottom-bar`, dan `.apple-popover` dengan palet warna teroptimasi untuk mode terang maupun gelap tanpa membebani performa CPU perangkat *low-end* (zero blur tax) dan tanpa merusak kontras panggung pemutar video bioskop.
 
+7. **Perbaikan Duplicate Icon Sidebar Android TV:**
+   - Mengeliminasi pemanggilan `updateTvTabSpannable` pada sidebar vertikal TV (`isVerticalSidebar`) di `MainActivity.java` yang sebelumnya menyisipkan `CenteredImageSpan` ke dalam string teks tab sementara elemen layout XML telah memiliki `drawableStart`, yang memicu munculnya dua ikon kembar berdampingan (`[Icon] [Icon] Judul Tab`).
+   - Menstandarkan pewarnaan ikon murni melalui `tab.setCompoundDrawableTintList(...)`.
+   - Mengganti atribut `drawableStart` pada `btn_tab_genre` dari `@drawable/ic_filter` menjadi `@drawable/ic_tab_genre` yang tepat di kedua berkas layout TV (`src/tv/` dan `layout-television/`).
+8. **Autohide / Collapsed Rail (64dp) & Expand (210dp) Sidebar Android TV:**
+   - Menghadirkan mekanisme *Autohide* cerdas di mana bilah sisi meramping menjadi rel ikon kompak (`64dp`) saat pengguna menjelajah katalog poster anime (`rv_anime_grid`), meluaskan ruang lebar kisi poster anime hingga ~146dp untuk tampilan sinematik maksimal di layar TV 1080p dan 4K.
+   - Memasang `OnGlobalFocusChangeListener` pada root sidebar untuk mendeteksi pergerakan fokus remote D-Pad secara reaktif (zero polling); saat fokus berpindah ke kisi poster, sidebar otomatis meramping (*collapse*), dan saat remote diarahkan ke kiri masuk ke sidebar, sidebar mengembang halus (*expand* 210dp, durasi 200ms `DecelerateInterpolator`) menampilkan seluruh teks label tab, kolom pencarian, dan logo `TATAP TV`.
+   - Menyesuaikan orientasi kontrol bawah (`btn_status_power` dan `btn_toggle_menu`) menjadi vertikal saat collapsed dan horizontal saat expanded dengan rantai fokus remote D-Pad yang mengalir mulus tanpa hambatan.
+9. **Automated Regression Suite (`tests/test_android_tv_sidebar_autohide.py`):**
+   - Menambahkan test suite otomatis yang menguji ketiadaan duplicate ImageSpan pada vertical sidebar, integritas ID layout TV, nilai default dimensi rel `64dp` dan `210dp`, serta sinkronisasi paritas 100% kedua layout TV.
+
 ## [2.12.0] - 2026-10-22
 
 ### Justifikasi SemVer 2.0.0 (MINOR: 2.11.0 -> 2.12.0)

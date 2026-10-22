@@ -16,6 +16,9 @@ import android.text.TextWatcher;
 import android.transition.AutoTransition;
 import android.transition.TransitionManager;
 import android.util.Log;
+import android.animation.ValueAnimator;
+import android.view.animation.DecelerateInterpolator;
+import android.view.ViewParent;
 import android.view.FocusFinder;
 import android.view.HapticFeedbackConstants;
 import android.content.SharedPreferences;
@@ -77,6 +80,15 @@ public class MainActivity extends Activity {
     private ViewGroup layoutHeaderRoot;
     private View layoutSearchBox;
     private TextView btnToggleMenu;
+
+    // Android TV Docked Sidebar (Autohide / Collapsed Rail 64dp <-> Expanded 210dp)
+    private View layoutTvSidebar;
+    private View layoutTvBrand;
+    private TextView tvAppLogo;
+    private TextView tvBadgeTv;
+    private LinearLayout layoutTvBottomControls;
+    private boolean isTvSidebarExpanded = true;
+    private ValueAnimator tvSidebarAnimator;
 
     // In-memory tab cache untuk peralihan instan (<1ms) & race condition tokenization
     private static class TabCacheEntry {
@@ -163,6 +175,12 @@ public class MainActivity extends Activity {
         layoutHeaderRoot = findViewById(R.id.layout_header_root);
         layoutSearchBox = findViewById(R.id.layout_search_box);
         btnToggleMenu = findViewById(R.id.btn_toggle_menu);
+
+        layoutTvSidebar = findViewById(R.id.layout_tv_sidebar);
+        layoutTvBrand = findViewById(R.id.layout_tv_brand);
+        tvAppLogo = findViewById(R.id.tv_app_logo);
+        tvBadgeTv = findViewById(R.id.tv_badge_tv);
+        layoutTvBottomControls = findViewById(R.id.layout_tv_bottom_controls);
 
         etSearch = findViewById(R.id.et_search);
         btnClearSearch = findViewById(R.id.btn_clear_search);
@@ -291,6 +309,7 @@ public class MainActivity extends Activity {
 
         if (TvFocusHelper.isTv(this)) {
             applyTvTopBarCompression();
+            setupTvSidebarFocusListener();
             btnTabMusim.post(() -> btnTabMusim.requestFocus());
         }
 
@@ -319,6 +338,168 @@ public class MainActivity extends Activity {
         }
     }
 
+    private void setupTvSidebarFocusListener() {
+        if (layoutTvSidebar == null || !TvFocusHelper.isTv(this)) return;
+        layoutTvSidebar.getViewTreeObserver().addOnGlobalFocusChangeListener((oldFocus, newFocus) -> {
+            if (newFocus == null || !TvFocusHelper.isTv(this)) return;
+            boolean insideSidebar = isViewDescendantOf(newFocus, layoutTvSidebar);
+            if (insideSidebar && !isTvSidebarExpanded) {
+                setTvSidebarExpanded(true, true);
+            } else if (!insideSidebar && isTvSidebarExpanded) {
+                setTvSidebarExpanded(false, true);
+            }
+        });
+    }
+
+    private boolean isViewDescendantOf(View child, View parent) {
+        if (child == null || parent == null) return false;
+        if (child == parent) return true;
+        ViewParent p = child.getParent();
+        while (p != null) {
+            if (p == parent) return true;
+            p = p.getParent();
+        }
+        return false;
+    }
+
+    private void setTvSidebarExpanded(boolean expand, boolean animate) {
+        if (layoutTvSidebar == null || !TvFocusHelper.isTv(this)) return;
+        isTvSidebarExpanded = expand;
+
+        int targetWidth = expand ? dpToPx(210) : dpToPx(64);
+        int targetPaddingStart = expand ? dpToPx(16) : dpToPx(8);
+        int targetPaddingEnd = expand ? dpToPx(12) : dpToPx(8);
+
+        if (tvSidebarAnimator != null && tvSidebarAnimator.isRunning()) {
+            tvSidebarAnimator.cancel();
+        }
+
+        if (animate) {
+            int startWidth = layoutTvSidebar.getWidth();
+            if (startWidth <= 0) startWidth = expand ? dpToPx(64) : dpToPx(210);
+            tvSidebarAnimator = ValueAnimator.ofInt(startWidth, targetWidth);
+            tvSidebarAnimator.setDuration(200);
+            tvSidebarAnimator.setInterpolator(new DecelerateInterpolator());
+            tvSidebarAnimator.addUpdateListener(anim -> {
+                int val = (Integer) anim.getAnimatedValue();
+                ViewGroup.LayoutParams lp = layoutTvSidebar.getLayoutParams();
+                if (lp != null) {
+                    lp.width = val;
+                    layoutTvSidebar.setLayoutParams(lp);
+                }
+            });
+            tvSidebarAnimator.start();
+        } else {
+            ViewGroup.LayoutParams lp = layoutTvSidebar.getLayoutParams();
+            if (lp != null) {
+                lp.width = targetWidth;
+                layoutTvSidebar.setLayoutParams(lp);
+            }
+        }
+
+        layoutTvSidebar.setPadding(targetPaddingStart, dpToPx(20), targetPaddingEnd, dpToPx(16));
+
+        // 1. App Brand Logo
+        if (layoutTvBrand != null && tvAppLogo != null) {
+            if (expand) {
+                tvAppLogo.setText("TATAP");
+                if (tvBadgeTv != null) tvBadgeTv.setVisibility(View.VISIBLE);
+                if (layoutTvBrand instanceof LinearLayout) {
+                    ((LinearLayout) layoutTvBrand).setGravity(Gravity.CENTER_VERTICAL | Gravity.START);
+                }
+                layoutTvBrand.setPadding(dpToPx(6), 0, dpToPx(6), 0);
+            } else {
+                tvAppLogo.setText("T");
+                if (tvBadgeTv != null) tvBadgeTv.setVisibility(View.GONE);
+                if (layoutTvBrand instanceof LinearLayout) {
+                    ((LinearLayout) layoutTvBrand).setGravity(Gravity.CENTER);
+                }
+                layoutTvBrand.setPadding(0, 0, 0, 0);
+            }
+        }
+
+        // 2. Quick Search Box
+        if (layoutSearchBox != null && etSearch != null) {
+            if (expand) {
+                etSearch.setHint("Cari anime...");
+                layoutSearchBox.setPadding(dpToPx(10), 0, dpToPx(10), 0);
+                etSearch.setPadding(0, 0, 0, 0);
+                if (btnClearSearch != null) {
+                    btnClearSearch.setVisibility(etSearch.getText().length() > 0 ? View.VISIBLE : View.GONE);
+                }
+            } else {
+                etSearch.setHint("");
+                layoutSearchBox.setPadding(0, 0, 0, 0);
+                etSearch.setPadding(dpToPx(12), 0, 0, 0);
+                if (btnClearSearch != null) {
+                    btnClearSearch.setVisibility(View.GONE);
+                }
+            }
+        }
+
+        // 3. Navigation Tabs
+        TextView[] tvTabs = new TextView[]{btnTabMusim, btnTabAiring, btnTabJadwal, btnTabRiwayat, btnTabFavorit, btnTabKatalog, btnTabGenre};
+        for (TextView tab : tvTabs) {
+            if (tab == null) continue;
+            if (expand) {
+                tab.setText(getTabTitleString(tab));
+                tab.setGravity(Gravity.CENTER_VERTICAL | Gravity.START);
+                tab.setPadding(dpToPx(10), 0, dpToPx(10), 0);
+            } else {
+                tab.setText("");
+                tab.setGravity(Gravity.CENTER);
+                tab.setPadding(0, 0, 0, 0);
+            }
+        }
+
+        // 4. Bottom Controls (Server Status & Menu)
+        if (layoutTvBottomControls != null && btnStatusPower != null && btnToggleMenu != null) {
+            if (expand) {
+                layoutTvBottomControls.setOrientation(LinearLayout.HORIZONTAL);
+                layoutTvBottomControls.setGravity(Gravity.CENTER_VERTICAL);
+
+                LinearLayout.LayoutParams lpPower = new LinearLayout.LayoutParams(dpToPx(36), dpToPx(36));
+                btnStatusPower.setLayoutParams(lpPower);
+
+                LinearLayout.LayoutParams lpMenu = new LinearLayout.LayoutParams(0, dpToPx(36), 1.0f);
+                lpMenu.setMarginStart(dpToPx(8));
+                btnToggleMenu.setLayoutParams(lpMenu);
+                btnToggleMenu.setText("Menu");
+                btnToggleMenu.setGravity(Gravity.CENTER);
+                btnToggleMenu.setPadding(0, 0, 0, 0);
+
+                btnStatusPower.setNextFocusRightId(R.id.btn_toggle_menu);
+                btnStatusPower.setNextFocusDownId(R.id.btn_status_power);
+                btnToggleMenu.setNextFocusLeftId(R.id.btn_status_power);
+                btnToggleMenu.setNextFocusUpId(R.id.btn_tab_genre);
+                btnToggleMenu.setNextFocusRightId(R.id.rv_anime_grid);
+                btnToggleMenu.setNextFocusDownId(R.id.btn_toggle_menu);
+            } else {
+                layoutTvBottomControls.setOrientation(LinearLayout.VERTICAL);
+                layoutTvBottomControls.setGravity(Gravity.CENTER_HORIZONTAL);
+
+                LinearLayout.LayoutParams lpPower = new LinearLayout.LayoutParams(dpToPx(36), dpToPx(36));
+                lpPower.gravity = Gravity.CENTER_HORIZONTAL;
+                btnStatusPower.setLayoutParams(lpPower);
+
+                LinearLayout.LayoutParams lpMenu = new LinearLayout.LayoutParams(dpToPx(36), dpToPx(36));
+                lpMenu.gravity = Gravity.CENTER_HORIZONTAL;
+                lpMenu.topMargin = dpToPx(6);
+                btnToggleMenu.setLayoutParams(lpMenu);
+                btnToggleMenu.setText("");
+                btnToggleMenu.setGravity(Gravity.CENTER);
+                btnToggleMenu.setPadding(0, 0, 0, 0);
+
+                btnStatusPower.setNextFocusDownId(R.id.btn_toggle_menu);
+                btnStatusPower.setNextFocusRightId(R.id.rv_anime_grid);
+                btnToggleMenu.setNextFocusUpId(R.id.btn_status_power);
+                btnToggleMenu.setNextFocusLeftId(R.id.btn_toggle_menu);
+                btnToggleMenu.setNextFocusRightId(R.id.rv_anime_grid);
+                btnToggleMenu.setNextFocusDownId(R.id.btn_toggle_menu);
+            }
+        }
+    }
+
     private void applyTvTopBarCompression() {
         if (!TvFocusHelper.isTv(this)) return;
 
@@ -332,9 +513,7 @@ public class MainActivity extends Activity {
                     LinearLayout.LayoutParams tlp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dpToPx(38));
                     tlp.setMargins(0, dpToPx(2), 0, dpToPx(2));
                     tab.setLayoutParams(tlp);
-                    tab.setGravity(Gravity.CENTER_VERTICAL);
                     tab.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f);
-                    tab.setPadding(dpToPx(10), 0, dpToPx(10), 0);
                     tab.setNextFocusRightId(R.id.rv_anime_grid);
                     tab.setNextFocusLeftId(tab.getId());
                     tab.setNextFocusUpId(i == 0 ? R.id.layout_search_box : tvTabs[i - 1].getId());
@@ -350,16 +529,17 @@ public class MainActivity extends Activity {
             }
             if (btnStatusPower != null) {
                 btnStatusPower.setNextFocusUpId(R.id.btn_tab_genre);
-                btnStatusPower.setNextFocusRightId(R.id.btn_toggle_menu);
+                btnStatusPower.setNextFocusRightId(isTvSidebarExpanded ? R.id.btn_toggle_menu : R.id.rv_anime_grid);
                 btnStatusPower.setNextFocusLeftId(R.id.btn_status_power);
-                btnStatusPower.setNextFocusDownId(R.id.btn_status_power);
+                btnStatusPower.setNextFocusDownId(isTvSidebarExpanded ? R.id.btn_status_power : R.id.btn_toggle_menu);
             }
             if (btnToggleMenu != null) {
-                btnToggleMenu.setNextFocusUpId(R.id.btn_tab_genre);
-                btnToggleMenu.setNextFocusLeftId(R.id.btn_status_power);
+                btnToggleMenu.setNextFocusUpId(isTvSidebarExpanded ? R.id.btn_tab_genre : R.id.btn_status_power);
+                btnToggleMenu.setNextFocusLeftId(isTvSidebarExpanded ? R.id.btn_status_power : R.id.btn_toggle_menu);
                 btnToggleMenu.setNextFocusRightId(R.id.rv_anime_grid);
                 btnToggleMenu.setNextFocusDownId(R.id.btn_toggle_menu);
             }
+            setTvSidebarExpanded(isTvSidebarExpanded, false);
             updateTabButtons();
             return;
         }
@@ -2065,10 +2245,15 @@ public class MainActivity extends Activity {
         }
         int color = active ? 0xFFFFFFFF : 0xFFA1A1A6;
         tab.setTextColor(color);
-        if (TvFocusHelper.isTv(this)) {
+        if (TvFocusHelper.isTv(this) && !isVerticalSidebar) {
             updateTvTabSpannable(tab, active);
         } else {
             tab.setCompoundDrawableTintList(android.content.res.ColorStateList.valueOf(color));
+        }
+        if (isVerticalSidebar) {
+            tab.setText(isTvSidebarExpanded ? getTabTitleString(tab) : "");
+            tab.setGravity(isTvSidebarExpanded ? (Gravity.CENTER_VERTICAL | Gravity.START) : Gravity.CENTER);
+            tab.setPadding(isTvSidebarExpanded ? dpToPx(10) : 0, 0, isTvSidebarExpanded ? dpToPx(10) : 0, 0);
         }
     }
 
@@ -2736,5 +2921,14 @@ public class MainActivity extends Activity {
                 }).start();
             }
         }
+    }
+
+    @Override
+    protected void onDestroy() {
+        if (tvSidebarAnimator != null) {
+            tvSidebarAnimator.cancel();
+            tvSidebarAnimator = null;
+        }
+        super.onDestroy();
     }
 }
