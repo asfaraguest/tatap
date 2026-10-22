@@ -27,11 +27,11 @@ def test_focus_visible_decoupled_from_tv_focus():
     # .tv-focus has TV specifications
     assert ".tv-focus {" in css or ".tv-focus\n{" in css
     assert "transform: scale(1.06) !important;" in css
-    assert "outline: 3px solid var(--accent, #19d0d0) !important;" in css
+    assert "outline: 3px solid var(--accent, #38bdf8) !important;" in css
 
     # :focus-visible is decoupled and uses calm Apple focus ring
     assert ":focus-visible {" in css or ":focus-visible\n{" in css
-    assert "box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px rgba(25, 208, 208, 0.5) !important;" in css
+    assert "box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px rgba(56, 189, 248, 0.45) !important;" in css
 
 
 def test_term_js_and_app_js_tv_focus_gating():

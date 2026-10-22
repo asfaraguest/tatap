@@ -25,7 +25,7 @@ def test_apple_ui_tokens_and_spring_curves():
     assert "--ease-spring" in css
     assert "cubic-bezier(0.22,1,0.36,1)" in css or "cubic-bezier(0.22, 1, 0.36, 1)" in css
     assert "--ease-out-smooth" in css
-    assert "--accent:#19d0d0;" in css or "--accent: #19d0d0;" in css
+    assert "--accent:#38bdf8;" in css or "--accent: #38bdf8;" in css
 
 
 def test_four_corner_independent_badges():
@@ -84,5 +84,5 @@ def test_mobile_breakpoints_and_tv_focus_preserved():
 
     # TV D-Pad focus preserved
     assert ".tv-focus" in css
-    assert "outline: 3px solid var(--accent, #19d0d0) !important;" in css
+    assert "outline: 3px solid var(--accent, #38bdf8) !important;" in css
     assert "scroll-margin: 72px !important;" in css

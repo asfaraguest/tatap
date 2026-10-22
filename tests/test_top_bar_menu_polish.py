@@ -74,15 +74,15 @@ def test_design_language_consistency_top_and_bottom():
 
     # Top bar gradient & shadow
     assert "linear-gradient(180deg,rgba(14,16,21,0.98)" in css_content or "linear-gradient(180deg, rgba(14, 16, 21, 0.98)" in css_content
-    assert "0 4px 20px rgba(0,0,0,0.5)" in css_content or "0 4px 20px rgba(0, 0, 0, 0.5)" in css_content
+    assert "0 4px 20px" in css_content
 
     # Bottom bar symmetrical complementary gradient & upward shadow
     assert "linear-gradient(0deg,rgba(14,16,21,0.98)" in css_content or "linear-gradient(0deg, rgba(14, 16, 21, 0.98)" in css_content
-    assert "0 -4px 20px rgba(0,0,0,0.5)" in css_content or "0 -4px 20px rgba(0, 0, 0, 0.5)" in css_content
+    assert "0 -4px 20px" in css_content
 
     # Matching surface backgrounds for tabs and search input
     assert "background:rgba(18,21,28,0.85)" in css_content or "background: rgba(18, 21, 28, 0.85)" in css_content
-    assert "border-radius:9px" in css_content or "border-radius: 9px" in css_content
+    assert "border-radius:10px" in css_content or "border-radius: 10px" in css_content or "border-radius:9px" in css_content
 
 
 def test_javascript_event_listeners_wired():

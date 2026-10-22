@@ -86,6 +86,30 @@ Kenaikan digit PATCH diterapkan secara mutlak sesuai kaidah Semantic Versioning 
    - **Lifecycle Guards:** Melindungi `onPause()` dan `onStop()` dengan pengecekan `isInPictureInPictureMode()` agar pemutaran video dan sinkronisasi subtitle tidak terhenti saat sistem Android memanggil lifecycle background.
    - **Isolasi Android TV:** PiP dinonaktifkan secara ketat pada platform Android TV (`TvFocusHelper.isTv(this)`) untuk menjaga integritas antarmuka 10-Foot UI Leanback.
    - **Automated Regression Suite (`tests/test_android_pip.py`):** Menambahkan test suite otomatis yang memvalidasi deklarasi manifest, aset vektor PiP, tombol layout, lifecycle hooks, dan guard PiP.
+16. **Penyempurnaan Hierarki Spacing, Top Bar, dan Transformasi Warna AI-SLOP ke Soft Modern Palette (Web & Desktop):**
+   - **Eliminasi Total Palet Warna 'AI-SLOP':** Mengganti warna cyan neon menyilaukan (`#19d0d0`, `#38e8e8`), warna rawa gelap berlumpur (`#00363a`, `#002428`, `#0e281e`, `#241b0d`), dan efek *neon halo bloom* yang berlebihan dengan palet warna Apple Soft Modern & Obsidian Slate: Soft Sky (`#38bdf8`), Cerulean Deep (`#0284c7`), Soft Light Sky (`#7dd3fc`), Obsidian Slate (`#0c0d12`), dan warm graphite surfaces yang teduh, nyaman di mata saat menonton anime di ruangan gelap.
+   - **Perapian Top Bar (`.tui-head`) & Apple Concentric Segmented Control:**
+     - Menyelaraskan tinggi top bar menjadi `58px` (desktop) dan `52px` (mobile) dengan bayangan lembut `0 4px 20px rgba(0,0,0,0.45)`.
+     - Mengimplementasikan prinsip konsentris Apple HIG pada bilah navigasi tab: container `.nav-tabs-bar` memiliki radius sudut $R = 10\text{px}$, padding $3\text{px}$, tinggi $38\text{px}$, dan tombol tab `.nav-tab-btn` memiliki radius sudut dalam konsentris $R_{\text{inner}} = 7\text{px}$ dengan tinggi $32\text{px}$ dan padding horizontal $15\text{px}$.
+     - Tombol roda gigi (*gear menu*) `.header-drawer-btn` diselaraskan menjadi bujur sangkar presisi $38\text{px} \times 38\text{px}$ dengan radius $10\text{px}$, tepat sejajar pada garis sumbu tengah (*midline*) dengan kontainer segmented control.
+     - Posisi popover `.apple-popover` disesuaikan ke `top: 62px` (memberikan jeda vertikal alami 4px di bawah top bar 58px).
+   - **Perapian Hierarki Ruang (*Padding & Margin*) Halaman & Komponen:**
+     - Kontainer utama `main`: padding diselaraskan menjadi `clamp(16px, 2.2vw, 26px) var(--pad-x) calc(var(--status-h) + 24px)`.
+     - Judul seksi `.sec-head`: margin vertikal diselaraskan ke `22px 0 14px;` (dengan elemen pertama `margin-top: 4px;`) menghilangkan kesan sesak.
+     - Kotak pencarian `.search-input-wrap`: tinggi `44px`, padding horizontal `14px`, radius sudut `10px`, dengan ring fokus presisi `0 0 0 3px var(--accent-soft)` tanpa efek *neon glow*.
+     - Baris pencarian bawah `.bottom-search-row`: padding vertikal `10px var(--pad-x)`.
+     - Teks kartu poster `.poster-body`: padding horizontal dan bawah `8px 6px 4px;` (dan `10px 6px 4px;` pada desktop lebar) sehingga judul anime tidak lagi menempel ke tepi batas kartu.
+     - Kartu riwayat `.hist-info`: padding `10px 12px;` dan jeda vertikal `gap: 4px;`.
+     - Modal detail anime `.sheet`: padding `clamp(16px, 2.4vw, 24px)`, margin kontrol episode `14px 0 10px`, meta box `12px 0 4px`, seasons bar `12px 0 4px` dengan radius `10px`, dan box sinopsis `12px 14px` dengan radius `8px`.
+   - **Transformasi Badges & Filter Chips Menjadi Soft Translucent Tint:**
+     - Score badge: amber hangat `rgba(245, 158, 11, 0.12)` & teks `#fbbf24`.
+     - Finished status: emerald natural `rgba(16, 185, 129, 0.12)` & teks `#34d399`.
+     - Ongoing status: soft sky `rgba(56, 189, 248, 0.12)` & teks `#38bdf8`.
+     - Chip aktif (`.cf-chip.active`, `.genre-list button.active`, `.btn-cf-genre.active`): soft tint `rgba(56, 189, 248, 0.15)` dengan border `var(--accent)`.
+   - **Sinkronisasi Kode JavaScript (`frontend/js/app.js`):**
+     - Menstandarkan inline button status resolve stream dan switcher sumber dari `var(--cyan,#00dbeb)` menjadi `var(--accent)`.
+   - **Automated Regression Suite (`tests/test_web_soft_colors_and_spacing.py`):**
+     - Menambahkan test suite otomatis yang memverifikasi tidak ada lagi warna AI-slop di `style.css` dan `app.js`, variabel soft color `:root`, dimensi konsentris top bar 58px / 38px / 32px, dan nilai padding/margin proporsional.
 
 ## [2.12.0] - 2026-10-22
 

@@ -1277,7 +1277,7 @@ function openPlayer(ep, resumeTime, forceRefresh){
         return;
       }
       $("pm-spinner").classList.add("hidden");
-      $("pm-status").innerHTML="ERROR: "+esc(r && r.error ? r.error : "gagal resolve stream")+" · <button id='pm-retry-btn' class='server-badge' style='background:rgba(255,255,255,0.1);border:1px solid var(--cyan,#00dbeb);color:var(--cyan,#00dbeb);cursor:pointer;border-radius:4px;padding:2px 8px;font:inherit;'>Coba Lagi ↻</button>";
+      $("pm-status").innerHTML="ERROR: "+esc(r && r.error ? r.error : "gagal resolve stream")+" · <button id='pm-retry-btn' class='server-badge' style='background:rgba(255,255,255,0.1);border:1px solid var(--accent);color:var(--accent);cursor:pointer;border-radius:4px;padding:2px 8px;font:inherit;'>Coba Lagi ↻</button>";
       var rb=$("pm-retry-btn"); if(rb) rb.onclick=function(){ openPlayer(ep, resumeTime, true); };
       toast("Gagal resolve stream: "+(r && r.error ? r.error : "unknown"));
       return;
@@ -1296,7 +1296,7 @@ function openPlayer(ep, resumeTime, forceRefresh){
     cur.source=r.data.source||"hianime";
     var picked=r.data.picked||(r.data.variants&&r.data.variants[0])||{q:"HD",url:r.data.master||""};
     var srvText=r.data.server||"";
-    $("pm-meta").innerHTML="ep "+ep+" · "+cur.mode.toUpperCase()+" · "+picked.q+" · <button id='pm-source-btn' class='server-badge' title='Klik untuk switch sumber' style='background:none;border:1px solid rgba(255,255,255,0.25);color:var(--cyan,#00dbeb);cursor:pointer;border-radius:4px;padding:1px 6px;font:inherit;'>"+esc(srvText)+" ⇄</button>"+(r.data.cached?" · cached":" · "+(Date.now()-t0)+"ms");
+    $("pm-meta").innerHTML="ep "+ep+" · "+cur.mode.toUpperCase()+" · "+picked.q+" · <button id='pm-source-btn' class='server-badge' title='Klik untuk switch sumber' style='background:none;border:1px solid rgba(255,255,255,0.25);color:var(--accent);cursor:pointer;border-radius:4px;padding:1px 6px;font:inherit;'>"+esc(srvText)+" ⇄</button>"+(r.data.cached?" · cached":" · "+(Date.now()-t0)+"ms");
     var srvBtn=$("pm-source-btn");
     if(srvBtn){
       srvBtn.onclick=function(){
@@ -1334,7 +1334,7 @@ function openPlayer(ep, resumeTime, forceRefresh){
       return;
     }
     $("pm-spinner").classList.add("hidden");
-    $("pm-status").innerHTML="KONEKSI GAGAL: "+esc(err&&err.message||err)+" · <button id='pm-retry-btn-err' class='server-badge' style='background:rgba(255,255,255,0.1);border:1px solid var(--cyan,#00dbeb);color:var(--cyan,#00dbeb);cursor:pointer;border-radius:4px;padding:2px 8px;font:inherit;'>Coba Lagi ↻</button>";
+    $("pm-status").innerHTML="KONEKSI GAGAL: "+esc(err&&err.message||err)+" · <button id='pm-retry-btn-err' class='server-badge' style='background:rgba(255,255,255,0.1);border:1px solid var(--accent);color:var(--accent);cursor:pointer;border-radius:4px;padding:2px 8px;font:inherit;'>Coba Lagi ↻</button>";
     var rb2=$("pm-retry-btn-err"); if(rb2) rb2.onclick=function(){ openPlayer(ep, resumeTime, true); };
     toast("Koneksi gagal saat resolve: "+(err&&err.message||err));
   });

@@ -30,8 +30,8 @@ def test_search_input_wrap_dimensions_and_desktop_alignment():
     css = STYLE_CSS.read_text(encoding="utf-8")
 
     # Dimensi search-input-wrap
-    assert "height:42px" in css or "height: 42px" in css
-    assert "padding:0 16px" in css or "padding: 0 16px" in css
+    assert "height:44px" in css or "height: 44px" in css
+    assert "padding:0 14px" in css or "padding: 0 14px" in css
     assert "flex:1 1 100%" in css or "flex: 1 1 100%" in css
 
     # Desktop container flush alignment (1560px)

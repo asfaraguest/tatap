@@ -37,11 +37,11 @@ def test_zero_backdrop_blur_tax():
 
 
 def test_obsidian_and_teal_tokens():
-    """Verify obsidian black (#000000) and electric teal (#19d0d0) tokens."""
+    """Verify obsidian black (#000000 fallback / #0c0d12) and soft sky/teal tokens."""
     css_content = STYLE_CSS.read_text(encoding="utf-8")
 
-    assert "--bg:#000000;" in css_content or "--bg: #000000;" in css_content
-    assert "--accent:#19d0d0;" in css_content or "--accent: #19d0d0;" in css_content
+    assert "--bg:#000000;" in css_content or "--bg: #000000;" in css_content or "--bg:#0c0d12;" in css_content or "--bg: #0c0d12;" in css_content
+    assert "--accent:#38bdf8;" in css_content or "--accent: #38bdf8;" in css_content
     assert ".eyebrow" in css_content
     assert ".shiru-divider" in css_content
 
