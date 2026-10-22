@@ -180,6 +180,8 @@
         android:layout_gravity="bottom|center_horizontal"
         android:layout_marginBottom="22dp"
         android:layout_marginHorizontal="24dp"
+        android:maxWidth="580dp"
+        android:elevation="25dp"
         android:background="@drawable/bg_subtitle_pill"
         android:paddingHorizontal="14dp"
         android:paddingVertical="6dp"

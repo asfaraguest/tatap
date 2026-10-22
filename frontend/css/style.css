@@ -761,7 +761,7 @@ body.no-ambient #ambient,body.no-ambient #ambient-fallback{display:none}
 /* Overlay subtitle milik app: posisi di atas video, pointer tembus.
    Harmonis dan konsisten antara mode windowed dan fullscreen. */
 .subs-overlay{position:absolute;left:0;right:0;bottom:7%;z-index:4;display:flex;justify-content:center;pointer-events:none;padding:0 6%;transition:bottom .2s ease}
-.subs-overlay span{display:inline-block;max-width:100%;text-align:center;color:#fff;background:rgba(0,0,0,.72);
+.subs-overlay span{display:inline-block;max-width:min(72ch, 76%);text-wrap:balance;text-align:center;color:#fff;background:rgba(0,0,0,.72);
   padding:.2em .6em;border-radius:4px;line-height:1.45;font-weight:600;
   text-shadow:-1px -1px 0 #000,1px -1px 0 #000,-1px 1px 0 #000,1px 1px 0 #000,0 2px 4px rgba(0,0,0,.8);font-family:inherit}
 .subs-overlay span:empty{display:none;padding:0;background:transparent}

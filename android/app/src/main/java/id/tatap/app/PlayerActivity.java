@@ -32,8 +32,10 @@ import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.util.TypedValue;
+import android.view.Gravity;
 import android.view.ViewGroup;
 import android.widget.Button;
+import android.widget.FrameLayout;
 import android.widget.ImageButton;
 import android.widget.LinearLayout;
 
@@ -293,6 +295,7 @@ public class PlayerActivity extends Activity {
                         lastSubtitleText = active.text;
                         tvSubtitles.setText(active.text);
                         tvSubtitles.setVisibility(View.VISIBLE);
+                        tvSubtitles.bringToFront();
                     }
                 } else {
                     if (tvSubtitles.getVisibility() == View.VISIBLE) {
@@ -750,6 +753,12 @@ public class PlayerActivity extends Activity {
     }
 
     private void hideSystemUi() {
+        if (TvFocusHelper.isTv(this)) {
+            // Android TV selalu berada di mode leanback fullscreen tanpa status bar / navigation bar.
+            // Jangan dispatch perubahan window insets atau system UI flags agar tidak memicu window re-layout
+            // dan tidak menyebabkan Hardware Composer (HWC) pada TV TCL mem-bypass layer UI overlay.
+            return;
+        }
         try {
             Window window = getWindow();
             if (window != null) {
@@ -858,6 +867,7 @@ public class PlayerActivity extends Activity {
             showSystemUiForPortrait();
             updatePortraitEpisodeDisplay();
         }
+        applySubtitleStyle();
     }
 
     @Override
@@ -1071,6 +1081,30 @@ public class PlayerActivity extends Activity {
             subView.setVisibility(View.GONE);
         }
 
+        // Reparent tvSubtitles ke playerView.getOverlayFrameLayout() agar berada di panggung overlay resmi Media3 di atas SurfaceView
+        FrameLayout overlayFrame = playerView.getOverlayFrameLayout();
+        if (overlayFrame != null && tvSubtitles != null) {
+            ViewGroup oldParent = (ViewGroup) tvSubtitles.getParent();
+            if (oldParent != null && oldParent != overlayFrame) {
+                oldParent.removeView(tvSubtitles);
+                FrameLayout.LayoutParams flp = new FrameLayout.LayoutParams(
+                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                        Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL
+                );
+                int marginH = dpToPx(24);
+                flp.leftMargin = marginH;
+                flp.rightMargin = marginH;
+                int marginB = dpToPx(22);
+                flp.bottomMargin = marginB;
+                overlayFrame.addView(tvSubtitles, flp);
+            }
+            tvSubtitles.setElevation(25f);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                tvSubtitles.setZ(25f);
+            }
+        }
+
         player.addListener(new Player.Listener() {
             @Override
             public void onTracksChanged(androidx.media3.common.Tracks tracks) {
@@ -1208,7 +1242,9 @@ public class PlayerActivity extends Activity {
                     btnExoSettings.setVisibility(View.VISIBLE);
                 }
             } else {
-                applySystemUiVisibility();
+                if (!TvFocusHelper.isTv(this)) {
+                    applySystemUiVisibility();
+                }
             }
         });
     }
@@ -3606,6 +3642,7 @@ public class PlayerActivity extends Activity {
         String bg = sp.getString("sub_bg", "subtle");
         String defaultSize = isTv ? "large" : "medium";
         String size = sp.getString("sub_size", defaultSize);
+        String wrapMode = sp.getString("sub_wrap", "compact");
 
         // 1. Margin Bawah (Posisi)
         int marginDp = 22; // Default 22dp: Rendah & pas di batas bawah layar
@@ -3613,13 +3650,49 @@ public class PlayerActivity extends Activity {
         else if ("high".equals(pos)) marginDp = 54;
 
         int marginPx = (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, marginDp, getResources().getDisplayMetrics());
-        ViewGroup.MarginLayoutParams lp = (ViewGroup.MarginLayoutParams) tvSubtitles.getLayoutParams();
-        if (lp != null) {
-            lp.bottomMargin = marginPx;
-            tvSubtitles.setLayoutParams(lp);
+        ViewGroup.LayoutParams rawLp = tvSubtitles.getLayoutParams();
+        if (rawLp instanceof ViewGroup.MarginLayoutParams) {
+            ((ViewGroup.MarginLayoutParams) rawLp).bottomMargin = marginPx;
+            tvSubtitles.setLayoutParams(rawLp);
         }
 
-        // 2. Ukuran Font & Spasi Baris Dinamis (Adaptif Android TV vs Mobile)
+        // 2. Batasan Lebar Maksimal & Tumpukan 2-3 Baris Seimbang (Balanced Multi-Line Wrapping)
+        int screenWidth = getResources().getDisplayMetrics().widthPixels;
+        boolean isLandscape = isTv || getResources().getConfiguration().orientation == Configuration.ORIENTATION_LANDSCAPE;
+        int maxSubWidthPx;
+        if (!isLandscape) {
+            // Mode Portrait HP: 92% lebar layar agar nyaman
+            maxSubWidthPx = (int) (screenWidth * 0.92f);
+        } else if (isTv) {
+            // Android TV / Google TV Layar Lebar
+            if ("wide".equals(wrapMode)) {
+                maxSubWidthPx = (int) (screenWidth * 0.90f);
+            } else if ("medium".equals(wrapMode)) {
+                maxSubWidthPx = Math.min((int) (screenWidth * 0.78f), dpToPx(1100));
+            } else {
+                // Default compact (2-3 tumpuk seimbang): ~65% lebar layar TV, maks 880dp
+                maxSubWidthPx = Math.min((int) (screenWidth * 0.65f), dpToPx(880));
+            }
+        } else {
+            // Mode Landscape HP / Tablet (Miring)
+            if ("wide".equals(wrapMode)) {
+                maxSubWidthPx = (int) (screenWidth * 0.90f);
+            } else if ("medium".equals(wrapMode)) {
+                maxSubWidthPx = Math.min((int) (screenWidth * 0.82f), dpToPx(720));
+            } else {
+                // Default compact: ~70% layar HP, maks 560dp agar tidak membentang 1 baris sangat panjang
+                maxSubWidthPx = Math.min((int) (screenWidth * 0.70f), dpToPx(560));
+            }
+        }
+        tvSubtitles.setMaxWidth(maxSubWidthPx);
+
+        // Aktifkan balanced line-breaking bawaan Android (API 23+)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            tvSubtitles.setBreakStrategy(android.graphics.text.LineBreaker.BREAK_STRATEGY_BALANCED);
+            tvSubtitles.setHyphenationFrequency(android.text.Layout.HYPHENATION_FREQUENCY_NONE);
+        }
+
+        // 3. Ukuran Font & Spasi Baris Dinamis (Adaptif Android TV vs Mobile)
         float sizeSp;
         if (isTv) {
             if ("small".equals(size)) sizeSp = 18f;
@@ -3644,7 +3717,7 @@ public class PlayerActivity extends Activity {
         // Spasi baris proporsional agar kalimat multi-baris berukuran besar tidak tumpang tindih
         tvSubtitles.setLineSpacing(0f, isTv ? 1.25f : 1.15f);
 
-        // 3. Latar Belakang & Shadow
+        // 4. Latar Belakang & Shadow
         GradientDrawable gd = new GradientDrawable();
         int cornerPx = (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, isTv ? 8 : 6, getResources().getDisplayMetrics());
         gd.setCornerRadius(cornerPx);
@@ -3673,9 +3746,11 @@ public class PlayerActivity extends Activity {
         String curBg = sp.getString("sub_bg", "subtle");
         String defaultSize = isTv ? "large" : "medium";
         String curSize = sp.getString("sub_size", defaultSize);
+        String curWrap = sp.getString("sub_wrap", "compact");
 
         String posLabel = "low".equals(curPos) ? "Bawah (22dp) [Pas]" : ("mid".equals(curPos) ? "Sedang (36dp)" : "Tinggi (54dp)");
         String bgLabel = "transparent".equals(curBg) ? "Transparan (Tanpa Box)" : ("subtle".equals(curBg) ? "Samar / Lembut (30%)" : ("medium".equals(curBg) ? "Sedang (55%)" : "Pekat (80%)"));
+        String wrapLabel = "wide".equals(curWrap) ? "Lebar Penuh (1 Baris Panjang)" : ("medium".equals(curWrap) ? "Sedang (~80% Layar)" : "Kompak (2-3 Tumpuk Seimbang) [Rekomendasi]");
 
         String sizeLabel;
         if (isTv) {
@@ -3702,6 +3777,7 @@ public class PlayerActivity extends Activity {
                 "Posisi Subtitle: " + posLabel,
                 "Latar Belakang: " + bgLabel,
                 "Ukuran Huruf: " + sizeLabel,
+                "Lebar / Tumpukan: " + wrapLabel,
                 "Reset ke Default"
         };
 
@@ -3713,7 +3789,9 @@ public class PlayerActivity extends Activity {
             } else if (which == 2) {
                 showSizePicker(sp);
             } else if (which == 3) {
-                sp.edit().putString("sub_pos", "low").putString("sub_bg", "subtle").putString("sub_size", defaultSize).apply();
+                showWrapPicker(sp);
+            } else if (which == 4) {
+                sp.edit().putString("sub_pos", "low").putString("sub_bg", "subtle").putString("sub_size", defaultSize).putString("sub_wrap", "compact").apply();
                 applySubtitleStyle();
                 Toast.makeText(this, "Tampilan subtitle direset ke default", Toast.LENGTH_SHORT).show();
             }
@@ -3828,6 +3906,28 @@ public class PlayerActivity extends Activity {
                     applySubtitleStyle();
                     dialog.dismiss();
                     Toast.makeText(this, "Ukuran subtitle disimpan", Toast.LENGTH_SHORT).show();
+                })
+                .setNegativeButton("Batal", null)
+                .show();
+    }
+
+    private void showWrapPicker(SharedPreferences sp) {
+        String[] options = new String[]{
+                "Kompak / Sinema (2-3 Tumpuk Seimbang) [Direkomendasikan]",
+                "Sedang (~80% Layar)",
+                "Lebar Penuh (Tanpa Batas / 1 Baris Panjang)"
+        };
+        String cur = sp.getString("sub_wrap", "compact");
+        int checked = "wide".equals(cur) ? 2 : ("medium".equals(cur) ? 1 : 0);
+
+        new AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+                .setTitle("Pilih Lebar / Tumpukan Subtitle")
+                .setSingleChoiceItems(options, checked, (dialog, which) -> {
+                    String val = which == 2 ? "wide" : (which == 1 ? "medium" : "compact");
+                    sp.edit().putString("sub_wrap", val).apply();
+                    applySubtitleStyle();
+                    dialog.dismiss();
+                    Toast.makeText(this, "Format tumpukan subtitle disimpan", Toast.LENGTH_SHORT).show();
                 })
                 .setNegativeButton("Batal", null)
                 .show();

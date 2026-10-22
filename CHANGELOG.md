@@ -13,6 +13,27 @@ Format versi menggunakan skema `MAJOR.MINOR.PATCH`:
 - **MINOR (x.Y.0):** Penambahan fitur atau kapabilitas baru yang tetap kompatibel ke belakang (*backward-compatible new features*). Digit PATCH direset ke 0.
 - **PATCH (x.y.Z):** Perbaikan bug, peningkatan stabilitas, atau perbaikan internal tanpa penambahan fitur baru (*backward-compatible bug fixes*).
 
+## [2.11.2] - 2026-10-22
+
+### Justifikasi SemVer 2.0.0 (PATCH: 2.11.1 -> 2.11.2)
+Kenaikan digit PATCH diterapkan secara mutlak sesuai kaidah Semantic Versioning 2.0.0 dan Direktif #3 [`AGENTS.md`](AGENTS.md) karena rilis ini berfokus pada perbaikan kompatibilitas rendering subtitle pada perangkat Smart TV TCL (Android TV / Google TV), pencegahan respons error 403 HTML Nginx upstream pada parser subtitle, serta optimalisasi tipografi subtitle multi-line 2–3 baris seimbang (*balanced wrapping*) di layar landscape HP, TV, dan Web Desktop tanpa memperkenalkan perubahan arsitektur yang merusak kompatibilitas ke belakang (*backward-compatible platform fixes & UX refinements*):
+
+1. **Perbaikan Subtitle Smart TV TCL Lenyap Saat Kontrol Auto-Hide (`PlayerActivity.java`):**
+   - **Reparenting ke `playerView.getOverlayFrameLayout()`:** Memindahkan elemen custom subtitle `tv_subtitles` dari `fl_player_wrapper` langsung ke dalam kontainer resmi `@id/exo_overlay` Media3 di atas layer video `SurfaceView` dan di bawah `PlayerControlView`.
+   - **Elevasi Hardware UI Layer (`25dp`):** Menetapkan `tvSubtitles.setElevation(25f)` dan `tvSubtitles.setZ(25f)` serta memanggil `tvSubtitles.bringToFront()` setiap kali cue aktif berganti, mencegah Hardware Composer (HWC) chipset MediaTek/RealTek pada Smart TV TCL mem-bypass layer UI grafis saat kontrol pemutar menghilang.
+   - **Isolasi `hideSystemUi()` khusus Android TV:** Meniadakan pemanggilan berulang `hideSystemUi()` saat kontrol *auto-hide* di Android TV (`TvFocusHelper.isTv(this)`), mengeliminasi siklus window layout traversal (`performTraversals`) yang sebelumnya memicu *drop* layer UI subtitle pada TCL TV.
+
+2. **Subtitle 2–3 Tumpuk Seimbang (*Balanced Multi-Line Subtitle Wrapping*):**
+   - **Dynamic MaxWidth Constraint:** Membatasi lebar teks subtitle di mode layar miring (landscape) dan Android TV (maks ~70%–72% lebar layar, maks 560dp di HP) agar kalimat panjang tidak membentang selebar 1 baris penuh dari ujung kiri ke ujung kanan layar.
+   - **Mesin Tipografi `LineBreaker.BREAK_STRATEGY_BALANCED` (Android API 23+):** Membagi kalimat panjang secara cerdas dan seimbang menjadi 2 atau 3 baris bertumpuk rapi di tengah bawah layar tanpa memenggal kata (`HYPHENATION_FREQUENCY_NONE`).
+   - **Menu Preferensi "Lebar / Tumpukan" pada Dialog Gaya Subtitle:** Menambahkan opsi kustomisasi tumpukan (*Kompak / Sinema (2-3 Tumpuk Seimbang) [Default]*, *Sedang (~80% Layar)*, dan *Lebar Penuh*) yang tersimpan persisten di `SharedPreferences`.
+   - **Penyelarasan Web Desktop (`style.css`):** Menerapkan `max-width: min(72ch, 76%); text-wrap: balance;` pada `.subs-overlay span` untuk memberikan pengalaman membaca subtitle sinematik 2–3 tumpuk di PC/Laptop layar lebar.
+
+3. **Backend Anti-403 HTML Subtitle Validator & Prioritas Referer (`backend/main.py`):**
+   - Memperketat validator `_is_valid_sub()` pada `_fetch_sub_text` agar tidak pernah menganggap respons HTML error Nginx/Cloudflare (seperti `403 Forbidden` 548 byte dari `hls.dramahot.top`) sebagai subtitle valid.
+   - Memprioritaskan referer resmi `https://zokoanime.video/` dan `https://dramahot.top/` di urutan pertama saat menangani stream dari domain `dramahot.top` (seperti *Magic Knight Rayearth 2026 Episode 1*).
+   - Menjaga paritas identik 100% pada modul Chaquopy embedded (`android/app/src/main/python/backend/main.py`).
+
 ## [2.11.1] - 2026-10-22
 
 ### Justifikasi SemVer 2.0.0 (PATCH: 2.11.0 -> 2.11.1)

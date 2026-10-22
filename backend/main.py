@@ -2114,19 +2114,33 @@ async def _fetch_sub_text(target_url, ref):
     h = _host_from(target_url)
 
     candidates = []
-    if ref:
+    t_low = target_url.lower()
+    # Domain-specific smart prioritization (dramahot/zokoanime butuh origin zokoanime/dramahot)
+    if any(k in t_low for k in ("dramahot", "zokoanime")) or "dramahot" in h or "zokoanime" in h:
+        candidates.extend(["https://zokoanime.video/", "https://dramahot.top/"])
+    if ref and ref not in candidates:
         candidates.append(ref)
 
-    # Domain-specific smart prioritization (Megaplay CDN butuh origin megaplay)
-    t_low = target_url.lower()
     if any(k in t_low for k in ("toroplay", "anichan", "broforgotsave", "stellarfrontier", "megaplay", "megacloud", "eclipseharbor", "embermeadow", "nexabloom")) or "/anime/" in t_low:
-        candidates.extend(["https://megaplay.buzz/", "https://anichan.to/", "https://megaplay.top/", "https://megacloud.tv/"])
-    if any(k in t_low for k in ("dramahot", "zokoanime")):
-        candidates.extend(["https://zokoanime.video/", "https://dramahot.top/"])
+        for m_ref in ("https://megaplay.buzz/", "https://anichan.to/", "https://megaplay.top/", "https://megacloud.tv/"):
+            if m_ref not in candidates:
+                candidates.append(m_ref)
 
     for f_ref in ("https://megaplay.buzz/", "https://megaplay.top/", "https://zokoanime.video/", "https://megacloud.blog/", "https://hianime.at/", "https://hianime.to/", ""):
         if f_ref not in candidates:
             candidates.append(f_ref)
+
+    def _is_valid_sub(txt_str: str) -> bool:
+        if not txt_str:
+            return False
+        t_clean = txt_str.strip()
+        t_low_s = t_clean.lower()
+        # Proteksi mutlak: jangan pernah menerima respons error HTML (403/502/404) sebagai subtitle
+        if "<html" in t_low_s or "<head" in t_low_s or "<body" in t_low_s or "<!doctype" in t_low_s:
+            return False
+        if "WEBVTT" in t_clean or "-->" in t_clean:
+            return True
+        return len(t_clean) > 200
 
     last_err = None
     for r_head in candidates:
@@ -2141,7 +2155,7 @@ async def _fetch_sub_text(target_url, ref):
                 loop = asyncio.get_running_loop()
                 raw = await loop.run_in_executor(None, lambda: tls_desync_request(target_url, headers=headers))
                 txt = raw.decode("utf-8", errors="replace")
-                if "WEBVTT" in txt or len(txt) > 200:
+                if _is_valid_sub(txt):
                     return txt
             except Exception as e:
                 last_err = e
@@ -2150,7 +2164,7 @@ async def _fetch_sub_text(target_url, ref):
         try:
             async with httpx.AsyncClient(follow_redirects=True, timeout=12.0) as c:
                 r = await c.get(target_url, headers=headers)
-                if r.status_code == 200 and ("WEBVTT" in r.text or len(r.text) > 200):
+                if r.status_code == 200 and _is_valid_sub(r.text):
                     return r.text
         except Exception as e:
             last_err = e
@@ -2161,7 +2175,7 @@ async def _fetch_sub_text(target_url, ref):
                 loop = asyncio.get_running_loop()
                 raw = await loop.run_in_executor(None, lambda: tls_desync_request(target_url, headers=headers))
                 txt = raw.decode("utf-8", errors="replace")
-                if "WEBVTT" in txt or len(txt) > 200:
+                if _is_valid_sub(txt):
                     return txt
             except Exception as e2:
                 last_err = e2
