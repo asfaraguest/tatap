@@ -13,6 +13,26 @@ Format versi menggunakan skema `MAJOR.MINOR.PATCH`:
 - **MINOR (x.Y.0):** Penambahan fitur atau kapabilitas baru yang tetap kompatibel ke belakang (*backward-compatible new features*). Digit PATCH direset ke 0.
 - **PATCH (x.y.Z):** Perbaikan bug, peningkatan stabilitas, atau perbaikan internal tanpa penambahan fitur baru (*backward-compatible bug fixes*).
 
+## [2.12.1] - 2026-10-22
+
+### Justifikasi SemVer 2.0.0 (PATCH: 2.12.0 -> 2.12.1)
+Kenaikan digit PATCH diterapkan secara mutlak sesuai kaidah Semantic Versioning 2.0.0 dan Direktif #3 [`AGENTS.md`](AGENTS.md) untuk perbaikan bug (*backward-compatible bug fix*) khusus platform Android TV (tatapTV) dan antarmuka Leanback 10-Foot UI:
+
+1. **Perbaikan Layar TV Tergencet (*Screen Squashing Fix*):**
+   - Menghilangkan tabrakan `android:id="@+id/layout_header_root"` pada root container `LinearLayout` di `src/tv/res/layout/activity_main.xml` dan `layout-television/activity_main.xml`, menggantinya dengan `android:id="@+id/layout_tv_root"`.
+   - Menambahkan guard `isVerticalSidebar` pada `MainActivity.java:applyTvTopBarCompression()` sehingga tinggi layar TV tidak pernah dipaksa menjadi 44dp saat menggunakan layout sidebar vertikal.
+2. **Pembersihan Sintaks XML Dangling:**
+   - Menghapus fragmen atribut duplikat yang tidak valid di bawah tab `btn_tab_genre` pada kedua berkas layout TV.
+3. **Penyelarasan Rantai Navigasi D-Pad TV:**
+   - Memperbaiki rantai fokus tombol bawah sidebar (`btn_status_power` dan `btn_toggle_menu`), di mana `nextFocusUp` kini mengarah ke `btn_tab_genre` alih-alih melompati menu.
+   - Mengembalikan perilaku alami navigasi bawah dari `btn_tab_jadwal` menuju `btn_tab_riwayat` di dalam sidebar vertikal, sementara tombol D-Pad Kanan mengarahkan fokus ke chip jadwal harian (`btn_day_senin`).
+4. **Docked Left Sidebar & Harmonisasi Dimensi Poster:**
+   - Menghilangkan overscan padding pada root TV layout sehingga background sidebar menempel penuh (*docked*) ke tepi kiri layar sesuai kaidah Apple TV, dengan safe-zone padding internal yang rapi.
+   - Menyelaraskan `tv_card_poster_height` menjadi 175dp–180dp di `dimens.xml` TV sehingga poster anime mempertahankan aspek rasio sinematik 2:3 yang proporsional pada grid 6 kolom.
+5. **Poles Tampilan Detail Anime (Indikator Nomor Saja):**
+   - Menghilangkan badge teks status yang menumpuk pada kartu episode di `DetailActivity.java` dan `item_episode.xml`.
+   - Menstandarkan tombol episode menjadi nomor murni terpusat dengan palet status Apple Flat UI (System Blue tinted untuk episode terakhir diputar, muted dark untuk yang sudah ditonton, dan clean elevated surface untuk yang belum).
+
 ## [2.12.0] - 2026-10-22
 
 ### Justifikasi SemVer 2.0.0 (MINOR: 2.11.0 -> 2.12.0)

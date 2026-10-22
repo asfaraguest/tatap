@@ -218,7 +218,11 @@ public class MainActivity extends Activity {
                     TvFocusHelper.attachFocusScale(chip, 1.06f, 4f);
                     chip.setNextFocusUpId(R.id.btn_tab_jadwal);
                     chip.setNextFocusDownId(R.id.rv_anime_grid);
-                    if (i > 0 && scheduleChips[i - 1] != null) chip.setNextFocusLeftId(scheduleChips[i - 1].getId());
+                    if (i > 0 && scheduleChips[i - 1] != null) {
+                        chip.setNextFocusLeftId(scheduleChips[i - 1].getId());
+                    } else {
+                        chip.setNextFocusLeftId(R.id.btn_tab_jadwal);
+                    }
                     if (i < scheduleChips.length - 1 && scheduleChips[i + 1] != null) chip.setNextFocusRightId(scheduleChips[i + 1].getId());
                 }
             }
@@ -318,6 +322,48 @@ public class MainActivity extends Activity {
     private void applyTvTopBarCompression() {
         if (!TvFocusHelper.isTv(this)) return;
 
+        boolean isVerticalSidebar = (layoutTabsContainer != null && layoutTabsContainer.getOrientation() == LinearLayout.VERTICAL);
+        if (isVerticalSidebar) {
+            // Android TV Left Sidebar (Apple Flat 10-Foot UI):
+            TextView[] tvTabs = new TextView[]{btnTabMusim, btnTabAiring, btnTabJadwal, btnTabRiwayat, btnTabFavorit, btnTabKatalog, btnTabGenre};
+            for (int i = 0; i < tvTabs.length; i++) {
+                TextView tab = tvTabs[i];
+                if (tab != null) {
+                    LinearLayout.LayoutParams tlp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dpToPx(38));
+                    tlp.setMargins(0, dpToPx(2), 0, dpToPx(2));
+                    tab.setLayoutParams(tlp);
+                    tab.setGravity(Gravity.CENTER_VERTICAL);
+                    tab.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f);
+                    tab.setPadding(dpToPx(10), 0, dpToPx(10), 0);
+                    tab.setNextFocusRightId(R.id.rv_anime_grid);
+                    tab.setNextFocusLeftId(tab.getId());
+                    tab.setNextFocusUpId(i == 0 ? R.id.layout_search_box : tvTabs[i - 1].getId());
+                    tab.setNextFocusDownId(i == tvTabs.length - 1 ? R.id.btn_status_power : tvTabs[i + 1].getId());
+                }
+            }
+
+            if (layoutSearchBox != null) {
+                layoutSearchBox.setNextFocusUpId(R.id.layout_search_box);
+                layoutSearchBox.setNextFocusDownId(R.id.btn_tab_musim);
+                layoutSearchBox.setNextFocusRightId(R.id.rv_anime_grid);
+                layoutSearchBox.setNextFocusLeftId(R.id.layout_search_box);
+            }
+            if (btnStatusPower != null) {
+                btnStatusPower.setNextFocusUpId(R.id.btn_tab_genre);
+                btnStatusPower.setNextFocusRightId(R.id.btn_toggle_menu);
+                btnStatusPower.setNextFocusLeftId(R.id.btn_status_power);
+                btnStatusPower.setNextFocusDownId(R.id.btn_status_power);
+            }
+            if (btnToggleMenu != null) {
+                btnToggleMenu.setNextFocusUpId(R.id.btn_tab_genre);
+                btnToggleMenu.setNextFocusLeftId(R.id.btn_status_power);
+                btnToggleMenu.setNextFocusRightId(R.id.rv_anime_grid);
+                btnToggleMenu.setNextFocusDownId(R.id.btn_toggle_menu);
+            }
+            updateTabButtons();
+            return;
+        }
+
         if (layoutHeaderRoot != null) {
             ViewGroup.LayoutParams lp = layoutHeaderRoot.getLayoutParams();
             if (lp != null) {
@@ -347,47 +393,6 @@ public class MainActivity extends Activity {
                 layoutTabsSegmented.setLayoutParams(mlp);
             }
             layoutTabsSegmented.setPadding(0, 0, 0, 0);
-        }
-        boolean isVerticalSidebar = (layoutTabsContainer != null && layoutTabsContainer.getOrientation() == LinearLayout.VERTICAL);
-        if (isVerticalSidebar) {
-            // Android TV Left Sidebar (Apple Flat 10-Foot UI):
-            TextView[] tvTabs = new TextView[]{btnTabMusim, btnTabAiring, btnTabJadwal, btnTabRiwayat, btnTabFavorit, btnTabKatalog, btnTabGenre};
-            for (int i = 0; i < tvTabs.length; i++) {
-                TextView tab = tvTabs[i];
-                if (tab != null) {
-                    LinearLayout.LayoutParams tlp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dpToPx(38));
-                    tlp.setMargins(0, dpToPx(2), 0, dpToPx(2));
-                    tab.setLayoutParams(tlp);
-                    tab.setGravity(Gravity.CENTER_VERTICAL);
-                    tab.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f);
-                    tab.setPadding(dpToPx(10), 0, dpToPx(10), 0);
-                    tab.setNextFocusRightId(R.id.rv_anime_grid);
-                    tab.setNextFocusLeftId(tab.getId());
-                    tab.setNextFocusUpId(i == 0 ? R.id.layout_search_box : tvTabs[i - 1].getId());
-                    tab.setNextFocusDownId(i == tvTabs.length - 1 ? R.id.btn_status_power : tvTabs[i + 1].getId());
-                }
-            }
-
-            if (layoutSearchBox != null) {
-                layoutSearchBox.setNextFocusUpId(R.id.layout_search_box);
-                layoutSearchBox.setNextFocusDownId(R.id.btn_tab_musim);
-                layoutSearchBox.setNextFocusRightId(R.id.rv_anime_grid);
-                layoutSearchBox.setNextFocusLeftId(R.id.layout_search_box);
-            }
-            if (btnStatusPower != null) {
-                btnStatusPower.setNextFocusUpId(R.id.btn_tab_favorit);
-                btnStatusPower.setNextFocusRightId(R.id.btn_toggle_menu);
-                btnStatusPower.setNextFocusLeftId(R.id.btn_status_power);
-                btnStatusPower.setNextFocusDownId(R.id.btn_status_power);
-            }
-            if (btnToggleMenu != null) {
-                btnToggleMenu.setNextFocusUpId(R.id.btn_tab_favorit);
-                btnToggleMenu.setNextFocusLeftId(R.id.btn_status_power);
-                btnToggleMenu.setNextFocusRightId(R.id.rv_anime_grid);
-                btnToggleMenu.setNextFocusDownId(R.id.btn_toggle_menu);
-            }
-            updateTabButtons();
-            return;
         }
 
         if (layoutTabsContainer != null) {
@@ -798,6 +803,9 @@ public class MainActivity extends Activity {
                 if (TvFocusHelper.isTv(this)) {
                     dBtn.setNextFocusUpId(R.id.btn_tab_jadwal);
                     dBtn.setNextFocusDownId(R.id.rv_anime_grid);
+                    if (dBtn == btnDaySenin) {
+                        dBtn.setNextFocusLeftId(R.id.btn_tab_jadwal);
+                    }
                 }
             }
         }
@@ -2132,7 +2140,13 @@ public class MainActivity extends Activity {
         setTabAppearance(btnTabGenre, isGenre);
 
         if (btnTabJadwal != null && TvFocusHelper.isTv(this)) {
-            btnTabJadwal.setNextFocusDownId(isJadwal ? R.id.btn_day_senin : R.id.rv_anime_grid);
+            boolean isVerticalSidebar = (layoutTabsContainer != null && layoutTabsContainer.getOrientation() == LinearLayout.VERTICAL);
+            if (isVerticalSidebar) {
+                btnTabJadwal.setNextFocusDownId(R.id.btn_tab_riwayat);
+                btnTabJadwal.setNextFocusRightId(isJadwal ? R.id.btn_day_senin : R.id.rv_anime_grid);
+            } else {
+                btnTabJadwal.setNextFocusDownId(isJadwal ? R.id.btn_day_senin : R.id.rv_anime_grid);
+            }
         }
 
         if (layoutScheduleDays != null) {

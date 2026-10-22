@@ -678,26 +678,25 @@ public class DetailActivity extends Activity {
             holder.tvTitle.setText(String.valueOf(ep));
 
             if (ep == cachedLastPlayedEp) {
-                // Last played episode: Apple System Blue
-                holder.card.setCardBackgroundColor(0xFF1E2B45);
+                // Last played episode: Apple System Blue (Nomor Saja)
+                holder.card.setCardBackgroundColor(0xFF162A45);
                 holder.card.setStrokeColor(0xFF0A84FF);
                 holder.tvTitle.setTextColor(0xFF0A84FF);
-                holder.tvBadge.setVisibility(View.VISIBLE);
-                holder.tvBadge.setText("TERAKHIR");
-                holder.tvBadge.setTextColor(0xFF0A84FF);
+                holder.tvTitle.setTypeface(null, android.graphics.Typeface.BOLD);
+                holder.tvBadge.setVisibility(View.GONE);
             } else if (cachedWatchedSet.contains(ep)) {
-                // Watched episode: Apple Muted
-                holder.card.setCardBackgroundColor(0xFF18181C);
-                holder.card.setStrokeColor(0xFF26262B);
+                // Watched episode: Apple Muted Surface (Nomor Saja)
+                holder.card.setCardBackgroundColor(0xFF141418);
+                holder.card.setStrokeColor(0xFF222228);
                 holder.tvTitle.setTextColor(0xFF71717A);
-                holder.tvBadge.setVisibility(View.VISIBLE);
-                holder.tvBadge.setText("DITONTON");
-                holder.tvBadge.setTextColor(0xFF30D158);
+                holder.tvTitle.setTypeface(null, android.graphics.Typeface.NORMAL);
+                holder.tvBadge.setVisibility(View.GONE);
             } else {
-                // Unwatched episode: Apple Elevated Surface
-                holder.card.setCardBackgroundColor(0xFF22242B);
+                // Unwatched episode: Apple Clean Elevated Surface (Nomor Saja)
+                holder.card.setCardBackgroundColor(0xFF1C1C22);
                 holder.card.setStrokeColor(0xFF2C2E38);
                 holder.tvTitle.setTextColor(0xFFF5F5F7);
+                holder.tvTitle.setTypeface(null, android.graphics.Typeface.NORMAL);
                 holder.tvBadge.setVisibility(View.GONE);
             }
 

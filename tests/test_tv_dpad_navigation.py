@@ -103,3 +103,37 @@ def test_six_level_back_hierarchy_and_tv_focus_styling():
     activity_java = MAIN_ACTIVITY.read_text(encoding="utf-8")
     assert "lastBackPressTime" in activity_java
     assert "Toast.makeText(this, \"Tekan sekali lagi untuk keluar dari Tatap\"" in activity_java
+
+
+def test_tv_sidebar_layout_root_id_and_no_squashing():
+    """Memastikan layout TV tidak memakai layout_header_root pada root container dan MainActivity memiliki guard isVerticalSidebar."""
+    tv_layout_path = REPO_ROOT / "android" / "app" / "src" / "tv" / "res" / "layout" / "activity_main.xml"
+    main_tv_layout_path = REPO_ROOT / "android" / "app" / "src" / "main" / "res" / "layout-television" / "activity_main.xml"
+    for p in [tv_layout_path, main_tv_layout_path]:
+        content = p.read_text(encoding="utf-8")
+        assert 'android:id="@+id/layout_tv_root"' in content, f"Root layout TV di {p} wajib ber-id layout_tv_root!"
+        assert 'android:id="@+id/layout_header_root"' not in content, f"Root layout TV di {p} dilarang memakai layout_header_root!"
+        assert "btn_tab_genre" in content
+        # Memastikan tidak ada duplikat syntax dangling
+        assert content.count('android:id="@+id/btn_tab_favorit"') == 1
+
+    activity_java = MAIN_ACTIVITY.read_text(encoding="utf-8")
+    assert "boolean isVerticalSidebar = (layoutTabsContainer != null && layoutTabsContainer.getOrientation() == LinearLayout.VERTICAL);" in activity_java
+    assert "if (isVerticalSidebar) {" in activity_java
+
+
+def test_detail_episode_clean_number_only_indicator():
+    """Memastikan kartu episode pada DetailActivity hanya menampilkan nomor episode bersih tanpa label badge teks yang berantakan."""
+    detail_java = REPO_ROOT / "android" / "app" / "src" / "main" / "java" / "id" / "tatap" / "app" / "DetailActivity.java"
+    content = detail_java.read_text(encoding="utf-8")
+    assert "holder.tvBadge.setVisibility(View.GONE)" in content
+    assert "Last played episode: Apple System Blue (Nomor Saja)" in content
+
+
+def test_tv_sidebar_bottom_controls_dpad_chain():
+    """Memastikan tombol kontrol bawah pada sidebar TV mengarah ke btn_tab_genre saat menekan D-Pad UP."""
+    tv_layout_path = REPO_ROOT / "android" / "app" / "src" / "tv" / "res" / "layout" / "activity_main.xml"
+    content = tv_layout_path.read_text(encoding="utf-8")
+    assert 'android:id="@+id/btn_status_power"' in content
+    assert 'android:nextFocusUp="@+id/btn_tab_genre"' in content
+    assert 'android:id="@+id/btn_toggle_menu"' in content

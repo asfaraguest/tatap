@@ -17,7 +17,7 @@
     <LinearLayout
         android:id="@+id/layout_ep_body"
         android:layout_width="match_parent"
-        android:layout_height="48dp"
+        android:layout_height="44dp"
         android:orientation="vertical"
         android:gravity="center"
         android:paddingHorizontal="4dp">
@@ -26,13 +26,7 @@
             android:id="@+id/tv_ep_status_badge"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="SELESAI"
-            android:textColor="@color/text_success"
-            android:textSize="@dimen/text_badge"
-            android:fontFamily="sans-serif-medium"
-            android:letterSpacing="0.04"
-            android:visibility="gone"
-            android:layout_marginBottom="1dp" />
+            android:visibility="gone" />
 
         <TextView
             android:id="@+id/tv_ep_title"
@@ -40,7 +34,7 @@
             android:layout_height="wrap_content"
             android:text="1"
             android:textColor="@color/text_primary"
-            android:textSize="@dimen/text_title_medium"
+            android:textSize="15sp"
             android:fontFamily="sans-serif-medium" />
     </LinearLayout>
 </com.google.android.material.card.MaterialCardView>
