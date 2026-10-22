@@ -250,6 +250,7 @@ def hianime_details(slug: str) -> dict:
         "score": 0.0,
         "status": "",
         "season": "",
+        "year": 0,
         "duration": "",
         "studio": "",
         "genres": [],
@@ -293,12 +294,46 @@ def hianime_details(slug: str) -> dict:
         if m_stat:
             out["status"] = m_stat.group(1).strip()
 
-        # Premiered / Season
+        # Premiered / Season / Year
         m_prem = re.search(r'class="item-head">Premiered:</span>\s*<span[^>]*class="name"[^>]*>([^<]+)</span>', html_txt)
         if not m_prem:
             m_prem = re.search(r'class="item-head">Premiered:</span>\s*<a[^>]*>([^<]+)</a>', html_txt)
         if m_prem:
             out["season"] = m_prem.group(1).strip()
+            m_yr = re.search(r'\b(19\d\d|20\d\d)\b', out["season"])
+            if m_yr:
+                try:
+                    out["year"] = int(m_yr.group(1))
+                except Exception:
+                    pass
+
+        # Fallback Aired jika Premiered / Season kosong
+        if not out.get("season"):
+            m_aired = re.search(r'class="item-head">Aired:</span>\s*<span[^>]*class="name"[^>]*>([^<]+)</span>', html_txt)
+            if not m_aired:
+                m_aired = re.search(r'class="item-head">Aired:</span>\s*<a[^>]*>([^<]+)</a>', html_txt)
+            if m_aired:
+                aired_str = m_aired.group(1).strip()
+                m_yr = re.search(r'\b(19\d\d|20\d\d)\b', aired_str)
+                yr = int(m_yr.group(1)) if m_yr else 0
+                if yr:
+                    out["year"] = yr
+                    m_mth = re.search(r'\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*', aired_str, re.I)
+                    if m_mth:
+                        m_str = m_mth.group(1).title()
+                        month_seasons = {
+                            "Jan": "Winter", "Feb": "Winter", "Mar": "Winter",
+                            "Apr": "Spring", "May": "Spring", "Jun": "Spring",
+                            "Jul": "Summer", "Aug": "Summer", "Sep": "Summer",
+                            "Oct": "Fall", "Nov": "Fall", "Dec": "Fall"
+                        }
+                        s_name = month_seasons.get(m_str, "")
+                        if s_name:
+                            out["season"] = f"{s_name} {yr}"
+                        else:
+                            out["season"] = str(yr)
+                    else:
+                        out["season"] = str(yr)
 
         # Duration
         m_dur = re.search(r'class="item-head">Duration:</span>\s*<span[^>]*class="name"[^>]*>([^<]+)</span>', html_txt)

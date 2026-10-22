@@ -641,7 +641,15 @@ function renderDetailMeta(meta){
   if(infoEl){
     var parts = [];
     if(meta.studio) parts.push("Studio: " + meta.studio);
-    if(meta.season) parts.push(meta.season);
+    if(meta.season){
+      var sTxt = meta.season;
+      if(meta.year && sTxt.indexOf(String(meta.year)) === -1){
+        sTxt += " " + meta.year;
+      }
+      parts.push(sTxt);
+    } else if(meta.year){
+      parts.push(String(meta.year));
+    }
     if(meta.source) parts.push("Sumber: " + meta.source);
     if(parts.length > 0){
       infoEl.textContent = parts.join(" · ");

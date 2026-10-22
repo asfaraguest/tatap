@@ -13,268 +13,45 @@ Format versi menggunakan skema `MAJOR.MINOR.PATCH`:
 - **MINOR (x.Y.0):** Penambahan fitur atau kapabilitas baru yang tetap kompatibel ke belakang (*backward-compatible new features*). Digit PATCH direset ke 0.
 - **PATCH (x.y.Z):** Perbaikan bug, peningkatan stabilitas, atau perbaikan internal tanpa penambahan fitur baru (*backward-compatible bug fixes*).
 
-## [2.12.1] - 2026-10-22
+## [2.11.0] - 2026-10-22
 
-### Justifikasi SemVer 2.0.0 (PATCH: 2.12.0 -> 2.12.1)
-Kenaikan digit PATCH diterapkan secara mutlak sesuai kaidah Semantic Versioning 2.0.0 dan Direktif #3 [`AGENTS.md`](AGENTS.md) untuk perbaikan bug (*backward-compatible bug fix*) khusus platform Android TV (tatapTV) dan antarmuka Leanback 10-Foot UI:
+### Justifikasi SemVer 2.0.0 (MINOR: 2.10.0 -> 2.11.0)
+Kenaikan digit MINOR diterapkan secara mutlak sesuai kaidah Semantic Versioning 2.0.0 dan Direktif #3 [`AGENTS.md`](AGENTS.md) karena memperkenalkan serangkaian penambahan modul arsitektur, provider streaming baru, dukungan Picture-in-Picture Android, Left Vertical Sidebar Android TV 10-Foot UI, Safe Mode content filter, pengayaan metadata multiplatform (Season & Tahun Rilis), serta Apple Flat UI multiplatform yang backward-compatible terhadap rilis publik stabil `v2.10.0`:
 
-1. **Perbaikan Layar TV Tergencet (*Screen Squashing Fix*):**
-   - Menghilangkan tabrakan `android:id="@+id/layout_header_root"` pada root container `LinearLayout` di `src/tv/res/layout/activity_main.xml` dan `layout-television/activity_main.xml`, menggantinya dengan `android:id="@+id/layout_tv_root"`.
-   - Menambahkan guard `isVerticalSidebar` pada `MainActivity.java:applyTvTopBarCompression()` sehingga tinggi layar TV tidak pernah dipaksa menjadi 44dp saat menggunakan layout sidebar vertikal.
-2. **Pembersihan Sintaks XML Dangling:**
-   - Menghapus fragmen atribut duplikat yang tidak valid di bawah tab `btn_tab_genre` pada kedua berkas layout TV.
-3. **Penyelarasan Rantai Navigasi D-Pad TV:**
-   - Memperbaiki rantai fokus tombol bawah sidebar (`btn_status_power` dan `btn_toggle_menu`), di mana `nextFocusUp` kini mengarah ke `btn_tab_genre` alih-alih melompati menu.
-   - Mengembalikan perilaku alami navigasi bawah dari `btn_tab_jadwal` menuju `btn_tab_riwayat` di dalam sidebar vertikal, sementara tombol D-Pad Kanan mengarahkan fokus ke chip jadwal harian (`btn_day_senin`).
-4. **Docked Left Sidebar & Harmonisasi Dimensi Poster:**
-   - Menghilangkan overscan padding pada root TV layout sehingga background sidebar menempel penuh (*docked*) ke tepi kiri layar sesuai kaidah Apple TV, dengan safe-zone padding internal yang rapi.
-   - Menyelaraskan `tv_card_poster_height` menjadi 175dp–180dp di `dimens.xml` TV sehingga poster anime mempertahankan aspek rasio sinematik 2:3 yang proporsional pada grid 6 kolom.
-5. **Poles Tampilan Detail Anime (Indikator Nomor Saja):**
-   - Menghilangkan badge teks status yang menumpuk pada kartu episode di `DetailActivity.java` dan `item_episode.xml`.
-   - Menstandarkan tombol episode menjadi nomor murni terpusat dengan palet status Apple Flat UI (System Blue tinted untuk episode terakhir diputar, muted dark untuk yang sudah ditonton, dan clean elevated surface untuk yang belum).
-6. **Penyempurnaan Web & Desktop UI, Search & Bottom Bar, Ikon Gear, dan Dual Theme (Terang & Gelap):**
-   - **Perbaikan Input Spasi Search Bar:** Menghilangkan *event bubbling* pada `#search-input-wrap` yang memicu `e.preventDefault()`, mengisolasi input `#cmd` via `e.stopPropagation()`, serta melepas atribut statis `readonly` pada HTML.
-   - **Perbaikan Backspace Blur Bug:** Memisahkan penanganan `Escape` dan `Backspace` pada `term.js:onKey(e)` sehingga menekan backspace saat mengetik di kotak pencarian tidak lagi melepas fokus kursor.
-   - **Tombol Clear & Preservasi Kata Kunci:** Menambahkan tombol clear (`✕`) pada search bar untuk menghapus teks secara instan, serta mempertahankan kata kunci pencarian di dalam input saat submit pencarian judul anime.
-   - **Penggantian Ikon Menu Kanan Atas:** Mengganti ikon elipsis 3 titik (`#icon-more-options`) dengan ikon roda gigi (*gear/settings*) bergaya Apple Flat UI dengan animasi rotasi halus 45 derajat saat hover.
-   - **Dual Theme Engine (Apple Light & Obsidian Dark):** Menyediakan sistem pergantian tema 2 mode (Terang & Gelap) dengan persistensi `localStorage`, atribut dinamis `data-theme="light"|"dark"`, pencegahan kedipan (*zero flicker init*), dan integrasi pada Popover menu (`⌘T`), Drawer navigasi, serta perintah terminal (`:tema` / `:theme`).
-   - **Desain Presisi Bottom Bar & Header:** Menyelaraskan gradien warna elegan pada `.tui-head`, `.bottom-bar`, dan `.apple-popover` dengan palet warna teroptimasi untuk mode terang maupun gelap tanpa membebani performa CPU perangkat *low-end* (zero blur tax) dan tanpa merusak kontras panggung pemutar video bioskop.
-
-7. **Perbaikan Duplicate Icon Sidebar Android TV:**
-   - Mengeliminasi pemanggilan `updateTvTabSpannable` pada sidebar vertikal TV (`isVerticalSidebar`) di `MainActivity.java` yang sebelumnya menyisipkan `CenteredImageSpan` ke dalam string teks tab sementara elemen layout XML telah memiliki `drawableStart`, yang memicu munculnya dua ikon kembar berdampingan (`[Icon] [Icon] Judul Tab`).
-   - Menstandarkan pewarnaan ikon murni melalui `tab.setCompoundDrawableTintList(...)`.
-   - Mengganti atribut `drawableStart` pada `btn_tab_genre` dari `@drawable/ic_filter` menjadi `@drawable/ic_tab_genre` yang tepat di kedua berkas layout TV (`src/tv/` dan `layout-television/`).
-8. **Autohide / Collapsed Rail (64dp) & Expand (210dp) Sidebar Android TV:**
-   - Menghadirkan mekanisme *Autohide* cerdas di mana bilah sisi meramping menjadi rel ikon kompak (`64dp`) saat pengguna menjelajah katalog poster anime (`rv_anime_grid`), meluaskan ruang lebar kisi poster anime hingga ~146dp untuk tampilan sinematik maksimal di layar TV 1080p dan 4K.
-   - Memasang `OnGlobalFocusChangeListener` pada root sidebar untuk mendeteksi pergerakan fokus remote D-Pad secara reaktif (zero polling); saat fokus berpindah ke kisi poster, sidebar otomatis meramping (*collapse*), dan saat remote diarahkan ke kiri masuk ke sidebar, sidebar mengembang halus (*expand* 210dp, durasi 200ms `DecelerateInterpolator`) menampilkan seluruh teks label tab, kolom pencarian, dan logo `TATAP TV`.
-   - Menyesuaikan orientasi kontrol bawah (`btn_status_power` dan `btn_toggle_menu`) menjadi vertikal saat collapsed dan horizontal saat expanded dengan rantai fokus remote D-Pad yang mengalir mulus tanpa hambatan.
-9. **Automated Regression Suite (`tests/test_android_tv_sidebar_autohide.py`):**
-   - Menambahkan test suite otomatis yang menguji ketiadaan duplicate ImageSpan pada vertical sidebar, integritas ID layout TV, nilai default dimensi rel `64dp` dan `210dp`, serta sinkronisasi paritas 100% kedua layout TV.
-10. **Background Pattern Wallpaper Mac (macOS Wave Ribbons, Ambient Mesh & Topographic Contours):**
-   - Menghadirkan pola wallpaper khas macOS (Sonoma/Ventura/Monterey/Sequoia) di `#bg-glow` menggunakan SVG vektor resolusi independen dan pure CSS multi-radial gradient mesh.
-   - Menggunakan 3 lapisan pita gelombang melengkung (*cubic bezier waves*) dan garis kontur topografi (*topographic contour lines*) yang halus dan dinamis.
-   - Adaptasi palet warna penuh: Mode Gelap (*Obsidian & Midnight Cyan/Indigo Glow*) dan Mode Terang (*Apple Studio Silver & Soft Sky/Lavender Ribbon Waves*).
-   - Menjaga filosofi *zero-bloat*, performa tinggi dengan hardware acceleration GPU, dan zero CPU overhead tanpa aset gambar raster eksternal.
-11. **Full-Width Layout `<footer class="bottom-bar">`:**
-   - Menghilangkan pembatasan `max-width: 1560px` pada `.bottom-search-row` dan `.statusbar` sehingga membentang penuh 100% (*edge-to-edge*) di semua resolusi layar lebar desktop, selaras dengan `.tui-head`.
-   - Menjaga kontainer konten `main` tetap terpusat dengan padding responsif yang konsisten.
-12. **Penyempurnaan Menyeluruh Apple Light Theme (`[data-theme="light"]`):**
-   - Memperbaiki latar belakang header dan footer di mode terang agar selaras dengan palet Apple Light Theme tanpa warna hitam pekat.
-   - Memperbaiki latar belakang kotak pencarian `.search-input-wrap` dan teks `#cmd` agar memiliki kontras tinggi dan mudah dibaca di atas tema terang.
-   - Memperbaiki `.apple-popover`, `.drawer-content`, badge status, genre pill, dan tombol chip aktif di mode terang.
-   - Membersihkan duplikasi 150+ baris CSS di akhir berkas `frontend/css/style.css`.
-   - Menjamin modal video player (`#player-modal`) tetap 100% hitam pekat (`#000000 !important`) di semua tema demi pengalaman teatrikal maksimal.
-13. **Automated Regression Suite (`tests/test_web_bottom_bar_and_light_theme.py`):**
-   - Menambahkan test suite otomatis yang memverifikasi Mac Wallpaper SVG, CSS variables, ketiadaan batasan 1560px pada bottom bar, ketiadaan duplikasi blok CSS, zero backdrop blur tax, dan integritas pemutar video bioskop.
-14. **Perapian Presisi Ikon Sidebar Android TV Mode Collapsed (Rail 64dp Midline Alignment):**
-   - Mengatasi masalah ikon yang berantakan dan tidak sejajar saat sidebar TV menciut (*collapsed rail 64dp*).
-   - Menyelaraskan seluruh 11 elemen vertikal sidebar ke garis sumbu tengah (*midline*) tepat di `x = 24dp` pada kontainer konten 48dp:
-     - Logo brand "T" (`tv_app_logo`): 24dp.
-     - Ikon pencarian (`etSearch`): padding horizontal `(48dp - 15dp) / 2 = 16.5dp` dan `compoundDrawablePadding(0)`.
-     - 7 Ikon Tab Navigasi (`btn_tab_*`): padding horizontal simetris `(48dp - 15dp) / 2 = 16.5dp` dan `compoundDrawablePadding(0)`.
-     - Tombol status server (`btn_status_power`): dimensi kotak simetris `38dp x 38dp` dengan internal icon padding `9dp`.
-     - Tombol menu (`btn_toggle_menu`): dimensi kotak simetris `38dp x 38dp`, top margin `8dp`, dan padding horizontal `(38dp - 15dp) / 2 = 11.5dp` berpusat di `24dp`.
-   - Mengunci preservasi padding rel pada `setTabAppearance` di `MainActivity.java` sehingga saat tab berganti status (aktif/inaktif) saat sidebar menciut, padding simetris dan pemusatan ikon tetap utuh 100%.
-   - Menambahkan pengujian regresi otomatis `test_tv_sidebar_collapsed_icons_centered` di `tests/test_android_tv_sidebar_autohide.py`.
-15. **Picture-in-Picture (PiP) Eksklusif Android Mobile:**
-   - Menghadirkan dukungan penuh mode Picture-in-Picture (PiP) pada `PlayerActivity.java` untuk perangkat Android Mobile (ponsel dan tablet).
-   - Menambahkan atribut `android:supportsPictureInPicture="true"` pada `AndroidManifest.xml`.
-   - **Seamless Auto-Enter & Gesture Support:** Mengintegrasikan `onUserLeaveHint()` dan `setAutoEnterEnabled(true)` (Android 12+ / API 31+) sehingga saat pengguna melakukan gesture swipe ke beranda (*Home*) atau menekan tombol Home saat video diputar, aplikasi bertransisi halus secara otomatis ke jendela mengambang (*floating window*).
-   - **Tombol Kontrol Manual:** Menambahkan tombol "PiP" berikon vektor pada bilah atas landscape (`btn_pip`) dan bilah kontrol portrait (`btn_portrait_pip`).
-   - **3 Remote Actions Interaktif:** Menyediakan tombol aksi interaktif pada jendela PiP (Mundur 10 detik, Play / Pause dinamis, dan Maju 10 detik) yang dikelola via `BroadcastReceiver` berizin `RECEIVER_NOT_EXPORTED` (Android 13+).
-   - **Subtitle Mini Proporsional:** Menyesuaikan ukuran font dan margin subtitle custom overlay saat berada dalam mode PiP (`10sp`, margin `4dp`) agar teks tetap terbaca jelas tanpa menutupi video, dan secara otomatis memulihkan preferensi ukuran subtitle pengguna saat kembali ke layar penuh.
-   - **Lifecycle Guards:** Melindungi `onPause()` dan `onStop()` dengan pengecekan `isInPictureInPictureMode()` agar pemutaran video dan sinkronisasi subtitle tidak terhenti saat sistem Android memanggil lifecycle background.
-   - **Isolasi Android TV:** PiP dinonaktifkan secara ketat pada platform Android TV (`TvFocusHelper.isTv(this)`) untuk menjaga integritas antarmuka 10-Foot UI Leanback.
-   - **Automated Regression Suite (`tests/test_android_pip.py`):** Menambahkan test suite otomatis yang memvalidasi deklarasi manifest, aset vektor PiP, tombol layout, lifecycle hooks, dan guard PiP.
-16. **Penyempurnaan Hierarki Spacing, Top Bar, dan Transformasi Warna AI-SLOP ke Soft Modern Palette (Web & Desktop):**
-   - **Eliminasi Total Palet Warna 'AI-SLOP':** Mengganti warna cyan neon menyilaukan (`#19d0d0`, `#38e8e8`), warna rawa gelap berlumpur (`#00363a`, `#002428`, `#0e281e`, `#241b0d`), dan efek *neon halo bloom* yang berlebihan dengan palet warna Apple Soft Modern & Obsidian Slate: Soft Sky (`#38bdf8`), Cerulean Deep (`#0284c7`), Soft Light Sky (`#7dd3fc`), Obsidian Slate (`#0c0d12`), dan warm graphite surfaces yang teduh, nyaman di mata saat menonton anime di ruangan gelap.
-   - **Perapian Top Bar (`.tui-head`) & Apple Concentric Segmented Control:**
-     - Menyelaraskan tinggi top bar menjadi `58px` (desktop) dan `52px` (mobile) dengan bayangan lembut `0 4px 20px rgba(0,0,0,0.45)`.
-     - Mengimplementasikan prinsip konsentris Apple HIG pada bilah navigasi tab: container `.nav-tabs-bar` memiliki radius sudut $R = 10\text{px}$, padding $3\text{px}$, tinggi $38\text{px}$, dan tombol tab `.nav-tab-btn` memiliki radius sudut dalam konsentris $R_{\text{inner}} = 7\text{px}$ dengan tinggi $32\text{px}$ dan padding horizontal $15\text{px}$.
-     - Tombol roda gigi (*gear menu*) `.header-drawer-btn` diselaraskan menjadi bujur sangkar presisi $38\text{px} \times 38\text{px}$ dengan radius $10\text{px}$, tepat sejajar pada garis sumbu tengah (*midline*) dengan kontainer segmented control.
-     - Posisi popover `.apple-popover` disesuaikan ke `top: 62px` (memberikan jeda vertikal alami 4px di bawah top bar 58px).
-   - **Perapian Hierarki Ruang (*Padding & Margin*) Halaman & Komponen:**
-     - Kontainer utama `main`: padding diselaraskan menjadi `clamp(16px, 2.2vw, 26px) var(--pad-x) calc(var(--status-h) + 24px)`.
-     - Judul seksi `.sec-head`: margin vertikal diselaraskan ke `22px 0 14px;` (dengan elemen pertama `margin-top: 4px;`) menghilangkan kesan sesak.
-     - Kotak pencarian `.search-input-wrap`: tinggi `44px`, padding horizontal `14px`, radius sudut `10px`, dengan ring fokus presisi `0 0 0 3px var(--accent-soft)` tanpa efek *neon glow*.
-     - Baris pencarian bawah `.bottom-search-row`: padding vertikal `10px var(--pad-x)`.
-     - Teks kartu poster `.poster-body`: padding horizontal dan bawah `8px 6px 4px;` (dan `10px 6px 4px;` pada desktop lebar) sehingga judul anime tidak lagi menempel ke tepi batas kartu.
-     - Kartu riwayat `.hist-info`: padding `10px 12px;` dan jeda vertikal `gap: 4px;`.
-     - Modal detail anime `.sheet`: padding `clamp(16px, 2.4vw, 24px)`, margin kontrol episode `14px 0 10px`, meta box `12px 0 4px`, seasons bar `12px 0 4px` dengan radius `10px`, dan box sinopsis `12px 14px` dengan radius `8px`.
-   - **Transformasi Badges & Filter Chips Menjadi Soft Translucent Tint:**
-     - Score badge: amber hangat `rgba(245, 158, 11, 0.12)` & teks `#fbbf24`.
-     - Finished status: emerald natural `rgba(16, 185, 129, 0.12)` & teks `#34d399`.
-     - Ongoing status: soft sky `rgba(56, 189, 248, 0.12)` & teks `#38bdf8`.
-     - Chip aktif (`.cf-chip.active`, `.genre-list button.active`, `.btn-cf-genre.active`): soft tint `rgba(56, 189, 248, 0.15)` dengan border `var(--accent)`.
-   - **Sinkronisasi Kode JavaScript (`frontend/js/app.js`):**
-     - Menstandarkan inline button status resolve stream dan switcher sumber dari `var(--cyan,#00dbeb)` menjadi `var(--accent)`.
-   - **Automated Regression Suite (`tests/test_web_soft_colors_and_spacing.py`):**
-     - Menambahkan test suite otomatis yang memverifikasi tidak ada lagi warna AI-slop di `style.css` dan `app.js`, variabel soft color `:root`, dimensi konsentris top bar 58px / 38px / 32px, dan nilai padding/margin proporsional.
-17. **Perbaikan Kehilangan Padding & Margin Saat Katalog Muncul (Web & Desktop):**
-   - **Eliminasi Penumpukan & Margin Collapse Antara Top Bar dan Judul Katalog:** Mengatur `padding-top` pada kontainer `main` secara konsisten menjadi `clamp(22px, 2.6vw, 34px)` dan menormalkan `margin: 0 0 clamp(16px, 2vw, 22px)` pada `.sec-head` (serta menghapus selector non-fungsional `main > .sec-head:first-child{margin-top:4px}` yang membuat heading terdesak ke atas).
-   - **Pemberian Headroom Proporsional Pada Grid Katalog Poster (`.poster-grid`):** Menambahkan `margin-top: clamp(6px, 1vw, 10px)` dan `margin-bottom: clamp(20px, 2.5vw, 40px)` pada `.poster-grid` di seluruh breakpoint layar. Menghilangkan masalah kartu baris pertama menempel ketat langsung di bawah teks judul seksi dan badge filter saat katalog selesai dimuat, sehingga kartu memiliki ruang gerak bebas saat efek hover/focus scale (`translate3d(0, -4px, 0) scale(1.015)`).
-   - **Penyelarasan Horizontal Guides dengan Top Bar & Bottom Bar:** Menstandarkan padding horizontal `main` menggunakan `var(--pad-x)` murni di semua resolusi desktop (menggantikan pembatasan kaku `max-width: 1560px` pada 1024px yang sebelumnya menyebabkan indentasi ganjil 90px pada konten katalog dibanding logo TATAP dan kotak pencarian), dengan batas maksimal `1680px` pada layar ultra-wide (>= 1600px).
-   - **Harmonisasi Spacing Empty State & Pager:** Menyelaraskan padding dan margin vertikal pada `.empty` (`clamp(22px, 3.5vw, 36px) 14px`) dan `.pager` (`clamp(22px, 2.5vw, 32px) 0 clamp(16px, 2vw, 24px)`) agar ritme visual konsisten di semua status pemuatan katalog.
-
-18. **Fitur Safe Mode (Mode Aman) Terisolasi pada Platform Android (Mobile & Android TV):**
-   - **Penyaringan Konten Vulgar & Ecchi Dinamis:**
-     - **Safe Mode ON (Default/Bawaan):** Menyembunyikan seluruh konten vulgar, genre dewasa, ecchi, erotica, dan magical-sex-shift dari penjelajahan katalog umum, penyaring genre (`dialog_genre_selector`), metadata chip genre di `DetailActivity`, serta pemfilteran kata kunci pencarian.
-     - **Safe Mode OFF:** Memberikan fleksibilitas bagi pengguna dewasa untuk menonaktifkan Mode Aman, mengizinkan katalog dan genre ecchi/erotica tampil secara normal.
-   - **Kepatuhan Mutlak Master Directive #4 (Zero-Tolerance Blacklist Hentai):**
-     - Konten dan kata kunci genre Hentai tetap diblokir 100% secara permanen di seluruh level arsitektur (backend scraper, browse, search, dan antarmuka UI) baik saat Safe Mode berstatus AKTIF maupun MATI.
-   - **Terminal Command & Interaksi UI Android TV/Mobile:**
-     - Mendukung perintah terminal cepat `:safemode` (serta alias `:safe`, `:aman`) dengan argumen opsional `on`/`off` atau ketuk langsung untuk toggle.
-     - Menambahkan item perintah visual `:safemode` pada `dialog_command_help.xml` lengkap dengan status badge dinamis (`AKTIF` `#38BDF8` / `MATI` `#EF4444`), deskripsi interaktif, dan penanganan fokus spasial remote TV (`TvFocusHelper`).
-   - **Sinkronisasi Otomatis Backend Chaquopy & Java State:**
-     - Pengaturan tersimpan persisten di `SharedPreferences` (`tatap_player_prefs`, key `pref_safemode`) dan secara otomatis tersinkronisasi ke backend FastAPI lokal via `POST /api/settings` (`safe_mode: "1"|"0"`).
-     - Menghapus cache tab memory (`tabDataCache.clear()`) seketika saat status Safe Mode berganti agar tampilan katalog langsung diperbarui tanpa perlu memuat ulang aplikasi.
-   - **Automated Regression Suite (`tests/test_safe_mode.py`):**
-     - Menambahkan rangkaian automated test yang memverifikasi helper `_parse_safe_mode`, endpoint API `/api/settings`, filtering genre `/api/genres`, pencarian `/api/search`, deklarasi XML layout Android, dan integrasi di `MainActivity.java` serta `DetailActivity.java`.
-
-## [2.12.0] - 2026-10-22
-
-### Justifikasi SemVer 2.0.0 (MINOR: 2.11.0 -> 2.12.0)
-Kenaikan digit MINOR diterapkan secara mutlak sesuai kaidah Semantic Versioning 2.0.0 dan Direktif #3 [`AGENTS.md`](AGENTS.md) karena memuat perombakan arsitektur navigasi Android TV 10-Foot UI (*Left Vertical Sidebar Navigation*), restrukturisasi navigasi Desktop berbasis Apple HIG Flat UI (*single-source navigation & Apple Options Popover*), standardisasi indikator episode murni angka (*Episode Number Only*), polesan tampilan Detail Anime Apple Flat Inspector, serta ketahanan metadata franchise dan katalog:
-
-1. **Android TV Left Vertical Sidebar Navigation (10-Foot UI):**
-   - Menggantikan bar menu horizontal atas yang memakan ruang vertikal pada layar TV dengan **Left Vertical Sidebar (~200dp)** pada `layout-television/activity_main.xml` dan `src/tv/res/layout/activity_main.xml`.
-   - Memberikan area katalog kanan ruang vertikal penuh (100% full height) dengan grid 5-6 kolom yang lebih lega dan imersif.
-   - Integrasi navigasi spasial D-Pad mulus: D-Pad Kanan dari item sidebar langsung berpindah ke kartu kolom 0 pada katalog, dan D-Pad Kiri dari kolom 0 katalog secara otomatis kembali ke tab sidebar yang sedang aktif via `dispatchKeyEvent` di `MainActivity.java`.
-   - Adopsi Apple tvOS Flat Dark Palette (`#161618`, `#1E1E22`, `#26262B`, Apple Blue `#0A84FF`) dengan selector fokus `bg_tv_sidebar_item.xml`.
-
-2. **Standardisasi Indikator Episode (Clean Episode Number Only):**
-   - Menghilangkan seluruh prefiks redundan (`EP 01`, `EP 12`, `SUB 12`, `Putar Ep 1`) pada seluruh antarmuka Android dan Web.
-   - Badge episode pada kartu anime (`AnimeAdapter.java`, `term.js`) kini secara konsisten menampilkan angka bersih (misal: `1`, `2`, `12` atau `12/24` atau `TAMAT`).
-   - Tombol quick play di Detail Anime diperbarui menjadi `"Putar 1"` atau `"Lanjutkan 4"`.
-   - Nomor episode di modal detail dan selector pemutar kini terpusat dengan angka murni.
-
-3. **Anime Detail View Apple Flat Polish:**
-   - Memperbarui `activity_detail.xml` dan `layout-land/activity_detail.xml` dengan palet Apple Flat UI: kontainer `#161618`, kartu `#1E1E22`, dan tombol aksi kapsul Apple Blue `#0A84FF`.
-   - Tipografi sinopsis Apple Subhead (`#86868B`, sans-serif-medium, letter-spacing 0.08) dengan body text `#D1D1D6` yang bersih dan mudah dibaca pada TV maupun smartphone.
-
-4. **Desktop Apple HIG Redesign & Anti-Menu Ganda:**
-   - Memusatkan navigasi desktop pada Top Segmented Pill Bar sebagai navigasi primer tunggal.
-   - Mengeliminasi menu ganda pada desktop melalui **Apple Options Popover (`⋯`)** untuk utilitas (Cross Filter Katalog, Filter Genre, Ganti Sumber Stream, Cek Pembaruan, Bantuan).
-   - Menambahkan spotlight search bar bergaya macOS dengan pintasan global `⌘K` / `Ctrl+K` dan `/`.
-
-5. **Metadata & Catalog Resilient Fallback:**
-   - Menambahkan fallback franchise relation langsung dari scraper HiAnime ketika AniList mengalami pemadaman (403 disabled) atau limitasi koneksi.
-   - Menyelaraskan filter katalog musim lampau (`sy` dan `ey`) dan pagination agar selalu menyajikan total halaman akurat.
-
-6. **Perbaikan Subtitle Anime Favorit (Bookmark) Tidak Muncul Permanen:**
-   - **Invalidasi Cache SQLite Otomatis**: Menambahkan `clear_episode_cache_for_slug` pada `database/__init__.py` dan mengintegrasikannya ke `add_bookmark` serta `remove_bookmark` agar status favorit baru selalu membersihkan cache episode yang berpotensi cacat.
-   - **Pencegahan Negative Subtitle Caching & Bypass Cache Stale**: Menambahkan parameter `refresh` dan route alias `/api/episode` pada `backend/main.py`. Mengabaikan cache hit dan scraping ulang jika `mode == 'sub'` namun entri cache tidak memiliki softsub yang valid, menghapus fallback buta ke cache 'dub', menolak penyimpanan ke `episode_cache` jika subtitle kosong, dan membersihkan in-memory failover cache saat bookmark diubah.
-   - **Isolasi State Web Player**: Memisahkan metadata jumlah episode bookmark (`cur.subCount`) dari track subtitle pemutar (`cur.activeSub`, `cur.res`, `cur.cues`), memuat detail lengkap anime saat membuka dari favorit, dan mengaktifkan auto-recovery `refresh=1` jika unbookmark terjadi saat pemutar aktif dengan subtitle kosong.
-   - **Android Native Intent & ExoPlayer Auto-Retry**: Memastikan `AnimeAdapter` dan `DetailActivity` selalu meneruskan extra `mode = 'sub'` yang valid, serta mengimplementasikan satu kali auto-retry dengan query `&refresh=1` pada `PlayerActivity` jika respons `mode='sub'` mengembalikan array subtitle kosong.
-
-## [2.11.0] - 2026-10-21
-
-### Justifikasi SemVer 2.0.0 (MINOR: 2.10.2 -> 2.11.0)
-Kenaikan digit MINOR diterapkan secara mutlak sesuai kaidah Semantic Versioning 2.0.0 dan Direktif #3 [`AGENTS.md`](AGENTS.md) karena memuat penambahan provider scraping baru (*new scraping provider*) dan kapabilitas failover streaming CDN otomatis (`https://anichan.to/`) yang tetap kompatibel ke belakang (*backward-compatible new feature*):
-
-1. **New Direct HLS Scraping Provider: AniChan (`backend/api/anichan.py` & Chaquopy Parity):**
-   - Mengimplementasikan scraper native untuk `https://anichan.to/` yang langsung mengekstrak stream **raw HLS Master `.m3u8` murni** (zero iframe/embed player) dan segmen MPEG-TS asli (`0x47`). Server bertipe `embed` ditolak keras.
-   - Mengelola sesi token otomatis via `POST /api/watch/session` dengan auto-refresh berdasarkan timestamp kedaluwarsa (`exp`).
-   - Menyediakan dekriptor AES-GCM 256-bit payload server dari `GET /api/watch/servers` berbasis HMAC-SHA256 session token dan kunci `XOR(O, b)` dengan fallback ekstraksi dinamis jika kunci rotasi di masa depan.
-   - Mengintegrasikan AniList ID resolver (`clean_title_for_search` dan `/api/suggest?q=...`) dengan pencocokan judul token similarity dan konsistensi musim.
-   - Mengekstrak varian resolusi adaptif (`1080p`, `720p`, `480p`, `360p`), track subtitle WEBVTT asli, dan metadata intro/outro untuk fitur AniSkip.
-   - Menerapkan perlindungan anti-hentai zero-tolerance (memvalidasi `isAdult: false` dan blacklist genre `Hentai`/`Adult`).
-2. **Title-Scoped Automatic CDN Failover (`backend/main.py`):**
-   - Kegagalan stream utama (HiAnime / Otakudesu) akibat CDN mati, 404, atau terblokir DPI (seperti kasus anime *Eyeshield 21*) secara transparan memicu failover otomatis ke AniChan HLS M3U8.
-   - **Isolasi Mutlak Per-Judul:** Failover dicatat pada memori judul `_ANIME_FAILOVER_CACHE[slug] = "anichan"`, sehingga episode lanjutan (ep 2, 3, dst.) dari judul tersebut langsung tersambung ke AniChan tanpa delay timeout, sementara preferensi sumber utama global pengguna (`preferred_source`) **TIDAK PERNAH DIUBAH**. Judul anime lain tetap memprioritaskan HiAnime secara normal.
-   - Mendaftarkan whitelist referer proxy video (`/api/player/video`) dan subtitle (`_fetch_sub_text`) untuk domain CDN AniChan (`toroplay.cymru`, `nexabloom.top`, `broforgotsave.online`, `shiora.top`, `imgnex.top`, `anichan.to`, `hiddenvertex.space`).
-   - Menambahkan fallback daftar episode via `anichan.get_episodes(slug)` jika HiAnime dan Otakudesu tidak memiliki data episode judul tertentu.
-3. **Frontend In-App Controls & Notification (`frontend/js/app.js`, `frontend/js/term.js`):**
-   - Menampilkan toast notifikasi informatif saat stream dialihkan via failover: `"CDN HiAnime tidak merespon · Otomatis memutar cadangan dari AniChan"`.
-   - Menambahkan opsi siklus sumber 3-arah (`hianime` $\leftrightarrow$ `otakudesu` $\leftrightarrow$ `anichan`) pada tombol sumber pemutar dan perintah terminal `:switch [hianime|otaku|anichan]` serta `:source anichan`.
-   - Menampilkan label `"SRC: ANICHAN (FAILOVER) ⇄"` pada tombol info sumber pemutar video.
-4. **Automated Unit Tests (`tests/test_anichan.py`):**
-   - Menambahkan 6 unit test baru mencakup normalisasi judul, dekripsi payload AES-GCM, unwrapping direct HLS M3U8, parser varian resolusi, penolakan keras konten hentai, dan cascading failover per-judul tanpa polusi preferensi global.
-
-## [2.10.2] - 2026-10-21
-
-### Justifikasi SemVer 2.0.0 (PATCH: 2.10.1 -> 2.10.2)
-Kenaikan digit PATCH diterapkan sesuai kaidah Semantic Versioning 2.0.0 karena memuat perbaikan bug navigasi (*navigation bug fixes*), perbaikan kompatibilitas platform Android TV dan 10-Foot UI, eliminasi *orphan focus*, pencegahan *virtual keyboard popup thrashing*, serta implementasi hierarki tombol Back berjenjang tanpa mengubah kontrak antarmuka eksternal (*backward-compatible platform ergonomics & bug fix patch*):
-1. **Zero Orphan Focus & Focus History Stack (`frontend/js/app.js`):**
-   - Mengimplementasikan `TvNavigationManager` yang mencatat `activeZone` (`tabs`, `search`, `chips`, `grid`, `detail-modal`, `player-hud`, `settings-modal`) dan `focusHistoryStack`.
-   - Menambahkan mekanisme preservasi fokus sebelum dan sesudah re-render DOM (`innerHTML = ''`), menyimpan indeks elemen fokus dan memulihkannya secara otomatis setelah render selesai, sehingga fokus tidak pernah terlempar ke `document.body`.
-   - Mengelola tumpukan riwayat fokus saat membuka Detail Anime, dialog Resume Watch, atau masuk ke Video Player, serta memulihkan fokus dan posisi scroll persis ke kartu atau episode pemicu saat pengguna menekan Back.
-2. **Geometric & Dynamic Grid Spatial Navigation (`frontend/js/app.js`, `frontend/js/term.js`):**
-   - Menghilangkan modulo statis `(idx + cols) % total` yang memicu wrap-around ke baris teratas saat pengguna menekan D-Pad Bawah di baris terbawah.
-   - Mengimplementasikan kalkulasi geometris spasial 2D via `getBoundingClientRect()` dan dynamic row grouping.
-   - Mengatasi edge-case baris terakhir tidak penuh: jika baris terakhir memiliki jumlah item lebih sedikit, target fokus otomatis dikunci ke item terakhir di baris bawah tersebut (`Math.min(targetIndex, items.length - 1)`).
-   - Menambahkan pemanggilan seragam `targetEl.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' })` pada setiap perpindahan fokus remote TV.
-3. **Player HUD State Machine & Auto-Hide Fix (`frontend/js/app.js`, `frontend/css/style.css`):**
-   - Memisahkan state fokus pemutaran video menjadi 3 mode tegas:
-     a) `PLAYER_IDLE`: HUD tersembunyi. D-Pad Kiri/Kanan langsung melakukan seek 5 detik tanpa terhalang kontrol tersembunyi; OK melakukan Play/Pause (atau eksekusi AniSkip jika aktif); Up memunculkan HUD kontrol atas; Down memfokuskan AniSkip atau bar bawah.
-     b) `PLAYER_HUD_ACTIVE`: HUD tampil dengan timer auto-hide 4000ms (4 detik) yang di-reset pada setiap interaksi D-Pad. Saat timer habis dan `hidePlayerControls()` berjalan, kelas `.tv-focus` dan `blur()` dibersihkan dari seluruh tombol HUD sebelum kembali ke mode `PLAYER_IDLE`.
-     c) `PLAYER_MODAL_ACTIVE`: Saat dialog pengaturan (Subtitle/Resolusi/Kecepatan/Resume) terbuka, timer auto-hide dihentikan sementara (*suspended*) dan navigasi dikunci (*focus trap*) di dalam dialog sampai ditutup.
-4. **Two-Stage Search Input Focus vs Virtual Keyboard (IME) (`frontend/js/app.js`, `frontend/index.html`, `MainActivity.java`):**
-   - Pada mode TV di antarmuka web, kolom pencarian `#cmd` berstatus `readonly` saat navigasi visual D-Pad (Stage 1), mencegah Virtual Keyboard (IME) muncul menutupi layar hanya karena dilewati cursor D-Pad.
-   - Mode ketik aktif (Stage 2) hanya dibuka ketika pengguna menekan tombol OK/Enter pada kolom pencarian.
-   - Di Android TV native (`MainActivity.java`), `layoutSearchBox` menerima fokus visual D-Pad terlebih dahulu, dan `etSearch` tidak memanggil `showKeyboard(SHOW_FORCED)` secara agresif. Tombol Back dan D-Pad Bawah menutup keyboard via `hideSoftInputFromWindow` dan mengembalikan fokus navigasi.
-5. **6-Level Back Button Hierarchy & Indikator Visual .tv-focus (`frontend/css/style.css`, `MainActivity.java`):**
-   - Memastikan seluruh elemen interaktif memiliki `tabindex="0"`.
-   - Memperkuat styling visual `.tv-focus` dengan `outline: 3px solid var(--accent)`, `transform: scale(1.06)`, `z-index: 20`, dan `scroll-margin: 72px` agar tidak terpotong header sticky maupun batas overscan TV.
-   - Menata alur penanganan tombol Back (`Escape` / `KEYCODE_BACK`) berjenjang 6-level:
-     (1) Tutup IME / keluar search edit $\to$ (2) Tutup modal dialog aktif $\to$ (3) Sembunyikan Player HUD $\to$ (4) Keluar Player ke Detail Episode $\to$ (5) Tutup Detail ke Grid Beranda $\to$ (6) Konfirmasi double-back (Toast 2000ms) untuk keluar aplikasi di layar utama.
-6. **Refaktorisasi AniSkip OP/ED Caching, Anti-Stutter Seek & Remote Shortcut (`backend/api/aniskip.py`, `backend/main.py`, `frontend/js/app.js`, `PlayerActivity.java`):**
-   - **Backend URL & Caching Fix:** Menghapus parameter statis `&episodeLength=0` dari endpoint AniSkip API (hanya disertakan jika durasi > 0). Memperbaiki logika caching agar tidak menyimpan respons kosong selama 24 jam saat terjadi network error/timeout/HTTP 5xx/429, menetapkan negative cache TTL 15 menit untuk 404, dan menambahkan validasi interval `is_valid_interval(start, end)` (durasi >= 5.0 detik).
-   - **Cross-Provider OP/ED Cache Sharing:** Timestamp OP/ED valid yang diperoleh dari provider mana pun disimpan dengan kunci `(mal_id, ep)` dan `(normalized_title, ep)`, sehingga saat pengguna beralih stream ke Otakudesu untuk anime yang sama, timestamp intro dan outro tetap tersedia.
-   - **Frontend Anti-Stutter & Rewind Tolerance:** State intro/outro, `activeSkipTarget`, dan tombol skip langsung di-reset sebelum request stream baru selesai. Ditambahkan flag `hasAutoSkippedIntro` dan `hasAutoSkippedOutro` serta offset `+0.5s` yang mengeliminasi seek loop / micro-stutter HLS dan memungkinkan pengguna me-rewind manual untuk mendengarkan lagu tanpa dilempar paksa ke depan.
-   - **Shortcut 'S' Collision Fix:** Event listener tombol keyboard `S` memeriksa status tombol skip terlebih dahulu; jika tombol skip sedang aktif/terlihat, tombol 'S' memicu eksekusi skip OP/ED dan mencegah pemanggilan `switchSource`.
-   - **ExoPlayer Android & Remote TV Fix:** Menambahkan validasi ketat interval (`introEnd > introStart && introEnd > 0 && duration >= 5000ms`) agar default {0, 0} tidak memicu tombol skip di 00:00. Ditambahkan flag auto-skip dan offset `+500ms`. Pada TV remote, tombol Fast-Forward langsung memicu skip, dan tombol OK mengeksekusi skip hanya jika tombol skip difokuskan atau saat HUD pemutar sedang tersembunyi.
-7. **Unit Test Suite Otomatis Navigasi TV & AniSkip (`tests/test_tv_dpad_navigation.py`, `tests/test_skip_times.py`):**
-   - Menambahkan unit test komprehensif baru untuk validasi interval, negative cache 404, error recovery tanpa cache polusi, dan cross-provider cache sharing.
-   - Seluruh 253 test suite unit tests Tatap lulus 100%.
-8. **Linux AppImage & Process Management Auto-Shutdown (`linux/AppRun`, `manage.sh`, `run.sh`):**
-   - **Auto-Shutdown Backend via Signal Trap (`linux/AppRun`):** Menambahkan fungsi pembersihan `cleanup()` dan mengikat sinyal via `trap cleanup EXIT INT TERM HUP`. Saat jendela peramban atau runtime AppImage ditutup, skrip mengirim sinyal `kill -TERM "$SERVER_PID"`, memberikan tenggat toleransi 2 detik agar koneksi database SQLite dan FastAPI tertutup dengan bersih, lalu mengirimkan `kill -KILL "$SERVER_PID"` jika proses masih menggantung, meniadakan proses zombie server backend di latar belakang.
-   - **Isolasi Proses Browser & Profil Independen (`linux/AppRun`):** Menambahkan flag `--user-data-dir="${DATA_DIR}/browser-profile"`, `--class=Tatap`, dan `--ozone-platform-hint=auto` pada eksekusi peramban berbasis Chromium (Chrome, Brave, Chromium, Edge). Isolasi ini mencegah *browser socket delegation* ke sesi browser pengguna yang sedang berjalan, sehingga `$BROWSER_PID` terikat murni pada jendela Tatap dan memicu `trap cleanup` seketika saat jendela aplikasi ditutup. Pada fallback `xdg-open`, ditambahkan panduan terminal dan notifikasi desktop interaktif.
-   - **Multi-User Safe Log & PID Handling (`manage.sh`, `run.sh`):** Mengganti hardcoded path `/tmp/tatap.log` menjadi path terisolasi ramah multi-user (`${XDG_STATE_HOME:-$HOME/.local/state}/tatap/tatap.log` dengan fallback `./cache/tatap.log` atau `/tmp/tatap-$UID/`) untuk mencegah error `Permission denied` pada Linux multi-user. Menambahkan verifikasi kepemilikan proses pengguna aktif (`ps -u "$UID" -p "$pid" -o args=`) sebelum menjalankan `kill`, dan membatasi perintah stop via `pkill -u "$UID"` agar tidak mengganggu proses milik pengguna lain. Menambahkan fallback deteksi python executable pada `run.sh`.
-   - **Unit Test Suite Linux Process Management (`tests/test_linux_process_management.py`):** Menambahkan 5 automated unit test untuk memverifikasi signal trap, isolasi profil peramban, isolasi path log multi-user, dan validasi sintaksis skrip bash (`bash -n`). Seluruh 258 unit test Tatap lulus 100%.
-9. **Pemolesan Visual Apple UI × OG Tatap Eksklusif Desktop & Web (`frontend/css/style.css`):**
-   - **Specular Inset Highlight & Animasi Pegas Apple:** Mengadopsi specular inset (`var(--specular-inset)`) dan kurva pegas Apple (`var(--ease-spring): cubic-bezier(0.22, 1, 0.36, 1)`) pada antarmuka desktop, memberikan kehalusan visual setara macOS Sequoia dan Apple TV+ tanpa membebani GPU/CPU dengan `backdrop-filter: blur()`.
-   - **Penataan 4 Sudut Badge Poster Tanpa Tabrakan:** Menata ulang posisi badge di kontainer poster `.pc-media` ke 4 sudut mandiri (Kiri Atas: Indeks, Kanan Atas: Skor Rating, Kiri Bawah: Tag Episode/Tamat, Kanan Bawah: Tag Tipe, Dasar: Progress Track) dengan gaya pill gelap Apple TV yang bersih.
-   - **Segmented Control & macOS Spotlight Bar:** Memperhalus tab navigasi atas (`.nav-tabs-bar`, `.nav-tab-btn`) dan kolom pencarian bawah (`#search-input-wrap`) bergaya Spotlight bar dengan prompt terminal `tatap$` aksen Cyan `#19d0d0`.
-   - **Detail Anime Sheet & Uniform Episode Grid:** Mengunci `max-height: min(86vh, 780px)` pada modal detail dengan scroll lancar dan tombol episode seragam 44px.
-   - **Video Player HUD & Floating Skip Pill:** Menyempurnakan transisi auto-hide HUD kontrol pemutar (220ms smooth) dan tombol AniSkip pill melayang.
-   - **Eksklusivitas Desktop & Web:** Seluruh breakpoint responsif mobile (`<= 768px`, `<= 480px`), remote TV D-Pad (`.tv-focus`), dan modul native Android (`android/`) tetap 100% utuh tanpa modifikasi.
-   - **Automated Unit Tests:** Menambahkan 6 automated unit test baru (`tests/test_apple_ui_desktop_polish.py`). Seluruh 264 test suite unit tests Tatap lulus 100%.
-10. **Redesign Apple UI & Eliminasi Total Bug Visual Desktop/Web (`frontend/css/style.css`, `frontend/js/term.js`, `frontend/js/app.js`, `frontend/index.html`):**
-    - **Pemisahan Total Fokus Desktop dari TV 10-Foot UI:** Mendekopel pemilih `:focus-visible` dari `.tv-focus`. Mengganti scaling paksa `scale(1.06)` dan neon glow 18px pada desktop dengan ring fokus Apple yang tenang (`box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px rgba(25, 208, 208, 0.5)`), meniadakan layout jumping saat navigasi atau klik mouse di peramban desktop.
-    - **Pencegahan TV Mode False-Positive di Desktop:** Memperbaiki `renderSel()` di `term.js` agar hanya menyematkan `.tv-focus` jika `isTvMode()` aktif. Mengeliminasi hardcoded `_isTvDetected = true` pada `setFocus()` di `app.js` agar peramban desktop tidak disalahartikan sebagai Android TV.
-    - **Eliminasi Double-Box Nesting pada Kartu Poster:** Mengubah kontainer luar `.poster-card` menjadi transparan dan tanpa border ganda, menjadikan artwork squircle `.pc-media` sebagai pahlawan visual utama dengan bayangan lembut Apple TV dan spring hover lift (`translateY(-4px) scale(1.015)`).
-    - **Badge Kapsul Kaca Gelap Translucent:** Mengganti warna solid teal, hijau, dan oranye yang mencolok pada `.pc-badge-ep`, `.pc-badge-tamat`, dan `.pc-badge-long` menjadi kapsul gelap elegan (`rgba(10,12,16,0.82)`) dengan border dan teks beraksen halus.
-    - **Pencarian Desktop Interaktif Seketika:** Menghilangkan kunci `readonly` pada `#cmd` di desktop saat inisialisasi sehingga pengguna dapat langsung mengklik dan mengetik tanpa hambatan.
-    - **Apple Capsule Player Controls:** Memperhalus tombol kontrol video player (`.player-head-btns button/select`, `.player-foot>button`, `.sub-picker`) menjadi pill capsule kaca semi-transparan (`border-radius: 999px`).
-    - **Refined Empty State Artwork:** Mempercantik tampilan kosong dengan ikon SVG viewfinder Tatap yang bersih menggantikan karakter ASCII mentah.
-    - **Automated Unit Tests:** Menambahkan 6 automated unit test baru (`tests/test_apple_ui_desktop_redesign.py`). Seluruh 270 test suite unit tests Tatap lulus 100%.
-
-## [2.10.1] - 2026-10-21
-
-### Justifikasi SemVer 2.0.0 (PATCH: 2.10.0 -> 2.10.1)
-Kenaikan digit PATCH diterapkan sesuai kaidah Semantic Versioning 2.0.0 karena memuat perbaikan bug keamanan kritis (*security vulnerability fix*), pencegahan kebocoran resource (*resource leak fix*), serta peningkatan stabilitas internal tanpa memodifikasi kontrak antarmuka eksternal (*backward-compatible security & reliability patch*):
-1. **Mitigasi Celah Kritis SSRF (Server-Side Request Forgery) & Intranet Scanning (`backend/main.py`):**
-   - Mengatasi kerentanan di mana endpoint proxy `/api/player/video`, `/api/player/sub`, dan `/api/player/sub_custom` memiliki konfigurasi CORS `Access-Control-Allow-Origin: *` dan sebelumnya hanya memverifikasi awalan skema `http`.
-   - Mengimplementasikan fungsi validasi terpusat `_validate_external_proxy_url(url)` yang menolak seluruh skema non-HTTP/HTTPS serta memblokir akses ke alamat IP privat RFC 1918 (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`), alamat loopback (`127.0.0.0/8`, `localhost`, `0.0.0.0`, `::1`), link-local/cloud metadata (`169.254.0.0/16`, `169.254.169.254`), multicast, dan domain intranet (`.local`, `.internal`) dengan status `HTTP 403 Forbidden`.
-   - Mencegah skrip jahat pada halaman web eksternal di peramban pengguna menyalahgunakan backend lokal Tatap (`127.0.0.1:8767`) untuk memindai jaringan lokal pengguna atau membaca layanan internal.
-2. **Eliminasi Kebocoran File Descriptor Socket pada TLS Desync Streaming (`backend/api/desync.py`):**
-   - Menyelidiki akar masalah terputusnya streaming video saat pengguna melakukan *seek*, *pause*, atau perpindahan episode: FastAPI `StreamingResponse` menginterupsi generator `tls_desync_stream` via `GeneratorExit`.
-   - Menata ulang generator `tls_desync_stream` dan fungsi transmisi `tls_desync_request` ke dalam blok `try...finally:`, menjamin pemanggilan `raw_sock.close()` selalu dieksekusi dalam kondisi apa pun sehingga mencegah akumulasi socket descriptor tak tertutup (`OSError: [Errno 24] Too many open files`).
-   - Menerapkan batasan kapasitas maksimum memori (*bounded cache* 256 entri) pada tabel in-memory `_DNS_CACHE`.
-3. **Graceful Connection Pool Cleanup pada FastAPI Lifespan (`backend/main.py`):**
-   - Menambahkan prosedur pembersihan koneksi jaringan asinkron saat server menerima sinyal *shutdown* pada handler `lifespan(app)`.
-   - Menutup connection pool `_direct_client` via `await _direct_client.aclose()`, serta memanggil pembersihan persistent client pada `api.anilist.close_al_client()`, `api.hianime.close_shared_client()`, dan `api.otakudesu.close_otaku_client()`.
-4. **Resiliensi Rate Limiting AniList & Optimasi Traversal Prekuel (`backend/api/anilist.py`):**
-   - Mengimplementasikan pelacak *backoff cooldown* in-memory `_al_rate_limit_until`: jika upstream AniList merespons `HTTP 429 Too Many Requests`, sistem secara cerdas membaca header `Retry-After` (default 60 detik) dan menahan request berikutnya agar tidak memperpanjang penalti ban IP pengguna, melainkan langsung mengalirkan *fallback* katalog HiAnime / data lokal.
-   - Mengoptimalkan penelusuran rantai prekuel pada `anime_relations()` dari 5 langkah menjadi 3 langkah maksimal, menghemat konsumsi kuota AniList secara drastis saat membuka modal detail anime berseri panjang.
-5. **Perbaikan Resolusi URL Relatif Master M3U8 (`backend/api/hianime.py`):**
-   - Memperbaiki metode pembacaan variant stream pada `_probe_master` agar menggunakan RFC-compliant `urllib.parse.urljoin(master_url, v_url)` alih-alih penggabungan string mentah `base + v_url`, mencegah terbentuknya URL cacat dengan double slash (`//`) pada CDN upstream bertingkat.
-6. **Penguatan Defense-in-Depth Sanitasi XSS Frontend (`frontend/js/app.js`, `frontend/js/term.js`):**
-   - Memperluas utilitas pembersih string `esc()` di antarmuka web desktop dan antarmuka TUI agar turut meng-escape karakter tanda kutip tunggal (`'` $\to$ `&#39;`), menutup celah penyisipan HTML injection pada atribut berelemen kutip tunggal.
-7. **Suite Pengujian Keamanan & Resiliensi Otomatis (`tests/test_security_and_resilience.py`):**
-   - Menambahkan 6 unit test baru yang memverifikasi penolakan SSRF, kelulusan URL publik sah, penutupan socket saat interupsi generator, serta pelacakan backoff AniList 429.
-   - Seluruh 243 unit test lulus 100%.
+1. **Provider Baru AniChan & Title-Scoped Direct HLS M3U8 Scraping (`backend/api/anichan.py`):**
+   - Implementasi modul scraper mandiri yang mengekstrak langsung master playlist HLS murni (`.m3u8`) tanpa webview/iframe eksternal.
+   - Title-Scoped Failover: Deteksi otomatis judul anime spesifik (seperti *Eyeshield 21*) untuk dialihkan ke AniChan saat sumber utama HiAnime mengalami kerusakan chunk video CDN, tanpa mempengaruhi anime lain.
+2. **Failover Jadwal & Musim Offline-Resilient (Jikan):**
+   - Sistem failover otomatis ke endpoint publik Jikan / Unofficial MyAnimeList saat AniList mengalami pemadaman (403 disabled) atau limitasi koneksi.
+3. **Android TV Left Vertical Sidebar Navigation (10-Foot UI):**
+   - Menggantikan bar menu horizontal atas dengan Left Vertical Sidebar (~200dp) pada TV layout (`tatapTV`).
+   - Autohide & Expand cerdas (64dp collapsed rail saat menjelajah kisi poster, 210dp expanded saat remote masuk ke sidebar) dengan animasi halus `DecelerateInterpolator`.
+   - Midline icon alignment pada seluruh tab sidebar TV dan eliminasi duplicate ImageSpan.
+4. **Apple Flat UI & HIG Redesign pada TV dan Desktop:**
+   - Standardisasi indikator nomor episode murni angka (*Episode Number Only*) pada detail anime.
+   - Apple Options Popover menu (`⋯` / `⚙`) untuk konsolidasi navigasi primer dan utilitas.
+   - Dual Theme Engine (Apple Light Theme & Obsidian Dark) dengan persistensi `localStorage` dan zero flicker.
+5. **Dukungan Picture-in-Picture (PiP) Android Mobile (`PlayerActivity.java`):**
+   - Mendukung Android O+ Picture-in-Picture API (`enterPictureInPictureMode`) saat pengguna menekan tombol Home atau beralih aplikasi.
+6. **Fitur Safe Mode (Mode Aman) Vulgar & Ecchi Content Filter (`safe_mode=1`):**
+   - Menyembunyikan konten bertag *ecchi*, *erotica*, dan *magical-sex-shift* dari katalog dan pencarian saat Safe Mode aktif (default: ON).
+   - Opsi beralih status secara instan via perintah `:safemode on|off` di terminal/search bar.
+   - Menjaga blacklist Hentai 100% permanen di semua layer backend dan UI (Master Directive #4).
+7. **Pengayaan Metadata Season & Tahun Rilis Multiplatform:**
+   - **Pencarian Anime (`/api/search`)**: Memperkaya hasil pencarian dengan `season` (contoh: `"Fall 2023"`) dan `year` (contoh: `2023`) secara asinkron via AniList GraphQL concurrent search matching.
+   - **Detail Anime (`hianime_details`)**: Fallback ekstraksi musim dan tahun rilis dari baris `Aired:` saat `Premiered:` tidak tersedia.
+   - **Tampilan Web & Desktop (`term.js`, `app.js`)**: Menampilkan musim & tahun pada baris pencarian (`tr-meta`) menggantikan raw slug ID, pada kisi kartu poster (`poster-meta`), dan info baris detail (`#tm-info-line`).
+   - **Tampilan Android Mobile & TV (`AnimeAdapter.java`, `DetailActivity.java`)**: Menampilkan musim & tahun pada kartu anime (`tvMeta`) dan info baris detail (`tvInfoLine`).
+8. **Pola Wallpaper Mac (macOS Ambient Waves & Topographic Contours):**
+   - Pola gelombang kurva Sonoma/Ventura/Monterey di `#bg-glow` berbasis SVG vektor dan pure CSS radial mesh tanpa dependensi gambar raster eksternal.
+9. **Penyempurnaan Palet Warna Soft Modern (Eliminasi AI-Slop) & Perbaikan Layout:**
+   - Menggantikan warna cyan neon menyilaukan dan rawa berlumpur dengan Soft Sky (`#38bdf8`), Cerulean Deep (`#0284c7`), dan Obsidian Slate (`#0c0d12`).
+   - Harmonisasi padding top bar dan headroom kisi katalog di semua resolusi.
+   - Full-width layout footer dan perbaikan penanganan spasi pada input pencarian.
+10. **Perbaikan Subtitle Anime Favorit (Bookmark) SQLite Cache:**
+    - Pembersihan otomatis cache episode SQLite saat anime ditambahkan/dihapus dari bookmark guna mencegah penumpukan data kadaluarsa.
+11. **Keamanan Jaringan & Kompatibilitas OS:**
+    - Mitigasi celah SSRF intranet proxy, pencegahan socket leak TLS desync, dan 16KB page alignment ready untuk Android 15 & 16.
 
 ## [2.10.0] - 2026-10-20
 

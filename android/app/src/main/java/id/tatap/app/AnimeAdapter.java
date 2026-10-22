@@ -184,9 +184,22 @@ public class AnimeAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
                 metaStr.append(" · ").append(type);
             }
         } else {
+            String season = item.optString("season", "");
+            String year = item.optString("year", "");
+            if (!season.isEmpty()) {
+                String sTxt = season;
+                if (!year.isEmpty() && !sTxt.contains(year)) {
+                    sTxt += " " + year;
+                }
+                metaStr.append(sTxt);
+            } else if (!year.isEmpty()) {
+                metaStr.append(year);
+            }
             if (!epsCounter.isEmpty()) {
+                if (metaStr.length() > 0) metaStr.append(" · ");
                 metaStr.append(epsCounter).append(" Ep");
             } else if (!eps.isEmpty() && !eps.equals("0")) {
+                if (metaStr.length() > 0) metaStr.append(" · ");
                 metaStr.append(eps).append(" Ep");
             }
             if (!duration.isEmpty()) {
@@ -204,6 +217,7 @@ public class AnimeAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
         String synopsis = item.optString("synopsis", "");
         String studio = item.optString("studio", "");
         String season = item.optString("season", "");
+        String year = item.optString("year", "");
         String rawStatus = item.optString("status", isFinished ? "finished" : (badge.equalsIgnoreCase("ONGOING") ? "releasing" : ""));
         final String status = (isFinished && (rawStatus.isEmpty() || rawStatus.equalsIgnoreCase("releasing"))) ? "finished" : rawStatus;
         String source = item.optString("source", "");
@@ -233,6 +247,7 @@ public class AnimeAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
             intent.putExtra("score", score);
             intent.putExtra("studio", studio);
             intent.putExtra("season", season);
+            intent.putExtra("year", year);
             intent.putExtra("status", status);
             intent.putExtra("source", source);
             intent.putExtra("genres", genresStr);

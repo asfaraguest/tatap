@@ -476,6 +476,13 @@ var Tui = (function () {
             var subMeta2=document.createElement("div");
             subMeta2.className="tr-meta";
             var sm2=[];
+            if(a.season){
+              var sStr = a.season;
+              if(a.year && sStr.indexOf(String(a.year)) === -1) sStr += " " + a.year;
+              sm2.push(sStr);
+            } else if(a.year){
+              sm2.push(String(a.year));
+            }
             if(a.type) sm2.push(a.type);
             if(a.eps_counter){
               sm2.push("Ep " + a.eps_counter);
@@ -484,7 +491,7 @@ var Tui = (function () {
               if(a.dub) sm2.push("DUB "+a.dub);
               if(a.eps) sm2.push(a.eps+" ep");
             }
-            if(a.id) sm2.push(a.id);
+            if(a.duration) sm2.push(a.duration);
             subMeta2.textContent=sm2.join(" · ");
             infoCol2.appendChild(subMeta2);
             d2.appendChild(infoCol2);
@@ -636,6 +643,13 @@ var Tui = (function () {
             if(a.mode)m.push(String(a.mode).toUpperCase());
             if(a.progress&&a.progress>=15&&window.App&&App.formatTimeSec)m.push(App.formatTimeSec(a.progress));
           }else{
+            if(a.season){
+              var sStr = a.season;
+              if(a.year && sStr.indexOf(String(a.year)) === -1) sStr += " " + a.year;
+              m.push(sStr);
+            } else if(a.year){
+              m.push(String(a.year));
+            }
             if(a.eps_counter){
               m.push("Ep "+a.eps_counter);
             }else if(a.eps){

@@ -281,6 +281,55 @@ async def health():
             reachable = False
     return ok({"hianime": HI_BASE, "reachable": reachable})
 
+def _enrich_search_results_with_metadata(items: list, al_meta_list: list):
+    """Perkaya item hasil pencarian dengan metadata season dan tahun dari AniList jika cocok."""
+    if not items:
+        return
+    for it in items:
+        if it.get("season") and it.get("year"):
+            continue
+        title = (it.get("title") or "").strip()
+        if not title:
+            continue
+        t_clean = re.sub(r'[^a-zA-Z0-9\s]', ' ', title.lower()).split()
+        t_set = set(t_clean)
+        best_match = None
+        best_score = 0.0
+        if al_meta_list and t_set:
+            for al_m in al_meta_list:
+                t_obj = al_m.get("title") or {}
+                al_titles = [t_obj.get("romaji"), t_obj.get("english"), t_obj.get("native")]
+                for at in al_titles:
+                    if not at:
+                        continue
+                    at_clean = re.sub(r'[^a-zA-Z0-9\s]', ' ', at.lower()).split()
+                    at_set = set(at_clean)
+                    if not at_set:
+                        continue
+                    common = t_set & at_set
+                    overlap = len(common) / min(len(t_set), len(at_set))
+                    if overlap > best_score:
+                        best_score = overlap
+                        best_match = al_m
+        if best_match and best_score >= 0.35:
+            s_name = (best_match.get("season") or "").title()
+            s_year = best_match.get("seasonYear") or (best_match.get("startDate") or {}).get("year") or 0
+            if s_name and s_year:
+                it["season"] = f"{s_name} {s_year}".strip()
+                it["year"] = s_year
+            elif s_year:
+                it["year"] = s_year
+                it["season"] = str(s_year)
+            elif s_name:
+                it["season"] = s_name
+
+        if not it.get("year"):
+            m_yr = re.search(r'\b(19\d\d|20\d\d)\b', title)
+            if m_yr:
+                it["year"] = int(m_yr.group(1))
+                if not it.get("season"):
+                    it["season"] = str(it["year"])
+
 @app.get("/api/search")
 async def search(q: str = Query(""), page: int = Query(1, ge=1, le=100), limit: int = 24, source: str = Query(""), safe_mode: int = Query(1)):
     q = (q if isinstance(q, str) else "").strip()
@@ -323,6 +372,7 @@ async def search(q: str = Query(""), page: int = Query(1, ge=1, le=100), limit: 
                 return ok({"results": results, "page": c_page, "total_pages": 1, "has_next": False, "cached": True})
         
         loop = asyncio.get_running_loop()
+        al_meta_task = loop.run_in_executor(None, lambda: al.search_anime_metadata(q, per_page=15))
         paged_res = None
         if src == "otakudesu":
             from api import otakudesu as ot
@@ -346,6 +396,13 @@ async def search(q: str = Query(""), page: int = Query(1, ge=1, le=100), limit: 
         
         if not paged_res:
             paged_res = {"results": [], "page": c_page, "total_pages": 1, "has_next": False}
+
+        if paged_res.get("results"):
+            try:
+                al_meta_list = await al_meta_task
+                _enrich_search_results_with_metadata(paged_res["results"], al_meta_list)
+            except Exception:
+                pass
             
         paged_res["cached"] = False
         if paged_res.get("results"):

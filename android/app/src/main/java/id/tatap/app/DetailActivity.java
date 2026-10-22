@@ -50,6 +50,7 @@ public class DetailActivity extends Activity {
     private String synopsis;
     private String studio;
     private String season;
+    private String year;
     private String status;
     private String source;
     private String genresStr;
@@ -113,6 +114,7 @@ public class DetailActivity extends Activity {
         score = getIntent().getDoubleExtra("score", 0.0);
         studio = getIntent().getStringExtra("studio");
         season = getIntent().getStringExtra("season");
+        year = getIntent().getStringExtra("year");
         status = getIntent().getStringExtra("status");
         source = getIntent().getStringExtra("source");
         genresStr = getIntent().getStringExtra("genres");
@@ -144,7 +146,7 @@ public class DetailActivity extends Activity {
         tvTitle.setText(title != null ? title : "Detail Anime");
         tvTitleFull.setText(title != null ? title : "Anime");
         setupSynopsis(synopsis);
-        setupMetadata(score, status, studio, season, source, genresStr);
+        setupMetadata(score, status, studio, season, year, source, genresStr);
 
         String badgeText = (type != null && !type.isEmpty() ? type : "ANIME")
                 + (epsCounter != null && !epsCounter.isEmpty() ? " · " + epsCounter + " EP" : (eps != null && !eps.isEmpty() ? " · " + eps + " EP" : ""))
@@ -331,6 +333,7 @@ public class DetailActivity extends Activity {
                         String apiStatus = detailObj.optString("status", "");
                         String apiStudio = detailObj.optString("studio", "");
                         String apiSeason = detailObj.optString("season", "");
+                        String apiYear = detailObj.optString("year", "");
                         String apiSource = detailObj.optString("source", "");
                         JSONArray apiGenres = detailObj.optJSONArray("genres");
                         String apiGenresStr = apiGenres != null ? apiGenres.toString() : "";
@@ -343,9 +346,10 @@ public class DetailActivity extends Activity {
                             }
                             if ((studio == null || studio.isEmpty()) && !apiStudio.isEmpty()) studio = apiStudio;
                             if ((season == null || season.isEmpty()) && !apiSeason.isEmpty()) season = apiSeason;
+                            if ((year == null || year.isEmpty()) && !apiYear.isEmpty()) year = apiYear;
                             if ((source == null || source.isEmpty()) && !apiSource.isEmpty()) source = apiSource;
                             if ((genresStr == null || genresStr.isEmpty()) && !apiGenresStr.isEmpty()) genresStr = apiGenresStr;
-                            setupMetadata(score, status, studio, season, source, genresStr);
+                            setupMetadata(score, status, studio, season, year, source, genresStr);
                         });
                     }
 
@@ -392,7 +396,7 @@ public class DetailActivity extends Activity {
                         if (isFinishedAnime) {
                             if (status == null || !status.toLowerCase().contains("finish")) {
                                 status = "finished";
-                                setupMetadata(score, status, studio, season, source, genresStr);
+                                setupMetadata(score, status, studio, season, year, source, genresStr);
                             }
                         }
 
@@ -440,7 +444,7 @@ public class DetailActivity extends Activity {
         }).start();
     }
 
-    private void setupMetadata(double scoreVal, String statusVal, String studioVal, String seasonVal, String sourceVal, String genresData) {
+    private void setupMetadata(double scoreVal, String statusVal, String studioVal, String seasonVal, String yearVal, String sourceVal, String genresData) {
         // Score Badge
         if (tvScore != null) {
             if (scoreVal > 0) {
@@ -480,7 +484,13 @@ public class DetailActivity extends Activity {
                 metaParts.add("Studio: " + studioVal.trim());
             }
             if (seasonVal != null && !seasonVal.trim().isEmpty()) {
-                metaParts.add(seasonVal.trim());
+                String sTxt = seasonVal.trim();
+                if (yearVal != null && !yearVal.trim().isEmpty() && !sTxt.contains(yearVal.trim())) {
+                    sTxt += " " + yearVal.trim();
+                }
+                metaParts.add(sTxt);
+            } else if (yearVal != null && !yearVal.trim().isEmpty()) {
+                metaParts.add(yearVal.trim());
             }
             if (sourceVal != null && !sourceVal.trim().isEmpty()) {
                 metaParts.add("Sumber: " + sourceVal.trim());

@@ -481,3 +481,38 @@ def anime_relations(search_query: str):
         return []
 
 
+SEARCH_METADATA_QUERY = """
+query ($search: String, $perPage: Int) {
+  Page(page: 1, perPage: $perPage) {
+    media(search: $search, type: ANIME, sort: SEARCH_MATCH) {
+      id
+      title { romaji english native }
+      season
+      seasonYear
+      startDate { year }
+    }
+  }
+}
+"""
+
+
+def search_anime_metadata(search_query: str, per_page: int = 12) -> list:
+    """Cari metadata anime (season, year, title) dari AniList untuk memperkaya hasil pencarian."""
+    if not search_query or not search_query.strip() or _is_rate_limited():
+        return []
+    try:
+        c = _get_al_client()
+        r = c.post(ANILIST_URL, json={
+            "query": SEARCH_METADATA_QUERY,
+            "variables": {"search": search_query.strip(), "perPage": per_page}
+        })
+        if r.status_code != 200:
+            _record_rate_limit(r)
+            return []
+        data = r.json().get("data", {}).get("Page", {}).get("media", [])
+        return data or []
+    except Exception:
+        return []
+
+
+
