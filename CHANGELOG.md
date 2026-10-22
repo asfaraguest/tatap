@@ -110,6 +110,11 @@ Kenaikan digit PATCH diterapkan secara mutlak sesuai kaidah Semantic Versioning 
      - Menstandarkan inline button status resolve stream dan switcher sumber dari `var(--cyan,#00dbeb)` menjadi `var(--accent)`.
    - **Automated Regression Suite (`tests/test_web_soft_colors_and_spacing.py`):**
      - Menambahkan test suite otomatis yang memverifikasi tidak ada lagi warna AI-slop di `style.css` dan `app.js`, variabel soft color `:root`, dimensi konsentris top bar 58px / 38px / 32px, dan nilai padding/margin proporsional.
+17. **Perbaikan Kehilangan Padding & Margin Saat Katalog Muncul (Web & Desktop):**
+   - **Eliminasi Penumpukan & Margin Collapse Antara Top Bar dan Judul Katalog:** Mengatur `padding-top` pada kontainer `main` secara konsisten menjadi `clamp(22px, 2.6vw, 34px)` dan menormalkan `margin: 0 0 clamp(16px, 2vw, 22px)` pada `.sec-head` (serta menghapus selector non-fungsional `main > .sec-head:first-child{margin-top:4px}` yang membuat heading terdesak ke atas).
+   - **Pemberian Headroom Proporsional Pada Grid Katalog Poster (`.poster-grid`):** Menambahkan `margin-top: clamp(6px, 1vw, 10px)` dan `margin-bottom: clamp(20px, 2.5vw, 40px)` pada `.poster-grid` di seluruh breakpoint layar. Menghilangkan masalah kartu baris pertama menempel ketat langsung di bawah teks judul seksi dan badge filter saat katalog selesai dimuat, sehingga kartu memiliki ruang gerak bebas saat efek hover/focus scale (`translate3d(0, -4px, 0) scale(1.015)`).
+   - **Penyelarasan Horizontal Guides dengan Top Bar & Bottom Bar:** Menstandarkan padding horizontal `main` menggunakan `var(--pad-x)` murni di semua resolusi desktop (menggantikan pembatasan kaku `max-width: 1560px` pada 1024px yang sebelumnya menyebabkan indentasi ganjil 90px pada konten katalog dibanding logo TATAP dan kotak pencarian), dengan batas maksimal `1680px` pada layar ultra-wide (>= 1600px).
+   - **Harmonisasi Spacing Empty State & Pager:** Menyelaraskan padding dan margin vertikal pada `.empty` (`clamp(22px, 3.5vw, 36px) 14px`) dan `.pager` (`clamp(22px, 2.5vw, 32px) 0 clamp(16px, 2vw, 24px)`) agar ritme visual konsisten di semua status pemuatan katalog.
 
 ## [2.12.0] - 2026-10-22
 

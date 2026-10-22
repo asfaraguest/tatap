@@ -65,11 +65,15 @@ def test_spacing_padding_and_margins():
     content_no_space = re.sub(r"\s+", "", content)
 
     # main container padding
-    assert "padding:clamp(16px,2.2vw,26px)var(--pad-x)calc(var(--status-h)+24px);" in content_no_space
+    assert "padding:clamp(22px,2.6vw,34px)var(--pad-x)calc(var(--status-h)+36px);" in content_no_space
 
-    # Section head vertical rhythm
-    assert "margin:22px 0 14px;" in content or "margin: 22px 0 14px;" in content
-    assert "main>.sec-head:first-child{margin-top:4px" in content_no_space
+    # Section head vertical rhythm and catalog spacing
+    assert "margin:0 0 clamp(16px,2vw,22px);" in content or "margin: 0 0 clamp(16px, 2vw, 22px);" in content
+    assert "#continue-sec .sec-head" in content
+
+    # Poster grid top headroom and bottom spacing
+    assert "margin-top:6px;" in content_no_space or "margin-top: 6px;" in content
+    assert "margin-top:8px;" in content_no_space or "margin-top: 8px;" in content
 
     # Search wrap height and padding
     assert "height:44px;" in content or "height: 44px;" in content
