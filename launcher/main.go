@@ -405,6 +405,11 @@ func main() {
 			_ = os.WriteFile(pidFile, []byte(strconv.Itoa(pyCmd.Process.Pid)), 0644)
 		}
 
+		procDone := make(chan error, 1)
+		go func() {
+			procDone <- pyCmd.Wait()
+		}()
+
 		// 5. Polling hingga /api/ping merespons (maksimal 15 detik)
 		ready := false
 		for i := 0; i < 75; i++ {
@@ -414,12 +419,10 @@ func main() {
 				break
 			}
 
-			if pyCmd.Process != nil {
-				var status uint32
-				handle := syscall.Handle(pyCmd.Process.Pid)
-				if syscall.GetExitCodeProcess(handle, &status) == nil && status != 259 { // 259 = STILL_ACTIVE
-					break
-				}
+			select {
+			case <-procDone:
+				i = 75 // Proses backend keluar lebih awal (crash)
+			default:
 			}
 		}
 
@@ -439,9 +442,15 @@ func main() {
 		}
 	}
 
-	// 6. Window close -> kill background processes yang kita spawn
+	// 6. Window close -> matikan backend secara bersih lalu kill proses jika masih tersisa
 	if pyCmd != nil && pyCmd.Process != nil {
 		defer func() {
+			client := http.Client{Timeout: 600 * time.Millisecond}
+			resp, err := client.Post(appURL+"/api/shutdown", "application/json", nil)
+			if err == nil {
+				_ = resp.Body.Close()
+				time.Sleep(150 * time.Millisecond)
+			}
 			_ = pyCmd.Process.Kill()
 			pidFile := filepath.Join(appDir, "cache", "server.pid")
 			_ = os.Remove(pidFile)

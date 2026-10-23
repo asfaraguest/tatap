@@ -560,13 +560,13 @@ function toggleModalBookmark(){
       type: cur.type || "TV",
       score: 0.0
     }).then(function(){
-      if(window.Tui && window.Tui.state && window.Tui.state.view === "favorit"){
+      if(window.Tui && ((typeof window.Tui.view === "function" && window.Tui.view() === "favorit") || (typeof window.Tui.state === "function" && window.Tui.state().view === "favorit"))){
         window.Tui.setView("favorit");
       }
     });
   } else {
     window.Tatap.removeBookmark(slug).then(function(){
-      if(window.Tui && window.Tui.state && window.Tui.state.view === "favorit"){
+      if(window.Tui && ((typeof window.Tui.view === "function" && window.Tui.view() === "favorit") || (typeof window.Tui.state === "function" && window.Tui.state().view === "favorit"))){
         window.Tui.setView("favorit");
       }
       // Unbookmark Subtitle Auto-Recovery:
@@ -747,9 +747,12 @@ function openTitle(slug,title,poster,type,epsCounter,meta){
   if(meta && meta.sub){
     cur.subCount = meta.sub; // Simpan metadata jumlah episode subbed ke properti terpisah
   }
-  if(!cur.mode || (cur.mode !== "dub" && cur.mode !== "sub")){
+  if(meta && (meta.mode === "dub" || meta.mode === "sub")){
+    cur.mode = meta.mode;
+  } else if(!cur.mode || (cur.mode !== "dub" && cur.mode !== "sub")){
     cur.mode = "sub";
   }
+  syncSeg("mode-seg", "mode", cur.mode);
   setPlaySpeed(1.0, false);
   renderSourceUI();
   $("tm-title").textContent=title;
@@ -2657,6 +2660,11 @@ function closePlayer(){
       else if(document.webkitExitFullscreen) document.webkitExitFullscreen();
     }catch(e){}
   }
+  var stageEl = document.querySelector(".ambient-stage");
+  if(stageEl) stageEl.classList.remove("is-fullscreen");
+  if(typeof window.tatap_set_fullscreen === "function"){
+    try{ window.tatap_set_fullscreen(false); }catch(e){}
+  }
 
   // 5. Perilaku post-watch: kembalikan user ke list episode anime dengan marker last watch yang aktif
   var savedSlug = cur.slug;
@@ -3139,6 +3147,7 @@ function renderSourceUI(){
   var isAnichan = (s === "anichan");
   var txt = isOtaku ? "src: otakudesu (sub indo) ⇄" : (isAnichan ? "src: anichan (failover) ⇄" : "src: hianime ⇄");
   var badgeTxt = isOtaku ? "OTAKUDESU (SUB INDO) ⇄" : (isAnichan ? "ANICHAN (FAILOVER) ⇄" : "HIANIME ⇄");
+  var shortLabel = isOtaku ? "Otakudesu" : (isAnichan ? "AniChan" : "HiAnime");
   var sb = $("sb-source");
   if(sb){
     sb.textContent = txt;
@@ -3149,6 +3158,10 @@ function renderSourceUI(){
     tm.textContent = "SRC: " + badgeTxt;
     tm.classList.toggle("otaku", isOtaku);
   }
+  var popBadge = $("pop-src-badge");
+  if(popBadge) popBadge.textContent = shortLabel;
+  var drawerBadge = $("drawer-src-badge");
+  if(drawerBadge) drawerBadge.textContent = shortLabel;
 }
 
 function switchSource(targetSource){
@@ -3272,6 +3285,7 @@ App = {
   TvNavigationManager: TvNavigationManager,
   openTitle:openTitle, openPlayer:openPlayer, playMPV:playMPV,
   renderContinue:renderContinue, onKeyPlayer:onKeyPlayer,
+  formatTimeSec:formatTimeSec,
   switchSource:switchSource,
   setPlaySpeed:setPlaySpeed, adjustPlaySpeed:adjustPlaySpeed,
   openDrawer:openDrawer, closeDrawer:closeDrawer,
@@ -3531,8 +3545,6 @@ function init(){
   if(popSrc) popSrc.addEventListener("click", function(){
     closePopover();
     switchSource();
-    var b = $("drawer-src-badge");
-    if(b) b.textContent = cur.source === "otakudesu" ? "Otakudesu" : "HiAnime";
   });
   var popTheme = $("pop-toggle-theme");
   if(popTheme) popTheme.addEventListener("click", function(){
@@ -3543,7 +3555,7 @@ function init(){
   var popUpdate = $("pop-update");
   if(popUpdate) popUpdate.addEventListener("click", function(){
     closePopover();
-    checkUpdate(true);
+    checkForUpdate(true);
   });
   var popHelp = $("pop-help");
   if(popHelp) popHelp.addEventListener("click", function(){
@@ -3551,7 +3563,7 @@ function init(){
     var ho = $("help-overlay");
     if(ho) ho.classList.remove("hidden");
     var hb = $("help-body");
-    if(hb && typeof HELP_TEXT !== "undefined") hb.textContent = HELP_TEXT;
+    if(hb && window.Tui && typeof window.Tui.cmdUsage === "function") hb.textContent = window.Tui.cmdUsage();
   });
 
   // Global ⌘K / Ctrl+K spotlight shortcut & ⌘T theme toggle
@@ -3642,8 +3654,6 @@ function init(){
   var drawerSrc = $("drawer-switch-source");
   if(drawerSrc) drawerSrc.addEventListener("click", function(){
     switchSource();
-    var b = $("drawer-src-badge");
-    if(b) b.textContent = cur.source === "otakudesu" ? "Otakudesu" : "HiAnime";
   });
 
   var drawerHelp = $("drawer-help");

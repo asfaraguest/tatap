@@ -2626,6 +2626,9 @@ public class PlayerActivity extends Activity {
                             if (btnQuality != null && activeQuality != null) {
                                 btnQuality.setText(activeQuality.toUpperCase());
                             }
+                            if (btnPortraitQuality != null && activeQuality != null) {
+                                btnPortraitQuality.setText(activeQuality.toUpperCase());
+                            }
                             applyCurrentStream();
                             preResolveNeighbors();
                         });
@@ -2893,6 +2896,16 @@ public class PlayerActivity extends Activity {
     }
 
     private void updateSubStatusText(boolean isLoaded) {
+        if (btnPortraitSub != null) {
+            if (!subEnabled || activeSubUrl == null || activeSubUrl.isEmpty()) {
+                btnPortraitSub.setText("Sub: OFF");
+                btnPortraitSub.setAlpha(0.6f);
+            } else {
+                String langLbl = activeSubLang != null ? activeSubLang.toUpperCase() : "ID";
+                btnPortraitSub.setText("Sub: " + langLbl);
+                btnPortraitSub.setAlpha(1.0f);
+            }
+        }
         if (tvSubStatus == null) return;
         if (!subEnabled || activeSubUrl == null || activeSubUrl.isEmpty()) {
             if ("dub".equalsIgnoreCase(activeStreamMode) || (activeSubUrl == null || activeSubUrl.isEmpty())) {
@@ -3143,6 +3156,9 @@ public class PlayerActivity extends Activity {
         activeQuality = newQ;
         if (btnQuality != null) {
             btnQuality.setText(newQ.toUpperCase());
+        }
+        if (btnPortraitQuality != null) {
+            btnPortraitQuality.setText(newQ.toUpperCase());
         }
         getSharedPreferences("tatap_player_prefs", Context.MODE_PRIVATE)
                 .edit().putString("pref_quality", newQ).apply();
@@ -4534,6 +4550,15 @@ public class PlayerActivity extends Activity {
             if (btnSubSelector != null) {
                 btnSubSelector.setAlpha(subEnabled ? 1.0f : 0.6f);
             }
+            if (btnPortraitSub != null) {
+                btnPortraitSub.setAlpha(subEnabled ? 1.0f : 0.6f);
+                if (!subEnabled || activeSubUrl == null || activeSubUrl.isEmpty()) {
+                    btnPortraitSub.setText("Sub: OFF");
+                } else {
+                    String langLbl = activeSubLang != null ? activeSubLang.toUpperCase() : "ID";
+                    btnPortraitSub.setText("Sub: " + langLbl);
+                }
+            }
         });
     }
 
@@ -4844,6 +4869,7 @@ public class PlayerActivity extends Activity {
     private void executePreResolveNeighbors() {
         final String currentSlug = (slug != null) ? slug : "";
         final String currentQ = (activeQuality != null && !activeQuality.isEmpty()) ? activeQuality : "best";
+        final String currentMode = (requestMode != null && !requestMode.isEmpty()) ? requestMode : "sub";
 
         if (currentSlug.isEmpty()) return;
 
@@ -4863,7 +4889,8 @@ public class PlayerActivity extends Activity {
                     String u = "http://127.0.0.1:8767/api/stream/resolve?slug="
                             + URLEncoder.encode(currentSlug, "UTF-8")
                             + "&ep=" + targetEp
-                            + "&mode=sub&q=" + URLEncoder.encode(currentQ, "UTF-8");
+                            + "&mode=" + URLEncoder.encode(currentMode, "UTF-8")
+                            + "&q=" + URLEncoder.encode(currentQ, "UTF-8");
                     HttpURLConnection conn = (HttpURLConnection) new URL(u).openConnection();
                     conn.setConnectTimeout(15000);
                     conn.setReadTimeout(20000);

@@ -930,6 +930,7 @@ public class DetailActivity extends Activity {
                 intent.putExtra("type", relFormat);
                 intent.putExtra("eps", "");
                 intent.putExtra("sub", "SUB");
+                intent.putExtra("mode", mode);
                 startActivity(intent);
                 finish();
             });

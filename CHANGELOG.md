@@ -13,6 +13,38 @@ Format versi menggunakan skema `MAJOR.MINOR.PATCH`:
 - **MINOR (x.Y.0):** Penambahan fitur atau kapabilitas baru yang tetap kompatibel ke belakang (*backward-compatible new features*). Digit PATCH direset ke 0.
 - **PATCH (x.y.Z):** Perbaikan bug, peningkatan stabilitas, atau perbaikan internal tanpa penambahan fitur baru (*backward-compatible bug fixes*).
 
+## [2.11.6] - 2026-10-23
+
+### Justifikasi SemVer 2.0.0 (PATCH: 2.11.5 -> 2.11.6)
+Kenaikan digit PATCH diterapkan sesuai kaidah Semantic Versioning 2.0.0 dan Direktif #3 [`AGENTS.md`](AGENTS.md) karena rilis ini murni berisi perbaikan 18 bug visual dan fungsional lintas seluruh platform (Web Desktop, Windows Portable, Linux AppImage, Android Mobile, dan Android TV) tanpa penambahan fitur baru, perubahan skema database, maupun modifikasi kontrak API eksternal.
+
+### Fixed
+1. **Web Desktop (`frontend/js/app.js`, `frontend/js/term.js`):**
+   - **W1 (Tombol Cek Pembaruan di Popover):** Memperbaiki handler `#pop-update` yang sebelumnya memanggil fungsi tak terdefinisi `checkUpdate(true)` (`ReferenceError`) menjadi `checkForUpdate(true)`.
+   - **W2 (Tombol Panduan Perintah di Popover):** Memperbaiki handler `#pop-help` yang sebelumnya mereferensikan variabel tak terdefinisi `HELP_TEXT` menjadi `window.Tui.cmdUsage()`.
+   - **W3 (Badge Waktu tontonan pada Kartu Riwayat):** Mengekspor `formatTimeSec` ke `window.App` sehingga indikator durasi tontonan (`Ep X • MM:SS`) pada kartu tab **Riwayat** tampil normal.
+   - **W4 (Auto-Refresh Tab Favorit Saat Unbookmark):** Memperbaiki pengecekan `window.Tui.view() === "favorit"` (pemanggilan fungsi, bukan referensi fungsi) di `toggleModalBookmark()` agar grid tab **Favorit** otomatis menyegarkan diri ketika anime dihapus dari favorit lewat modal detail.
+   - **W5 (Sinkronisasi Badge Sumber 3-Provider):** Memperbarui `renderSourceUI()` agar menyinkronkan `#pop-src-badge` dan `#drawer-src-badge` secara akurat untuk ketiga sumber (`HiAnime`, `Otakudesu`, dan `AniChan`).
+   - **W6 (Pemulihan Mode SUB/DUB dari Riwayat):** Memperbarui `openTitle()` agar membaca `meta.mode` (`dub`/`sub`) dari kartu Riwayat dan menyinkronkan segmented control `#mode-seg`.
+   - **W7 (Guard Keyboard Navigasi Saat Modal Panduan Terbuka):** Menambahkan `$("help-overlay")` ke `isModalOpen()` di `term.js` agar tombol panah/Enter tidak menggerakkan grid di belakang modal panduan.
+   - **W8 (Deduplikasi Perintah CLI `:filter`):** Menggabungkan `case "filter":` yang terduplikasi di `term.js` sehingga `:filter` tanpa argumen membuka modal filter katalog dan `:filter reset` / `:filter key=val` mengeksekusi filter CLI.
+2. **Windows Portable (`launcher/main.go`, `frontend/js/app.js`):**
+   - **P1 (Deteksi Crash Awal Backend pada `Tatap.exe`):** Mengganti pemanggilan tidak valid `syscall.GetExitCodeProcess(syscall.Handle(pyCmd.Process.Pid), &status)` (yang mengoper PID sebagai `HANDLE`) dengan channel `procDone` berbasis `pyCmd.Wait()`.
+   - **P2 (Pemulihan Jendela Native Fullscreen Saat Menutup Player):** Menambahkan `window.tatap_set_fullscreen(false)` pada `closePlayer()` agar jendela WebView2 Windows Portable tidak terjebak dalam mode borderless fullscreen ketika pengguna menutup player secara langsung.
+   - **P3 (Graceful Shutdown Backend Saat Menutup Jendela):** Menambahkan request `POST /api/shutdown` sebelum `pyCmd.Process.Kill()` di `launcher/main.go` untuk memastikan WAL SQLite tertutup bersih.
+3. **Linux AppImage (`linux/AppRun`):**
+   - **L1 (Sanitasi Environment Saat Membuka Browser Host):** Menambahkan helper `run_sys` yang menghapus `PYTHONHOME` & `PYTHONPATH` serta memulihkan `PATH` dan `LD_LIBRARY_PATH` sistem host saat meluncurkan browser, `xdg-open`, atau dialog sistem dari dalam AppImage.
+4. **Android Mobile & Android TV (`AppUpdateManager.java`, `MainActivity.java`, `DetailActivity.java`, `PlayerActivity.java`):**
+   - **A1 (Versi Terpasang Dinamis pada Pengecek Update):** Mengganti fallback string versi `"2.9.2"` yang di-hardcode di `AppUpdateManager.java` dengan pembacaan dinamis `PackageManager.getPackageInfo(...).versionName` (`getInstalledVersion()`), mencegah false-positive notifikasi update saat mode fallback GitHub aktif.
+   - **A2 (Auto-Refresh Tab Favorit/Riwayat & Badge ditonton Saat Kembali ke Beranda):** Menambahkan lifecycle `onResume()` di `MainActivity.java` untuk menyegarkan daftar `favorit`/`riwayat` dan badge episode yang sudah ditonton setelah keluar dari `DetailActivity` atau `PlayerActivity`, serta menyelaraskan perintah `:favorit` ke `resetFiltersToTab("favorit")`.
+   - **A3 (Siklus 3 Sumber & Pembersihan Cache di Android):** Memperbarui `cmd_item_source` dan `switchDefaultSource()` di `MainActivity.java` agar mendukung penuh siklus 3 sumber (`HiAnime` → `Otakudesu` → `AniChan`) dan membersihkan `tabDataCache` saat berganti sumber.
+   - **A4 (Aktivasi Input Pencarian dari Dialog Bantuan di Android TV):** Mengganti `etSearch.requestFocus()` dengan `activateSearchInput()` pada item shortcut CLI di `showCommandHelpDialog()` agar kotak input dapat difokuskan dan membuka keyboard di Android TV.
+   - **A5 (Pelestarian Mode SUB/DUB Antar-Season):** Menambahkan `intent.putExtra("mode", mode)` pada `SeasonAdapter` di `DetailActivity.java` saat berpindah ke season/sekuel/prekuel terkait.
+   - **A6 (Sinkronisasi Label Kualitas & Subtitle Portrait + Pre-Resolve sesuai Mode Aktif):** Memastikan `btnPortraitQuality` dan `btnPortraitSub` selalu tersinkronisasi di `PlayerActivity.java`, serta menggunakan `requestMode` aktif (`sub`/`dub`) pada `executePreResolveNeighbors()`.
+
+### Tests
+- Menambahkan suite pengujian regresi lintas-platform `tests/test_multiplatform_audit_v2116.py` yang memverifikasi ke-18 perbaikan di atas.
+
 ## [2.11.5] - 2026-10-23
 
 ### Justifikasi SemVer 2.0.0 (PATCH: 2.11.4 -> 2.11.5)

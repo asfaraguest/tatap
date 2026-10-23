@@ -166,6 +166,8 @@ public class MainActivity extends Activity {
     private String filterCatalogType = "";
     private String filterCatalogStatus = "";
     private long lastBackPressTime = 0L;
+    private String currentPreferredSource = "hianime";
+    private boolean isFirstResume = true;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -1495,7 +1497,7 @@ public class MainActivity extends Activity {
             case "favorit":
             case "bookmark":
             case "bookmarks":
-                switchView("favorit");
+                resetFiltersToTab("favorit");
                 showCommandOutput("> tatap$ :favorit [Menampilkan Anime Favorit]", false);
                 break;
 
@@ -1965,13 +1967,13 @@ public class MainActivity extends Activity {
             dialog.dismiss();
             etSearch.setText(":season fall 2024");
             etSearch.setSelection(etSearch.getText().length());
-            etSearch.requestFocus();
+            activateSearchInput();
             showCommandOutput("> tatap$ Silakan tentukan musim & tahun lalu tekan Enter", false);
         });
 
         dialog.findViewById(R.id.cmd_item_source).setOnClickListener(v -> {
             dialog.dismiss();
-            switchDefaultSource("otakudesu");
+            switchDefaultSource("");
         });
 
         dialog.findViewById(R.id.cmd_item_ping).setOnClickListener(v -> {
@@ -1993,7 +1995,7 @@ public class MainActivity extends Activity {
             dialog.dismiss();
             etSearch.setText(":gemini ");
             etSearch.setSelection(8);
-            etSearch.requestFocus();
+            activateSearchInput();
             showCommandOutput("> tatap$ Masukkan API key Google AI Studio (AQ...) Anda", false);
         });
 
@@ -2001,7 +2003,7 @@ public class MainActivity extends Activity {
             dialog.dismiss();
             etSearch.setText(":groq ");
             etSearch.setSelection(6);
-            etSearch.requestFocus();
+            activateSearchInput();
             showCommandOutput("> tatap$ Masukkan API key Groq Cloud (gsk_...) Anda", false);
         });
 
@@ -2009,7 +2011,7 @@ public class MainActivity extends Activity {
             dialog.dismiss();
             etSearch.setText(":ollama ");
             etSearch.setSelection(8);
-            etSearch.requestFocus();
+            activateSearchInput();
             showCommandOutput("> tatap$ Masukkan API key Ollama Cloud Anda", false);
         });
 
@@ -2456,8 +2458,20 @@ public class MainActivity extends Activity {
     }
 
     private void switchDefaultSource(String target) {
-        String s = target.toLowerCase().trim();
-        String newSrc = s.contains("otaku") ? "otakudesu" : "hianime";
+        String s = target != null ? target.toLowerCase().trim() : "";
+        final String newSrc;
+        if (s.isEmpty()) {
+            if ("hianime".equals(currentPreferredSource)) newSrc = "otakudesu";
+            else if ("otakudesu".equals(currentPreferredSource)) newSrc = "anichan";
+            else newSrc = "hianime";
+        } else if (s.contains("otaku")) {
+            newSrc = "otakudesu";
+        } else if (s.contains("anichan") || s.equals("ani")) {
+            newSrc = "anichan";
+        } else {
+            newSrc = "hianime";
+        }
+        currentPreferredSource = newSrc;
 
         showCommandOutput("> tatap$ :source " + newSrc + " [Mengalihkan sumber...]", false);
 
@@ -2472,8 +2486,12 @@ public class MainActivity extends Activity {
                 conn.getOutputStream().write(body.toString().getBytes("UTF-8"));
                 conn.getInputStream().close();
                 runOnUiThread(() -> {
-                    String label = newSrc.equals("otakudesu") ? "Otakudesu (Sub Indo)" : "HiAnime (Multi-Sub)";
+                    String label;
+                    if ("otakudesu".equals(newSrc)) label = "Otakudesu (Sub Indo)";
+                    else if ("anichan".equals(newSrc)) label = "AniChan (Sub Indo)";
+                    else label = "HiAnime (Multi-Sub)";
                     showCommandOutput("> tatap$ [OK] Sumber default berhasil diubah ke " + label, false);
+                    tabDataCache.clear();
                     fetchData();
                 });
             } catch (Exception e) {
@@ -3232,6 +3250,22 @@ public class MainActivity extends Activity {
                     } catch (Throwable ignored) {}
                 }).start();
             }
+        }
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (isFirstResume) {
+            isFirstResume = false;
+            return;
+        }
+        tabDataCache.remove("favorit_1");
+        tabDataCache.remove("riwayat_1");
+        if ("favorit".equals(currentView) || "riwayat".equals(currentView)) {
+            fetchData();
+        } else if (adapter != null) {
+            adapter.notifyDataSetChanged();
         }
     }
 

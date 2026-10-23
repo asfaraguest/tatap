@@ -5,7 +5,20 @@ set -e
 HERE="$(dirname "$(readlink -f "${0}")")"
 export APPDIR="${HERE}"
 
-# Setup runtime environment
+# Simpan environment sistem asli agar tidak mengontaminasi browser / xdg-open / dialog sistem
+SYS_PATH="${PATH}"
+SYS_LD_LIBRARY_PATH="${LD_LIBRARY_PATH:-}"
+SYS_PYTHONHOME="${PYTHONHOME:-}"
+SYS_PYTHONPATH="${PYTHONPATH:-}"
+
+run_sys() {
+    env -u PYTHONHOME -u PYTHONPATH \
+        PATH="${SYS_PATH}" \
+        LD_LIBRARY_PATH="${SYS_LD_LIBRARY_PATH}" \
+        "$@"
+}
+
+# Setup runtime environment untuk backend Python internal AppImage
 export PATH="${HERE}/usr/bin:${PATH}"
 export LD_LIBRARY_PATH="${HERE}/usr/lib:${HERE}/usr/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH}"
 export PYTHONHOME="${HERE}/usr"
@@ -90,13 +103,13 @@ except Exception:
         MSG="Server backend Tatap tidak dapat dimulai atau gagal merespons dalam 15 detik pada http://127.0.0.1:8767.\n\nLog Kesalahan:\n${ERR_LOG:-Tidak ada catatan error di log.}"
 
         if command -v zenity >/dev/null 2>&1; then
-            zenity --error --title="Tatap — Gagal Memulai Backend" --text="$MSG" --width=520 2>/dev/null || true
+            run_sys zenity --error --title="Tatap — Gagal Memulai Backend" --text="$MSG" --width=520 2>/dev/null || true
         elif command -v kdialog >/dev/null 2>&1; then
-            kdialog --error "$MSG" --title "Tatap — Gagal Memulai Backend" 2>/dev/null || true
+            run_sys kdialog --error "$MSG" --title "Tatap — Gagal Memulai Backend" 2>/dev/null || true
         elif command -v xmessage >/dev/null 2>&1; then
-            xmessage -center -title "Tatap — Gagal Memulai Backend" "$MSG" 2>/dev/null || true
+            run_sys xmessage -center -title "Tatap — Gagal Memulai Backend" "$MSG" 2>/dev/null || true
         elif command -v notify-send >/dev/null 2>&1; then
-            notify-send -u critical "Tatap — Gagal Memulai Backend" "Server backend gagal berjalan. Periksa log di $SERVER_LOG" 2>/dev/null || true
+            run_sys notify-send -u critical "Tatap — Gagal Memulai Backend" "Server backend gagal berjalan. Periksa log di $SERVER_LOG" 2>/dev/null || true
         fi
 
         echo -e "$MSG" >&2
@@ -142,7 +155,7 @@ if [ -n "$BROWSER_CMD" ]; then
         --disable-features=Translate,OptimizationHints,MediaRouter
         --audio-buffer-size=2048
     )
-    "$BROWSER_CMD" "${CHROME_FLAGS[@]}" >/dev/null 2>&1 &
+    run_sys "$BROWSER_CMD" "${CHROME_FLAGS[@]}" >/dev/null 2>&1 &
     BROWSER_PID=$!
 
     # Tunggu sampai jendela aplikasi Tatap ditutup oleh pengguna.
@@ -158,12 +171,12 @@ else
     echo " Tekan Ctrl+C pada terminal ini untuk mematikan server Tatap."
     echo "================================================================="
     if command -v xdg-open >/dev/null 2>&1; then
-        xdg-open "$APP_URL" >/dev/null 2>&1 || true
+        run_sys xdg-open "$APP_URL" >/dev/null 2>&1 || true
     elif command -v sensible-browser >/dev/null 2>&1; then
-        sensible-browser "$APP_URL" >/dev/null 2>&1 || true
+        run_sys sensible-browser "$APP_URL" >/dev/null 2>&1 || true
     fi
     if command -v notify-send >/dev/null 2>&1; then
-        notify-send "Tatap Anime" "Server berjalan di $APP_URL. Tutup terminal atau kirim sinyal untuk mematikan backend." 2>/dev/null || true
+        run_sys notify-send "Tatap Anime" "Server berjalan di $APP_URL. Tutup terminal atau kirim sinyal untuk mematikan backend." 2>/dev/null || true
     fi
 
     # Menjaga server tetap aktif saat mode xdg-open sampai pengguna menekan Ctrl+C (INT/TERM)

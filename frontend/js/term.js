@@ -12,7 +12,8 @@ var Tui = (function () {
            ($("catalog-filter-modal") && !$("catalog-filter-modal").classList.contains("hidden")) ||
            ($("drawer-panel") && !$("drawer-panel").classList.contains("hidden")) ||
            ($("backend-error-overlay") && !$("backend-error-overlay").classList.contains("hidden")) ||
-           ($("update-modal") && !$("update-modal").classList.contains("hidden"));
+           ($("update-modal") && !$("update-modal").classList.contains("hidden")) ||
+           ($("help-overlay") && !$("help-overlay").classList.contains("hidden"));
   }
 
   function log(msg,kind){
@@ -1194,7 +1195,17 @@ var Tui = (function () {
       case "musim":setView("musim");break;
       case "lanjutan":setView("lanjutan");break;
       case "katalog":setView("katalog");break;
-      case "filter":case "cf":openCatalogFilterModal();break;
+      case "filter":case "cf":
+        if(!args){openCatalogFilterModal();break;}
+        if(args==="reset"){
+          S.filter={};S.page=1;log("filter direset","ok");applyFilter();break;
+        }
+        var f={};
+        for(var i=0;i<parts.length-1;i++){
+          var kv=parts[i+1].split("=");
+          if(kv.length===2)f[kv[0]]=kv[1];
+        }
+        S.filter=f;S.page=1;log("filter: "+JSON.stringify(f),"ok");applyFilter();break;
       case "season":cmdSeason(args);break;
       case "jadwal":case "schedule":case "terbaru":case "airing":
         var dArg = (args || "").trim().toLowerCase();
@@ -1236,16 +1247,6 @@ var Tui = (function () {
         }
         break;
       case "genre":cmdGenre(parts);break;
-      case "filter":
-        if(!args||args==="reset"){
-          S.filter={};S.page=1;log("filter direset","ok");applyFilter();break;
-        }
-        var f={};
-        for(var i=0;i<parts.length-1;i++){
-          var kv=parts[i+1].split("=");
-          if(kv.length===2)f[kv[0]]=kv[1];
-        }
-        S.filter=f;S.page=1;log("filter: "+JSON.stringify(f),"ok");applyFilter();break;
       case "crt":
         if(!args){log("usage: crt on|off|toggle","err");break;}
         var v1=args==="on"?"on":args==="off"?"off":null;

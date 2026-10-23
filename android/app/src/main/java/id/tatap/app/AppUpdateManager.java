@@ -3,7 +3,9 @@ package id.tatap.app;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.Dialog;
+import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageInfo;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Environment;
@@ -69,6 +71,21 @@ public class AppUpdateManager {
     }
 
     /**
+     * Membaca nomor versi terpasang secara dinamis dari PackageManager (menghapus sufiks -tv).
+     */
+    public static String getInstalledVersion(Context context) {
+        if (context != null) {
+            try {
+                PackageInfo pInfo = context.getPackageManager().getPackageInfo(context.getPackageName(), 0);
+                if (pInfo != null && pInfo.versionName != null && !pInfo.versionName.trim().isEmpty()) {
+                    return pInfo.versionName.trim().replaceFirst("^v", "").replaceFirst("-tv$", "");
+                }
+            } catch (Exception ignored) {}
+        }
+        return "2.11.6";
+    }
+
+    /**
      * Memeriksa pembaruan secara manual.
      */
     public void checkUpdate(Activity activity) {
@@ -123,7 +140,8 @@ public class AppUpdateManager {
 
                 JSONObject data = res.getJSONObject("data");
                 boolean hasUpdate = data.optBoolean("has_update", false);
-                String currentVer = data.optString("current_version", "2.9.2");
+                String installedVer = getInstalledVersion(activity);
+                String currentVer = data.optString("current_version", installedVer);
                 String latestVer = data.optString("latest_version", currentVer);
 
                 activity.runOnUiThread(() -> {
@@ -177,7 +195,7 @@ public class AppUpdateManager {
                         JSONObject rel = new JSONObject(sb.toString());
                         String tag = rel.optString("tag_name", "").trim();
                         String latestClean = tag.replaceFirst("^v", "");
-                        data = buildReleasePayload(latestClean, tag, rel.optString("name", tag), rel.optString("body", ""), rel.optString("html_url", ""));
+                        data = buildReleasePayload(activity, latestClean, tag, rel.optString("name", tag), rel.optString("body", ""), rel.optString("html_url", ""));
                     }
                     c.disconnect();
                 } catch (Exception ignored) {}
@@ -196,7 +214,7 @@ public class AppUpdateManager {
                         if (loc != null && loc.contains("/tag/")) {
                             String tag = loc.substring(loc.lastIndexOf('/') + 1).trim();
                             String latestClean = tag.replaceFirst("^v", "");
-                            data = buildReleasePayload(latestClean, tag, "Tatap " + tag, "Pembaruan rilis " + tag + " tersedia di GitHub.", loc);
+                            data = buildReleasePayload(activity, latestClean, tag, "Tatap " + tag, "Pembaruan rilis " + tag + " tersedia di GitHub.", loc);
                         }
                     } catch (Exception ignored) {}
                 }
@@ -216,7 +234,7 @@ public class AppUpdateManager {
                             if (latestClean != null) {
                                 latestClean = latestClean.trim().replaceFirst("^v", "");
                                 String tag = "v" + latestClean;
-                                data = buildReleasePayload(latestClean, tag, "Tatap " + tag, "Pembaruan rilis " + tag + " terdeteksi dari repositori resmi.", "https://github.com/asfaraguest/tatap/releases/tag/" + tag);
+                                data = buildReleasePayload(activity, latestClean, tag, "Tatap " + tag, "Pembaruan rilis " + tag + " terdeteksi dari repositori resmi.", "https://github.com/asfaraguest/tatap/releases/tag/" + tag);
                             }
                         }
                         c.disconnect();
@@ -226,7 +244,9 @@ public class AppUpdateManager {
                 if (data != null) {
                     final JSONObject finalData = data;
                     final boolean hasUpdate = finalData.optBoolean("has_update", false);
-                    final String latestVer = finalData.optString("latest_version", "2.9.2");
+                    final String installedVer = getInstalledVersion(activity);
+                    final String currentVer = finalData.optString("current_version", installedVer);
+                    final String latestVer = finalData.optString("latest_version", currentVer);
                     activity.runOnUiThread(() -> {
                         isChecking = false;
                         if (activity.isFinishing()) return;
@@ -234,8 +254,8 @@ public class AppUpdateManager {
                             if (listener != null) listener.onStatus("> tatap$ Pembaruan rilis v" + latestVer + " tersedia!", false);
                             showUpdateDialog(activity, finalData);
                         } else {
-                            if (listener != null) listener.onStatus("> tatap$ Tatap v2.9.2 adalah versi terbaru.", false);
-                            Toast.makeText(activity, "✓ Tatap v2.9.2 sudah versi terbaru!", Toast.LENGTH_SHORT).show();
+                            if (listener != null) listener.onStatus("> tatap$ Tatap v" + currentVer + " adalah versi terbaru.", false);
+                            Toast.makeText(activity, "✓ Tatap v" + currentVer + " sudah versi terbaru!", Toast.LENGTH_SHORT).show();
                         }
                     });
                     return;
@@ -264,10 +284,11 @@ public class AppUpdateManager {
         }).start();
     }
 
-    private JSONObject buildReleasePayload(String latestVer, String tag, String name, String notes, String htmlUrl) {
+    private JSONObject buildReleasePayload(Context context, String latestVer, String tag, String name, String notes, String htmlUrl) {
         try {
+            String installedVer = getInstalledVersion(context);
             JSONObject data = new JSONObject();
-            data.put("current_version", "2.9.2");
+            data.put("current_version", installedVer);
             data.put("latest_version", latestVer);
             data.put("tag_name", tag);
             data.put("release_name", name);
@@ -275,7 +296,7 @@ public class AppUpdateManager {
             data.put("body", notes != null ? notes : "");
             data.put("release_url", htmlUrl != null ? htmlUrl : ("https://github.com/asfaraguest/tatap/releases/tag/" + tag));
 
-            boolean hasUpdate = compareSemVer(latestVer, "2.9.2") > 0;
+            boolean hasUpdate = compareSemVer(latestVer, installedVer) > 0;
             data.put("has_update", hasUpdate);
 
             JSONObject assets = new JSONObject();
@@ -339,7 +360,7 @@ public class AppUpdateManager {
         MaterialButton btnNow = dialog.findViewById(R.id.btn_update_now);
         TextView tvFallback = dialog.findViewById(R.id.tv_update_fallback_browser);
 
-        String currentVer = data.optString("current_version", "2.9.2");
+        String currentVer = data.optString("current_version", getInstalledVersion(activity));
         String latestVer = data.optString("latest_version", currentVer);
         String notes = data.optString("notes", data.optString("body", ""));
         String releaseUrl = data.optString("release_url", "https://github.com/asfaraguest/tatap/releases/latest");
