@@ -13,6 +13,23 @@ Format versi menggunakan skema `MAJOR.MINOR.PATCH`:
 - **MINOR (x.Y.0):** Penambahan fitur atau kapabilitas baru yang tetap kompatibel ke belakang (*backward-compatible new features*). Digit PATCH direset ke 0.
 - **PATCH (x.y.Z):** Perbaikan bug, peningkatan stabilitas, atau perbaikan internal tanpa penambahan fitur baru (*backward-compatible bug fixes*).
 
+## [2.11.5] - 2026-10-23
+
+### Justifikasi SemVer 2.0.0 (PATCH: 2.11.4 -> 2.11.5)
+Kenaikan digit PATCH diterapkan sesuai kaidah Semantic Versioning 2.0.0 dan Direktif #3 [`AGENTS.md`](AGENTS.md) karena rilis ini murni berisi perbaikan bug (*backward-compatible bug fixes*) hasil audit regresi v2.11.4 pada aplikasi Android Mobile & Android TV, tanpa penambahan fitur, perubahan API backend, maupun skema database.
+
+### Fixed
+1. **Mode DUB Tertimpa Menjadi SUB di Riwayat Tontonan (`DetailActivity.java`, `PlayerActivity.java`):**
+   - Body `POST /api/history` sebelumnya meng-hardcode `"mode": "sub"`, sehingga anime yang ditonton dalam versi DUB tercatat sebagai SUB dan tombol *Lanjutkan* dari kartu Riwayat memutar versi yang salah.
+   - `DetailActivity` kini mengirim `mode` aktif, dan `PlayerActivity` (pindah episode / auto-next) mengirim `requestMode` beserta `poster` & `type`.
+2. **Regresi v2.11.4 — Tombol/Gesture Back di HP Kadang Tidak Merespons (`DetailActivity.java`):**
+   - Filter debounce back 450ms pasca `onResume()` ternyata aktif di semua perangkat. Filter kini dibatasi khusus Android TV (`TvFocusHelper.isTv`), sehingga gesture back cepat di HP kembali responsif.
+3. **Fallback Task-Root Android TV Menutup Aplikasi (`PlayerActivity.java`):**
+   - Saat `PlayerActivity` menjadi task root (Detail dipangkas OS low-memory), stack kini direkonstruksi lengkap **Beranda → Detail** via `startActivities()`, sehingga tombol Back dari Detail kembali ke Beranda alih-alih keluar dari aplikasi.
+
+### Tests
+- Menambahkan `tests/test_android_history_mode.py` (kontrak mode riwayat, debounce khusus TV, rekonstruksi stack Beranda) dan memperbarui `tests/test_android_tv_back_navigation.py`.
+
 ## [2.11.4] - 2026-10-23
 
 ### Justifikasi SemVer 2.0.0 (PATCH: 2.11.3 -> 2.11.4)

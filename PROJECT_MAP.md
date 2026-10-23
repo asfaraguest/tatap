@@ -190,11 +190,12 @@ Agent tidak perlu melakukan `grep` berulang kali. Gunakan indeks referensi fungs
   - **Reparenting Subtitle TCL Smart TV:** Elemen `tvSubtitles` dipindahkan ke `playerView.getOverlayFrameLayout()` dengan hardware elevation `25dp` agar Hardware Composer (HWC) chipset TCL tidak mem-bypass subtitle saat kontrol video auto-hide.
   - **Balanced Multi-Line Wrapping:** `LineBreaker.BREAK_STRATEGY_BALANCED` pada TextView subtitle untuk menyajikan teks 2–3 baris seimbang di mode landscape HP/TV.
   - `dispatchKeyEvent(KeyEvent)`: Tangkapan remote D-Pad TV untuk play/pause, seek, audio volume, dan menu subtitle. Pada `KEYCODE_BACK` Android TV, menelan habis `ACTION_DOWN` (return `true`) dan mengeksekusi `handleBackAction()` pada `ACTION_UP` (return `true`), mencegah kebocoran pulsa remote ke activity sebelumnya.
-  - `handleBackAction()`: Menutup player dengan proteksi `isTaskRoot()`. Pada TV stick low-memory (1GB-1.5GB) di mana `DetailActivity` sempat dimatikan OS saat playback, merekonstruksi dan meluncurkan kembali `DetailActivity` dengan metadata lengkap sebelum `finish()`.
+  - `handleBackAction()`: Menutup player dengan proteksi `isTaskRoot()`. Pada TV stick low-memory (1GB-1.5GB) di mana `DetailActivity` sempat dimatikan OS saat playback, merekonstruksi stack lengkap **`MainActivity` → `DetailActivity`** via `startActivities()` dengan metadata lengkap sebelum `finish()`.
+  - **Persistensi Mode Riwayat:** Body `POST /api/history` (Detail \& Player) WAJIB mengirim mode aktif (`mode` / `requestMode`), DILARANG hardcode `"sub"` agar resume DUB dari Riwayat tidak berubah menjadi SUB (`tests/test_android_history_mode.py`).
   - Continuous Float Accumulator: Akumulator volume (`currentVolumeFraction`) & brightness (`screenBrightness`) untuk swipe mulus tanpa macet.
 - [`DetailActivity.java`](file:///home/b-ict/tatap/android/app/src/main/java/id/tatap/app/DetailActivity.java):
   - Layar detail anime, rating, sinopsis, seleksi range episode, serta daftar episode.
-  - **Debounce Pulsa Back Remote TV:** Menggunakan `lastResumeTimeMs` di `dispatchKeyEvent` untuk memblokir kebocoran pulsa remote back yang datang dalam tempo < 450ms pasca resume.
+  - **Debounce Pulsa Back Remote TV (Khusus TV):** Menggunakan `lastResumeTimeMs` di `dispatchKeyEvent` (dijaga `TvFocusHelper.isTv`) untuk memblokir kebocoran pulsa remote back yang datang dalam tempo < 450ms pasca resume. Tidak aktif di HP agar gesture back tetap responsif.
   - **Fokus D-Pad Otomatis:** Mengarahkan fokus remote D-Pad saat `onResume()` di Android TV ke tombol **Lanjutkan Episode** (`btnQuickPlay`) atau daftar episode (`rvEpisodes`), bukan membiarkan fokus terjebak di `btnBack`.
 - [`MainActivity.java`](file:///home/b-ict/tatap/android/app/src/main/java/id/tatap/app/MainActivity.java):
   - TV Sidebar Navigation: Menu D-Pad samping kiri (Beranda, Musiman, Airing, Jadwal, Riwayat, Bookmark, Safe Mode, Update, Pengaturan).

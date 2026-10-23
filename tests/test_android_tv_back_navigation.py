@@ -34,5 +34,5 @@ def test_detail_activity_has_back_debounce_and_tv_focus():
 
     # dispatchKeyEvent debounce filter
     assert "public boolean dispatchKeyEvent(KeyEvent event)" in content
-    assert "if (event.getKeyCode() == KeyEvent.KEYCODE_BACK)" in content
+    assert "if (event.getKeyCode() == KeyEvent.KEYCODE_BACK && TvFocusHelper.isTv(this))" in content
     assert "SystemClock.uptimeMillis() - lastResumeTimeMs < 450" in content

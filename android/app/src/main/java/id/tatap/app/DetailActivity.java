@@ -251,7 +251,8 @@ public class DetailActivity extends Activity {
 
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
-        if (event.getKeyCode() == KeyEvent.KEYCODE_BACK) {
+        if (event.getKeyCode() == KeyEvent.KEYCODE_BACK && TvFocusHelper.isTv(this)) {
+            // Khusus Android TV: gesture/tombol back di HP tidak boleh ikut terbuang oleh debounce ini.
             // Filter debounce: abaikan pulsa back bocoran dalam 450ms pertama setelah kembali dari PlayerActivity
             if (SystemClock.uptimeMillis() - lastResumeTimeMs < 450) {
                 return true;
@@ -305,7 +306,7 @@ public class DetailActivity extends Activity {
                 b.put("episode", ep);
                 b.put("poster", poster != null ? poster : "");
                 b.put("type", type != null ? type : "");
-                b.put("mode", "sub");
+                b.put("mode", mode != null ? mode : "sub");
 
                 HttpURLConnection conn = (HttpURLConnection) new URL("http://127.0.0.1:8767/api/history").openConnection();
                 conn.setRequestMethod("POST");

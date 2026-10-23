@@ -907,14 +907,16 @@ public class PlayerActivity extends Activity {
         // luncurkan eksplisit kembali ke DetailActivity agar pengguna tetap kembali ke daftar episode (bukan home).
         if (TvFocusHelper.isTv(this) && isTaskRoot() && slug != null && !slug.isEmpty()) {
             try {
+                // Rekonstruksi stack lengkap Beranda -> Detail agar back dari Detail kembali ke Beranda (bukan keluar aplikasi).
+                Intent home = new Intent(this, MainActivity.class);
+                home.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
                 Intent intent = new Intent(this, DetailActivity.class);
                 intent.putExtra("slug", slug);
                 intent.putExtra("title", title);
                 intent.putExtra("poster", poster);
                 intent.putExtra("type", type);
                 intent.putExtra("mode", requestMode);
-                intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
-                startActivity(intent);
+                startActivities(new Intent[]{home, intent});
             } catch (Throwable ignored) {}
         }
         finish();
@@ -4799,7 +4801,9 @@ public class PlayerActivity extends Activity {
                 b.put("slug", slug != null ? slug : "");
                 b.put("title", title != null ? title : "");
                 b.put("episode", ep);
-                b.put("mode", "sub");
+                b.put("mode", (requestMode != null && !requestMode.isEmpty()) ? requestMode : "sub");
+                b.put("poster", poster != null ? poster : "");
+                b.put("type", type != null ? type : "");
                 b.put("progress", 0);
 
                 HttpURLConnection conn = (HttpURLConnection) new URL("http://127.0.0.1:8767/api/history").openConnection();
