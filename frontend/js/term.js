@@ -30,7 +30,7 @@ var Tui = (function () {
   function saveCmdHist(h){try{localStorage.setItem("tatap_hist",JSON.stringify(h.slice(0,50)));}catch(e){}}
 
   function cmdUsage(){
-    return "perintah:\n  cari <judul> | :musim | :lanjutan | :favorit | :katalog\n  :terbaru | :season <winter|spring|summer|fall> <tahun>\n  :switch [hianime|otaku] (ganti sumber video HiAnime / Otakudesu)\n  :filter [key=val...] | :filter reset\n  :genre <slug|title> | :genre | :genre --list | :genre reset\n  :tema [toggle|terang|gelap] (ganti mode terang / gelap Apple)\n  :update (cek versi rilis terbaru secara on-demand)\n  :apikey <key> | :ollama <key> | :groq <key> | :gemini <key> | :model <nama> | :apiurl <url>\n  :logs | :crt on|off|toggle | :ambient on|off|toggle\n  :riwayat | :favorit | :status | :bantuan | :q";
+    return "perintah:\n  cari <judul> | :musim | :lanjutan | :favorit | :katalog\n  :terbaru | :season <winter|spring|summer|fall> <tahun>\n  :switch [hianime|otaku] (ganti sumber video HiAnime / Otakudesu)\n  :filter [key=val...] | :filter reset\n  :genre <slug|title> | :genre | :genre --list | :genre reset\n  :subdelay <detik|reset> (sinkronisasi waktu subtitle, cth: :subdelay -0.5)\n  :tema [toggle|terang|gelap] (ganti mode terang / gelap Apple)\n  :update (cek versi rilis terbaru secara on-demand)\n  :apikey <key> | :ollama <key> | :groq <key> | :gemini <key> | :model <nama> | :apiurl <url>\n  :logs | :crt on|off|toggle | :ambient on|off|toggle\n  :riwayat | :favorit | :status | :bantuan | :q";
   }
 
   function applyFilter(){
@@ -1332,6 +1332,20 @@ var Tui = (function () {
         if(window.TatapTheme && window.TatapTheme.toggle){
           var newTh = window.TatapTheme.toggle();
           log("Tema beralih ke: " + (newTh === "light" ? "Mode Terang (Apple Light)" : "Mode Gelap (Obsidian Dark)"), "ok");
+        }
+        break;
+      case "subdelay":case "suboffset":
+        if(!args || args === "reset"){
+          if(window.App && window.App.setSubDelay) window.App.setSubDelay(0.0, true);
+          log("sinkronisasi subtitle direset ke 0.0 detik", "ok");
+        }else{
+          var dVal = parseFloat(args);
+          if(isNaN(dVal)){
+            log("usage: :subdelay <detik|reset> (cth: :subdelay -0.5 atau :subdelay +0.75)", "err");
+          }else{
+            if(window.App && window.App.setSubDelay) window.App.setSubDelay(dVal, true);
+            log("sinkronisasi subtitle disetel ke " + (dVal > 0 ? "+" : "") + dVal + " detik", "ok");
+          }
         }
         break;
       case "bantuan":case "help":case "?":

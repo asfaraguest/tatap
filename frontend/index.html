@@ -263,7 +263,7 @@
       <use href="#icon-brand-mark"/>
     </svg>
     <span class="brand-name">TATAP</span>
-    <span class="brand-ver" id="brand-ver">v2.11.6</span>
+    <span class="brand-ver" id="brand-ver">v2.12.0</span>
   </div>
   <nav class="nav-tabs-bar" id="nav-tabs-bar" role="navigation" aria-label="Navigasi Utama">
     <button class="nav-tab-btn active" data-view="katalog" id="tab-nav-katalog" tabindex="0">Katalog</button>
@@ -372,7 +372,7 @@
     <div class="drawer-head">
       <div class="drawer-title">
         <span class="brand-name">TATAP</span>
-        <span class="dim small">v2.11.6</span>
+        <span class="dim small">v2.12.0</span>
       </div>
       <button class="icon-btn big" id="drawer-close" title="Tutup Menu (Esc)"><svg class="ui-icon"><use href="#icon-close"/></svg></button>
     </div>
@@ -795,9 +795,14 @@
       <div id="pm-subs-wrap" class="sub-picker hidden" title="Pilih Subtitle">
         <span class="sub-icon" aria-hidden="true"><svg class="ui-icon"><use href="#icon-subtitles"/></svg></span>
         <select id="pm-subs" aria-label="Subtitle"></select>
-        <input type="file" id="pm-custom-sub-file" accept=".vtt,.srt" style="display:none">
+        <input type="file" id="pm-custom-sub-file" accept=".vtt,.srt,.ass,.ssa" style="display:none">
         <div class="sub-size" role="group" aria-label="Ukuran subtitle">
           <button data-subsize="s" title="Subtitle kecil">S</button><button data-subsize="m" title="Subtitle sedang">M</button><button data-subsize="l" title="Subtitle besar">L</button>
+        </div>
+        <div class="sub-delay-ctrl" role="group" aria-label="Sinkronisasi waktu subtitle">
+          <button type="button" id="pm-sub-delay-minus" title="Mundurkan subtitle -0.25s (Pintasan: ,)">-</button>
+          <span id="pm-sub-delay-val" class="sub-delay-val" title="Klik untuk reset offset subtitle ke 0.0s">0.0s</span>
+          <button type="button" id="pm-sub-delay-plus" title="Majukan subtitle +0.25s (Pintasan: .)">+</button>
         </div>
         <button id="pm-translate" class="sub-translate" data-on="0" aria-label="Toggle translate ID">
           <svg class="ui-icon"><use href="#icon-globe"/></svg><span class="tr-label">ID</span>
@@ -805,7 +810,7 @@
       </div>
       <button id="pm-next" title="Episode berikutnya (n)">NEXT <svg class="ui-icon"><use href="#icon-step-next"/></svg></button>
     </div>
-    <div class="player-hint dim small">Space play/pause · ←/→ seek 5 dtk · f fullscreen · [ / ] kecepatan · n/p ganti episode · m mute · Esc tutup</div>
+    <div class="player-hint dim small">Space play/pause · ←/→ seek 5 dtk · , / . sinkronisasi sub · f fullscreen · [ / ] kecepatan · n/p ganti episode · m mute · Esc tutup</div>
   </div>
 </div>
 

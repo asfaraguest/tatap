@@ -2256,13 +2256,17 @@ async def proxy_sub(url: str = Query(""),
                    referer: str = Query(""),
                    lang: str = Query("", pattern="^(en|id|ja|es|fr|de|pt|ko|zh)$|^$"),
                    src: str = Query("en", pattern="^(en|ja|es|fr|de|pt|ko|zh)$"),
-                   mode: str = Query("", pattern="^(gtx|gtx\\+|aigtx|ai|)$"),
+                   mode: str = Query("", pattern="^(gtx|gtx\\+|gtx\\+_dual|aigtx|ai|)$"),
+                   dual: bool = Query(False),
                    refresh: bool = Query(False)):
     """Proxy subtitle VTT. Menjalankan translasi multi-tier dengan deduplikasi inflight
     dan proteksi cache poisoning."""
     if not url.startswith("http"):
         return Response(status_code=400)
     _validate_external_proxy_url(url)
+
+    is_dual = bool(dual) or (mode == "gtx+_dual")
+    clean_mode = "gtx+" if mode == "gtx+_dual" else mode
 
     # Lang kosong atau sama dengan sumber -> return source apa adanya
     if not lang or lang == src:
@@ -2277,22 +2281,29 @@ async def proxy_sub(url: str = Query(""),
         (url + "|" + (referer or "") + "|" + lang).encode("utf-8")
     ).hexdigest()
     key_gtxplus = "sub2|gtx+|" + base_hash
+    key_gtxplus_dual = "sub2|gtx+_dual|" + base_hash
     key_aigtx = "sub2|aigtx|" + base_hash
     key_gtx = "sub2|gtx|" + base_hash
     key_llm = "sub2|llm|" + base_hash
 
     if refresh:
-        for k in (key_gtx, key_gtxplus, key_aigtx, key_llm, "sub2|mt|" + base_hash):
+        for k in (key_gtx, key_gtxplus, key_gtxplus_dual, key_aigtx, key_llm, "sub2|mt|" + base_hash):
             try:
                 await delete_subtitle_cache(k)
             except Exception:
                 pass
 
-    req_mode = "gtx+" if mode in ("gtx+", "aigtx") else (mode or "gtx")
+    req_mode = "gtx+" if clean_mode in ("gtx+", "aigtx") else (clean_mode or "gtx")
 
     # Periksa cache lokal jika tidak dalam mode refresh
     if not refresh:
-        if req_mode == "gtx":
+        if is_dual:
+            hit_dual = await _get_validated_subtitle_cache(key_gtxplus_dual, lang=lang)
+            if hit_dual:
+                resp = Response(content=hit_dual, media_type="text/vtt")
+                resp.headers["X-Translate-Tier"] = "cached-gtx+_dual"
+                return resp
+        elif req_mode == "gtx":
             hit = await _get_validated_subtitle_cache(key_gtx, lang=lang)
             if hit:
                 resp = Response(content=hit, media_type="text/vtt")
@@ -2323,11 +2334,11 @@ async def proxy_sub(url: str = Query(""),
                     return resp
 
     # Satukan eksekusi translasi agar tidak menduplikasi request bersamaan untuk mode yang sama
-    job_key = f"{base_hash}|{lang}|{req_mode}"
+    job_key = f"{base_hash}|{lang}|{req_mode}|dual={int(is_dual)}"
     fut = _SUB_INFLIGHT.get(job_key)
     if fut is None:
         fut = asyncio.ensure_future(
-            _translate_sub_job(url, referer, src, lang, key_llm, key_gtxplus, _fetch_sub_text, key_gtx=key_gtx, requested_mode=req_mode)
+            _translate_sub_job(url, referer, src, lang, key_llm, key_gtxplus, _fetch_sub_text, key_gtx=key_gtx, requested_mode=req_mode, is_dual=is_dual, key_dual=key_gtxplus_dual)
         )
         _SUB_INFLIGHT[job_key] = fut
         fut.add_done_callback(lambda _f, k=job_key: _SUB_INFLIGHT.pop(k, None))
@@ -2348,7 +2359,7 @@ async def proxy_sub(url: str = Query(""),
             raise HTTPException(status_code=502, detail=f"gagal memproses subtitle: {e}")
 
     resp = Response(content=new_text, media_type="text/vtt")
-    resp.headers["X-Translate-Tier"] = tier.get("level", "source")
+    resp.headers["X-Translate-Tier"] = tier.get("level", "source") + ("-dual" if is_dual else "")
     if tier.get("model"):
         resp.headers["X-Translate-Model"] = re.sub(r"[^\w.:/\-]", "", str(tier["model"]))[:60]
     if tier.get("gtx_lines"):
@@ -2367,7 +2378,7 @@ async def _llm_enabled():
     return bool(apikey) or is_local_llm(apiurl)
 
 
-async def _translate_sub_job(url, referer, src, lang, key_llm, key_gtxplus, fetcher, key_gtx=None, requested_mode="gtx"):
+async def _translate_sub_job(url, referer, src, lang, key_llm, key_gtxplus, fetcher, key_gtx=None, requested_mode="gtx", is_dual=False, key_dual=None):
     """Fetch + translate + cache. Return (vtt_text, tier_dict)."""
     if not key_gtx:
         import hashlib
@@ -2378,12 +2389,16 @@ async def _translate_sub_job(url, referer, src, lang, key_llm, key_gtxplus, fetc
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"gagal mengambil subtitle: {e}")
     try:
-        from api.translate import parse_vtt, build_vtt
-        cues = parse_vtt(text)
+        from api.translate import parse_vtt, build_vtt, build_bilingual_vtt, merge_overlapping_cues
+        raw_cues = parse_vtt(text)
+        cues = merge_overlapping_cues(raw_cues)
         if not cues:
             return text, {"level": "source", "error": "Subtitle kosong atau format tidak didukung"}
         tier = await _translate_with_fallback(cues, src, lang, requested_mode=requested_mode)
-        new_text = build_vtt(tier["cues"])
+        if is_dual:
+            new_text = build_bilingual_vtt(tier["cues"], cues)
+        else:
+            new_text = build_vtt(tier["cues"])
     except Exception as e:
         return text, {"cues": None, "level": "source", "error": str(e)}
 
@@ -2391,7 +2406,9 @@ async def _translate_sub_job(url, referer, src, lang, key_llm, key_gtxplus, fetc
     # PENTING: Dilarang menyimpan teks sumber (untranslated) atau hasil kaku MyMemory ke dalam cache berkualitas tinggi
     if lvl not in ("source", "source-fallback", "tier4", "mymemory"):
         if (lang or "").lower() != "id" or _is_valid_id_subtitle(new_text):
-            if lvl in ("tier1", "gtx"):
+            if is_dual and key_dual:
+                await set_subtitle_cache(key_dual, new_text)
+            elif lvl in ("tier1", "gtx"):
                 await set_subtitle_cache(key_gtx, new_text)
             elif lvl in ("tier2", "gtx+", "aigtx"):
                 await set_subtitle_cache(key_gtxplus, new_text)
@@ -2540,10 +2557,11 @@ async def upload_custom_sub(body: dict = None):
         return fail("Teks subtitle atau URL kosong")
 
     try:
-        from api.translate import parse_vtt, build_vtt
-        cues = parse_vtt(text)
+        from api.translate import parse_vtt, build_vtt, merge_overlapping_cues
+        raw_cues = parse_vtt(text)
+        cues = merge_overlapping_cues(raw_cues)
         if not cues:
-            return fail("Format subtitle tidak dikenali atau tidak memiliki cue valid (.srt / .vtt)")
+            return fail("Format subtitle tidak dikenali atau tidak memiliki cue valid (.srt / .vtt / .ass / .ssa)")
         norm_vtt = build_vtt(cues)
     except Exception as e:
         return fail(f"Gagal memproses format subtitle: {e}")
@@ -2590,10 +2608,12 @@ async def get_custom_sub(id: str = Query(""),
 
     # Jika pengguna meminta translasi autosub (misal dari English ke Indonesian)
     if lang and lang.lower() != src.lower():
-        from api.translate import parse_vtt, build_vtt
+        from api.translate import parse_vtt, build_vtt, build_bilingual_vtt
         import hashlib
+        is_dual = (mode == "gtx+_dual")
+        clean_mode = "gtx+" if mode == "gtx+_dual" else mode
         cache_id = id or hashlib.sha1(url.encode("utf-8")).hexdigest()[:16]
-        tr_hash = hashlib.sha1(f"custom_tr|{cache_id}|{lang}".encode("utf-8")).hexdigest()
+        tr_hash = hashlib.sha1(f"custom_tr|{cache_id}|{lang}|{mode or 'gtx+'}".encode("utf-8")).hexdigest()
         key_tr = f"sub2|custom|{tr_hash}"
 
         if not refresh:
@@ -2605,12 +2625,15 @@ async def get_custom_sub(id: str = Query(""),
 
         try:
             cues = parse_vtt(vtt_text)
-            tier = await _translate_with_fallback(cues, src, lang, requested_mode=mode or "gtx+")
-            new_text = build_vtt(tier.get("cues") or cues)
+            tier = await _translate_with_fallback(cues, src, lang, requested_mode=clean_mode or "gtx+")
+            if is_dual:
+                new_text = build_bilingual_vtt(tier.get("cues") or cues, cues)
+            else:
+                new_text = build_vtt(tier.get("cues") or cues)
             if tier.get("level") not in ("source", "source-fallback"):
                 await set_subtitle_cache(key_tr, new_text)
             resp = Response(content=new_text, media_type="text/vtt; charset=utf-8")
-            resp.headers["X-Translate-Tier"] = str(tier.get("level", "gtx+"))
+            resp.headers["X-Translate-Tier"] = str(tier.get("level", "gtx+")) + ("-dual" if is_dual else "")
             return resp
         except Exception as e:
             pass

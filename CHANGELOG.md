@@ -13,6 +13,35 @@ Format versi menggunakan skema `MAJOR.MINOR.PATCH`:
 - **MINOR (x.Y.0):** Penambahan fitur atau kapabilitas baru yang tetap kompatibel ke belakang (*backward-compatible new features*). Digit PATCH direset ke 0.
 - **PATCH (x.y.Z):** Perbaikan bug, peningkatan stabilitas, atau perbaikan internal tanpa penambahan fitur baru (*backward-compatible bug fixes*).
 
+## [2.12.0] - 2026-10-23
+
+### Justifikasi SemVer 2.0.0 (MINOR: 2.11.6 -> 2.12.0)
+Kenaikan digit MINOR (dan reset digit PATCH ke `0`) diterapkan sesuai kaidah Semantic Versioning 2.0.0 serta Direktif #3 [`AGENTS.md`](AGENTS.md) karena rilis ini menghadirkan penambahan fitur dan pengayaan besar (*backward-compatible new features*) pada **Subtitle Engine Tatap (`GTX+`)** lintas seluruh platform (Web Desktop, Windows Portable, Linux AppImage, Android Mobile, dan Android TV), termasuk: dukungan format `.ass`/`.ssa` & pembersih tag ASS override, penggabungan cue simultan (*overlapping dialogue & sign cues*), mode **Dual-Subtitle Bilingual (`ID + EN`)**, kontrol **Sinkronisasi Waktu Subtitle (Offset `-` / `+` detik)**, **Sliding-Window Scene Context (±3 cues / ≤15s)**, **Stutter Preservation (`W-What?!` → `A-Apa?!`)**, serta pengayaan 250+ aturan slang/idiom Inggris, kultivasi/murim/donghua, honorifik Jepang, dan koreksi terjemahan harfiah (*calque fixes*) agar kualitas terjemahan `GTX+` ≥90% setara fansub manusia.
+
+### Added
+1. **Dukungan Format Subtitle `.ass` / `.ssa` & Pembersih Tag ASS Override (`backend/api/translate.py`, `frontend/js/app.js`, `PlayerActivity.java`):**
+   - Menambahkan fungsi `clean_ass_tags()` dan parser otomatis blok `[Events]` `Dialogue:` untuk membaca file subtitle kustom berformat `.ass`/`.ssa` di Web Desktop maupun Android, sekaligus membersihkan tag override seperti `{\an8}`, `{\pos(x,y)}`, `{\fad(...)}`, serta mengonversi `\N`/`\n` menjadi baris baru dan `\h` menjadi spasi.
+2. **Penggabungan Cue Simultan / Overlapping (`merge_overlapping_cues` & Multi-Cue Renderer):**
+   - Menggabungkan cue yang memiliki rentang waktu identik atau sangat berdekatan (`<= 0.05s`) di backend serta merender seluruh cue aktif secara bersamaan pada overlay Web Desktop (`paintCue`) dan Android (`findActiveCue`), sehingga teks papan nama/lokasi (*sign*) tidak lagi menimpa dialog karakter yang sedang berbicara.
+3. **Mode Dual-Subtitle Bilingual (`GTX+ Bilingual ID + EN`):**
+   - Menambahkan fungsi `build_bilingual_vtt()` dan dukungan mode `gtx+_dual` / `dual=true` pada `/api/player/sub` dan `/api/player/sub_custom` yang menyusun terjemahan Bahasa Indonesia (`GTX+`) di baris utama dan teks Bahasa Inggris asli di baris bawah.
+   - Tersedia langsung pada pemilih subtitle Web Desktop (`Indonesian (GTX+ Bilingual ID+EN)`) serta Android Mobile & Android TV (`[ID+EN] Bahasa Indonesia — GTX+ Bilingual (ID + EN)`).
+4. **Kontrol Sinkronisasi Waktu Subtitle / Subtitle Timing Offset (`-` / `+` Detik):**
+   - **Web Desktop:** Menambahkan tombol HUD `-`, indikator `0.0s` (klik untuk reset), dan `+` (`±0.25s`), shortcut keyboard `,` (`-0.25s`) dan `.` (`+0.25s`), serta perintah CLI `:subdelay <detik|reset>`.
+   - **Android Mobile & Android TV:** Menambahkan menu **Sinkronisasi Waktu Subtitle (Offset)** (`-2.0s` s/d `+2.0s`) di dalam dialog pengaturan subtitle maupun tampilan subtitle, lengkap dengan indikator offset aktif pada status subtitle player.
+5. **Sliding-Window Scene Context (`sanitize_cues_with_context`):**
+   - Menganalisis konteks adegan menggunakan jendela geser `±3 cues` dalam jarak waktu `<= 15.0 detik`. Apabila terdapat indikator dialog formal/kerajaan/militer pada kalimat berdekatan (seperti *"Yang Mulia"*, *"Paduka"*, *"Lapor"*), seluruh kalimat di dalam adegan yang sama otomatis mempertahankan kata ganti dan register sopan (*Saya/Anda*), mencegah kebocoran partikel gaul di tengah adegan serius.
+6. **Pelestarian Dialog Gagap / Stutter Preservation (`_preprocess_stutter_en` & `_postprocess_stutter_id`):**
+   - Mendeteksi pola gagap bahasa Inggris (seperti `"W-What?!"`, `"S-Stop!"`, `"I-Impossible!"`) sebelum dikirim ke mesin GTX agar kata tidak rusak diterjemahkan, lalu memulihkan efek gagap secara alami pada kata hasil terjemahan Bahasa Indonesia (`"A-Apa?!"`, `"B-Berhenti!"`, `"T-Tidak mungkin!"`).
+7. **Pengayaan 250+ Slang/Idiom Bahasa Inggris, Leksikon Kultivasi/Donghua, Honorifik & Anti-Calque (`GTX+` ≥90% Setara Fansub):**
+   - **Stage-1 Pre-GTX English Slang & Idiom Normalizer:** Menambahkan 110+ phrasal verbs, idiom percakapan, kontraksi lisan (`whatcha`, `gotcha`, `lemme`, `gimme`, `dunno`, `kinda`, `outta`), dan ekspresi reaksi (`knock it off`, `passed out cold`, `hear me out`, `in the nick of time`, `out of my league`, `jump to conclusions`, `pulling my leg`, `throw in the towel`, `pushing your luck`, `buy some time`, `playing dumb`, `third wheel`, `spacing out`, `all ears`, `slipped my mind`, `ring a bell`, `turned the tables`, dll.).
+   - **Stage-2 Post-GTX Indonesian Calque Fixes & Naturalizer:** Memperbaiki terjemahan kaku kata-per-kata menjadi ungkapan lisan fansub yang luwes, memperhalus akhiran tanya (`", bukan?"` → `", kan?"`), serta memperkaya kosakata **Kultivasi / Murim / Wuxia / Donghua** (*Inti Emas, Tahap Fondasi, Jiwa Nascent, Kesengsaraan Langit, Kakak Senior, Adik Junior, Sekte Bela Diri, Qi Sejati*), **Istana Dalam / Apothecary** (*Istana Dalam, Selir Utama, Pencicip Racun, Tabib Istana*), dan **Honorifik Jepang** (*Onii-chan/Onee-chan → Kakak, Aniki → Bang, Ojou-sama → Nona Muda, Otou-san → Ayah, Okaa-san → Ibu*).
+8. **Pelestarian Baris Ganda (`\n`) pada Mesin GTX (`call_gtx_translate`):**
+   - Mengonversi newline internal cue menjadi `<br>` sebelum dikirim di dalam elemen `<p id="{i}">` ke endpoint Google GTX dan memulihkannya kembali menjadi `\n`, sehingga dialog dua baris tidak lagi menyatu menjadi satu baris panjang.
+
+### Tests
+- Menambahkan suite pengujian unit `tests/test_subtitle_engine_enrichment.py` yang menguji pembersihan tag ASS, parser `.ass`, penggabungan cue simultan, pembentukan VTT bilingual, pre-normalizer slang/idiom Inggris, pelestarian gagap (*stutter*), leksikon kultivasi/honorifik, dan sliding-window scene context.
+
 ## [2.11.6] - 2026-10-23
 
 ### Justifikasi SemVer 2.0.0 (PATCH: 2.11.5 -> 2.11.6)

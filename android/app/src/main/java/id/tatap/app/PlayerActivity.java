@@ -241,6 +241,7 @@ public class PlayerActivity extends Activity {
 
     private volatile List<SubtitleCue> currentCues = new ArrayList<>();
     private int currentSubLoadId = 0;
+    private long subtitleOffsetMs = 0L;
 
     private String rawStreamUrl = "";
     private String streamReferer = "";
@@ -2917,6 +2918,7 @@ public class PlayerActivity extends Activity {
         }
         String engineLabel = "Google GTX (Cepat)";
         if ("gtx+".equals(activeEngine) || "aigtx".equals(activeEngine)) engineLabel = "GTX+ (Smart Fansub & Scene Detection)";
+        else if ("gtx+_dual".equals(activeEngine)) engineLabel = "GTX+ Bilingual (ID + EN)";
         else if ("ai".equals(activeEngine)) engineLabel = "AI Fansub (" + configuredAiModel + ")";
         else if ("raw".equals(activeEngine)) {
             if ("en".equals(activeSubLang)) engineLabel = "Source English";
@@ -2924,8 +2926,21 @@ public class PlayerActivity extends Activity {
             else engineLabel = "Source Asli";
         }
 
+        String offsetSuffix = "";
+        if (subtitleOffsetMs != 0L) {
+            double sec = subtitleOffsetMs / 1000.0;
+            offsetSuffix = String.format(java.util.Locale.US, " (%+.2fs)", sec).replaceAll("0+s\\)", "s)").replace(".s)", ".0s)");
+        }
         String suffix = isLoaded ? "" : " [Memuat...]";
-        tvSubStatus.setText("Sub: " + activeSubLang.toUpperCase() + " • " + engineLabel + suffix);
+        tvSubStatus.setText("Sub: " + activeSubLang.toUpperCase() + " • " + engineLabel + offsetSuffix + suffix);
+    }
+
+    private static String cleanSubtitleText(String raw) {
+        if (raw == null || raw.isEmpty()) return "";
+        String s = raw.replace("\\N", "\n").replace("\\n", "\n").replace("\\h", " ");
+        s = s.replaceAll("\\{[^}]*\\}", "");
+        s = s.replaceAll("<[^>]*>", "");
+        return s.trim();
     }
 
     private static long parseTimestamp(String token) {
@@ -2970,6 +2985,36 @@ public class PlayerActivity extends Activity {
         }
 
         String[] lines = content.replace("\r\n", "\n").replace("\r", "\n").split("\n");
+
+        // Deteksi format ASS / SSA ([Events] / Dialogue:)
+        boolean isAss = false;
+        for (int i = 0; i < Math.min(lines.length, 80); i++) {
+            String t = lines[i].trim();
+            if (t.equalsIgnoreCase("[Events]") || t.regionMatches(true, 0, "Dialogue:", 0, 9)) {
+                isAss = true;
+                break;
+            }
+        }
+        if (isAss) {
+            for (String rawLine : lines) {
+                String line = rawLine.trim();
+                if (line.regionMatches(true, 0, "Dialogue:", 0, 9)) {
+                    String payload = line.substring(9).trim();
+                    String[] parts = payload.split(",", 10);
+                    if (parts.length >= 10) {
+                        long st = parseTimestamp(parts[1].trim());
+                        long et = parseTimestamp(parts[2].trim());
+                        String txt = cleanSubtitleText(parts[9]);
+                        if (st >= 0 && et > st && !txt.isEmpty()) {
+                            list.add(new SubtitleCue(st, et, txt));
+                        }
+                    }
+                }
+            }
+            java.util.Collections.sort(list, (a, b) -> Long.compare(a.startMs, b.startMs));
+            return list;
+        }
+
         long curStart = -1;
         long curEnd = -1;
         StringBuilder curText = new StringBuilder();
@@ -2980,7 +3025,7 @@ public class PlayerActivity extends Activity {
             if (line.contains("-->")) {
                 // Simpan cue sebelumnya jika belum sempat ter-flush
                 if (curStart != -1 && curEnd != -1 && curText.length() > 0) {
-                    String cleaned = curText.toString().replaceAll("<[^>]*>", "").trim();
+                    String cleaned = cleanSubtitleText(curText.toString());
                     if (!cleaned.isEmpty()) {
                         list.add(new SubtitleCue(curStart, curEnd, cleaned));
                     }
@@ -2994,7 +3039,7 @@ public class PlayerActivity extends Activity {
                 }
             } else if (line.isEmpty()) {
                 if (curStart != -1 && curEnd != -1 && curText.length() > 0) {
-                    String cleaned = curText.toString().replaceAll("<[^>]*>", "").trim();
+                    String cleaned = cleanSubtitleText(curText.toString());
                     if (!cleaned.isEmpty()) {
                         list.add(new SubtitleCue(curStart, curEnd, cleaned));
                     }
@@ -3012,7 +3057,7 @@ public class PlayerActivity extends Activity {
         }
 
         if (curStart != -1 && curEnd != -1 && curText.length() > 0) {
-            String cleaned = curText.toString().replaceAll("<[^>]*>", "").trim();
+            String cleaned = cleanSubtitleText(curText.toString());
             if (!cleaned.isEmpty()) {
                 list.add(new SubtitleCue(curStart, curEnd, cleaned));
             }
@@ -3023,13 +3068,14 @@ public class PlayerActivity extends Activity {
     private SubtitleCue findActiveCue(long posMs) {
         List<SubtitleCue> cues = currentCues;
         if (cues == null || cues.isEmpty()) return null;
+        long adjPos = posMs - subtitleOffsetMs;
         int low = 0;
         int high = cues.size() - 1;
         int best = -1;
         while (low <= high) {
             int mid = (low + high) >>> 1;
             SubtitleCue cue = cues.get(mid);
-            if (cue.startMs <= posMs) {
+            if (cue.startMs <= adjPos) {
                 best = mid;
                 low = mid + 1;
             } else {
@@ -3037,8 +3083,29 @@ public class PlayerActivity extends Activity {
             }
         }
         if (best != -1) {
-            SubtitleCue c = cues.get(best);
-            if (posMs <= c.endMs) return c;
+            // Kumpulkan seluruh cue yang sedang aktif pada timestamp adjPos (mendukung dialog ganda / sign simultan)
+            int startScan = Math.max(0, best - 8);
+            StringBuilder merged = new StringBuilder();
+            long minStart = Long.MAX_VALUE;
+            long maxEnd = Long.MIN_VALUE;
+            int activeCount = 0;
+            SubtitleCue singleCue = null;
+            for (int i = startScan; i <= best; i++) {
+                SubtitleCue c = cues.get(i);
+                if (adjPos >= c.startMs && adjPos <= c.endMs) {
+                    String t = c.text != null ? c.text.trim() : "";
+                    if (!t.isEmpty() && !merged.toString().contains(t)) {
+                        if (merged.length() > 0) merged.append("\n");
+                        merged.append(t);
+                        minStart = Math.min(minStart, c.startMs);
+                        maxEnd = Math.max(maxEnd, c.endMs);
+                        activeCount++;
+                        singleCue = c;
+                    }
+                }
+            }
+            if (activeCount == 1) return singleCue;
+            if (activeCount > 1) return new SubtitleCue(minStart, maxEnd, merged.toString());
         }
         return null;
     }
@@ -3359,6 +3426,16 @@ public class PlayerActivity extends Activity {
                     activeSubUrl = enSourceSubUrl;
                 });
 
+                // 2b. GTX+ Bilingual (ID + EN Dual Subtitle)
+                boolean isGtxDualSelected = subEnabled && "id".equals(activeSubLang) && "gtx+_dual".equals(activeEngine);
+                options.add("[ID+EN] Bahasa Indonesia — GTX+ Bilingual (ID + EN)" + (isGtxDualSelected ? " [Aktif]" : ""));
+                actions.add(() -> {
+                    subEnabled = true;
+                    activeSubLang = "id";
+                    activeEngine = "gtx+_dual";
+                    activeSubUrl = enSourceSubUrl;
+                });
+
                 // 3. AI Fansub (Prioritas Ketiga / LLM Translate)
                 boolean isAiSelected = subEnabled && "id".equals(activeSubLang) && "ai".equals(activeEngine);
                 String aiOptionText = "[AI] Bahasa Indonesia (AI Fansub / " + configuredAiModel + ")"
@@ -3431,11 +3508,16 @@ public class PlayerActivity extends Activity {
         }
 
         // Opsi Subtitle Kustom (File Lokal / URL)
-        options.add("[+] Pilih File Subtitle Lokal (.srt / .vtt)...");
+        options.add("[+] Pilih File Subtitle Lokal (.srt / .vtt / .ass)...");
         actions.add(this::openSubtitleFilePicker);
 
         options.add("[+] Masukkan URL Subtitle Kustom...");
         actions.add(this::showCustomSubtitleUrlDialog);
+
+        // Sinkronisasi Waktu Subtitle (Offset)
+        String curOffLbl = subtitleOffsetMs == 0L ? "0.0s (Normal)" : String.format(java.util.Locale.US, "%+.2fs", subtitleOffsetMs / 1000.0).replaceAll("0+s$", "s").replace(".s", ".0s");
+        options.add("[Sync] Sinkronisasi Waktu Subtitle (Offset: " + curOffLbl + ")...");
+        actions.add(this::showSubtitleOffsetPicker);
 
         // 7. Pengaturan Tampilan & Gaya Subtitle
         options.add("Pengaturan Tampilan (Posisi, Latar Belakang & Ukuran)...");
@@ -3451,7 +3533,7 @@ public class PlayerActivity extends Activity {
             if (which >= 0 && which < actions.size()) {
                 String chosen = options.get(which);
                 actions.get(which).run();
-                if (!chosen.contains("[Refresh]") && !chosen.contains("[+]")) {
+                if (!chosen.contains("[Refresh]") && !chosen.contains("[+]") && !chosen.contains("[Sync]") && !chosen.contains("Pengaturan Tampilan")) {
                     getSharedPreferences("tatap_player_prefs", MODE_PRIVATE).edit()
                             .putString("pref_sub_engine", activeEngine)
                             .putString("pref_sub_lang", activeSubLang)
@@ -3831,11 +3913,14 @@ public class PlayerActivity extends Activity {
             else sizeLabel = "Sedang (17sp)";
         }
 
+        String offsetLabel = subtitleOffsetMs == 0L ? "0.0s (Normal)" : String.format(java.util.Locale.US, "%+.2fs", subtitleOffsetMs / 1000.0).replaceAll("0+s$", "s").replace(".s", ".0s");
+
         String[] menu = new String[]{
                 "Posisi Subtitle: " + posLabel,
                 "Latar Belakang: " + bgLabel,
                 "Ukuran Huruf: " + sizeLabel,
                 "Lebar / Tumpukan: " + wrapLabel,
+                "Sinkronisasi Waktu (Offset): " + offsetLabel,
                 "Reset ke Default"
         };
 
@@ -3849,9 +3934,14 @@ public class PlayerActivity extends Activity {
             } else if (which == 3) {
                 showWrapPicker(sp);
             } else if (which == 4) {
+                showSubtitleOffsetPicker();
+            } else if (which == 5) {
+                subtitleOffsetMs = 0L;
                 sp.edit().putString("sub_pos", "low").putString("sub_bg", "subtle").putString("sub_size", defaultSize).putString("sub_wrap", "compact").apply();
                 applySubtitleStyle();
-                Toast.makeText(this, "Tampilan subtitle direset ke default", Toast.LENGTH_SHORT).show();
+                updateSubStatusText(true);
+                subtitleSyncRunnable.run();
+                Toast.makeText(this, "Tampilan & offset subtitle direset ke default", Toast.LENGTH_SHORT).show();
             }
         });
 
@@ -3886,6 +3976,44 @@ public class PlayerActivity extends Activity {
                     applySubtitleStyle();
                     dialog.dismiss();
                     Toast.makeText(this, "Posisi subtitle disimpan", Toast.LENGTH_SHORT).show();
+                })
+                .setNegativeButton("Batal", null)
+                .show();
+    }
+
+    private void showSubtitleOffsetPicker() {
+        final long[] offsetValuesMs = new long[]{
+                -2000L, -1000L, -500L, -250L, 0L, 250L, 500L, 1000L, 2000L
+        };
+        final String[] options = new String[]{
+                "-2.0s (Lebih Cepat 2 Detik)",
+                "-1.0s (Lebih Cepat 1 Detik)",
+                "-0.5s (Lebih Cepat 0.5 Detik)",
+                "-0.25s (Lebih Cepat 0.25 Detik)",
+                "0.0s (Normal / Default)",
+                "+0.25s (Lebih Lambat 0.25 Detik)",
+                "+0.5s (Lebih Lambat 0.5 Detik)",
+                "+1.0s (Lebih Lambat 1 Detik)",
+                "+2.0s (Lebih Lambat 2 Detik)"
+        };
+        int checked = 4;
+        for (int i = 0; i < offsetValuesMs.length; i++) {
+            if (offsetValuesMs[i] == subtitleOffsetMs) {
+                checked = i;
+                break;
+            }
+        }
+        new AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+                .setTitle("Sinkronisasi Waktu Subtitle (Offset)")
+                .setSingleChoiceItems(options, checked, (dialog, which) -> {
+                    if (which >= 0 && which < offsetValuesMs.length) {
+                        subtitleOffsetMs = offsetValuesMs[which];
+                        updateSubStatusText(true);
+                        subtitleSyncRunnable.run();
+                        String lbl = subtitleOffsetMs == 0L ? "0.0s (Normal)" : String.format(java.util.Locale.US, "%+.2fs", subtitleOffsetMs / 1000.0).replaceAll("0+s$", "s").replace(".s", ".0s");
+                        Toast.makeText(this, "Offset waktu subtitle: " + lbl, Toast.LENGTH_SHORT).show();
+                    }
+                    dialog.dismiss();
                 })
                 .setNegativeButton("Batal", null)
                 .show();

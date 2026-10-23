@@ -37,11 +37,51 @@ def get_translate_logs():
 
 
 
+_ASS_TAG_RE = _re.compile(r"\{[^}]*\}")
+_ASS_DIALOGUE_RE = _re.compile(
+    r"^\s*Dialogue:\s*[^,]*,\s*([0-9]+:[0-5]?\d:[0-5]?\d[.,]\d+)\s*,\s*([0-9]+:[0-5]?\d:[0-5]?\d[.,]\d+)\s*,"
+    r"[^,]*,[^,]*,[^,]*,[^,]*,[^,]*,[^,]*,(.*)$",
+    _re.I,
+)
+
+
+def clean_ass_tags(text: str) -> str:
+    """Bersihkan tag override ASS/SSA ({\\an8}, {\\pos(x,y)}, {\\fad(...)}) dan konversi \\N / \\n / \\h."""
+    if not text:
+        return ""
+    t = _ASS_TAG_RE.sub("", text)
+    t = t.replace("\\N", "\n").replace("\\n", "\n").replace("\\h", " ")
+    return t
+
+
 def parse_vtt(text):
-    """Parse WEBVTT text ke list[{start:float, end:float, text:str}].
-    Port dari app.js parseVtt() — keep logic consistent."""
+    """Parse WEBVTT, SRT, atau ASS/SSA text ke list[{start:float, end:float, text:str}].
+    Mendukung pembersihan tag HTML (<...>) maupun ASS override ({\\an8}, \\N)
+    serta penggabungan cue simultan (overlapping dialogue + sign)."""
     out = []
-    lines = (text or "").replace("\r\n", "\n").split("\n")
+    raw_text = (text or "").lstrip("\ufeff").replace("\r\n", "\n").replace("\r", "\n")
+    lines = raw_text.split("\n")
+
+    # Deteksi format ASS / SSA ([Events] / Dialogue:)
+    if any(ln.strip().lower().startswith("dialogue:") for ln in lines[:250]):
+        for ln in lines:
+            m = _ASS_DIALOGUE_RE.match(ln)
+            if not m:
+                continue
+            s_ts = _vtt_ts(m.group(1).strip())
+            e_ts = _vtt_ts(m.group(2).strip())
+            if s_ts < 0 or e_ts <= s_ts:
+                continue
+            cleaned_ass = clean_ass_tags(m.group(3))
+            text_lines = [
+                _html.unescape(_re.sub(r"<[^>]*>", "", sub_ln)).strip()
+                for sub_ln in cleaned_ass.split("\n")
+            ]
+            text_lines = [x for x in text_lines if x]
+            if text_lines:
+                out.append({"start": s_ts, "end": e_ts, "text": "\n".join(text_lines)})
+        return merge_overlapping_cues(out)
+
     i = 0
     if lines and lines[0].startswith("WEBVTT"):
         i = 1
@@ -53,10 +93,14 @@ def parse_vtt(text):
     def _flush():
         nonlocal start, end, buf, out
         if start >= 0 and end > start and buf:
-            # Plain text: buang tag VTT/HTML (<i>, <c.x>, <00:01.000>) lalu decode entity.
-            # Escaping HTML dilakukan frontend (parseVtt) saat render, bukan di sini.
-            text_lines = [_html.unescape(_re.sub(r"<[^>]*>", "", ln)).strip() for ln in buf]
-            text_lines = [x for x in text_lines if x]
+            # Plain text: buang tag ASS ({\an8}, \N) dan VTT/HTML (<i>, <c.x>, <00:01.000>) lalu decode entity.
+            text_lines = []
+            for ln in buf:
+                cleaned_ln = clean_ass_tags(ln)
+                for part in cleaned_ln.split("\n"):
+                    plain = _html.unescape(_re.sub(r"<[^>]*>", "", part)).strip()
+                    if plain:
+                        text_lines.append(plain)
             if text_lines:
                 out.append({"start": start, "end": end, "text": "\n".join(text_lines)})
         start = -1.0
@@ -81,10 +125,52 @@ def parse_vtt(text):
             i += 1
             continue
         if start >= 0:
+            # Abaikan nomor urut SRT jika berdiri sendiri sebelum timestamp berikutnya
+            if ln.isdigit() and (i + 1 < len(lines)) and "-->" in lines[i + 1]:
+                _flush()
+                i += 1
+                continue
             buf.append(ln)
         i += 1
     _flush()
-    return out
+    return merge_overlapping_cues(out)
+
+
+def merge_overlapping_cues(cues):
+    """Gabungkan cue yang memiliki rentang timestamp identik/hampir identik (selisih <= 0.05s)
+    dan deduplikasi baris teks yang sama agar dialog & sign simultan tidak saling menimpa."""
+    if not cues or len(cues) <= 1:
+        return cues
+    sorted_cues = sorted(cues, key=lambda c: (c["start"], c["end"]))
+    merged = []
+    for c in sorted_cues:
+        if merged and abs(c["start"] - merged[-1]["start"]) <= 0.05 and abs(c["end"] - merged[-1]["end"]) <= 0.05:
+            prev_lines = merged[-1]["text"].split("\n")
+            for ln in c["text"].split("\n"):
+                if ln and ln not in prev_lines:
+                    prev_lines.append(ln)
+            merged[-1]["text"] = "\n".join(prev_lines[:4])
+        else:
+            merged.append({"start": c["start"], "end": c["end"], "text": c["text"]})
+    return merged
+
+
+def build_bilingual_vtt(translated_cues, source_cues):
+    """Bangun teks WEBVTT dwibahasa (Baris atas: Terjemahan, Baris bawah: Teks Asli)."""
+    if not translated_cues:
+        return build_vtt(source_cues or [])
+    if not source_cues or len(source_cues) != len(translated_cues):
+        return build_vtt(translated_cues)
+    combined = []
+    for tr_c, src_c in zip(translated_cues, source_cues):
+        tr_txt = (tr_c.get("text") or "").strip()
+        src_txt = (src_c.get("text") or "").replace("\n", " ").strip()
+        if src_txt and tr_txt.lower() != src_txt.lower():
+            text_out = f"{tr_txt}\n{src_txt}"
+        else:
+            text_out = tr_txt
+        combined.append({"start": tr_c["start"], "end": tr_c["end"], "text": text_out})
+    return build_vtt(combined)
 
 
 def _vtt_ts(s):
@@ -817,15 +903,166 @@ _PRE_GTX_EN_SLANG_RULES = [
     (r"\bclear rewards?\b", "quest completion reward"),
     (r"\bepic (?:class|job)\b", "epic tier class"),
     (r"\blegendary job\b", "legendary class"),
+    # Stage-1: Exclamation Openers & Interjeksi Pembuka (Cegah "Pria, ..." / "Anak laki-laki, ...")
+    (r"^\s*oh\s+man,\s*", "oh gosh, "),
+    (r"^\s*man,\s+", "gosh, "),
+    (r"^\s*oh\s+boy,\s*", "oh my, "),
+    (r"^\s*boy,\s+", "wow, "),
+    (r"\bwhat the (?:heck|hell)\b", "what exactly"),
+    (r"\bwho the (?:heck|hell)\b", "who exactly"),
+    (r"\bwhere the (?:heck|hell)\b", "where exactly"),
+    (r"\bhow the (?:heck|hell)\b", "how on earth"),
+    (r"\bwhy the (?:heck|hell)\b", "why on earth"),
+    (r"\bfor crying out loud\b", "seriously, goodness gracious"),
+    (r"\bfor goodness'? sake\b", "for heaven's sake"),
+    (r"\bfor pete'?s sake\b", "for heaven's sake"),
+    (r"\bno wonder\b", "it is natural that"),
+    (r"\bspeaking of which\b", "by the way about that"),
+    (r"\bcome to think of it\b", "now that I think about it"),
+    (r"\bnow that you mention it\b", "now that I think about it"),
+    (r"\bas if!\b", "impossible!"),
+    (r"\blike hell i (?:would|will)\b", "I definitely refuse to"),
+    (r"\bmy ass!\b", "that is nonsense!"),
+    # Stage-1: Phrasal Verbs & Colloquial Idioms (Anti-Calque Harfiah)
+    (r"\bknock it off\b", "stop doing that"),
+    (r"\bgive it a rest\b", "stop talking about it"),
+    (r"\bpassed out cold\b", "fainted unconscious"),
+    (r"\bpassed out\b", "fainted unconscious"),
+    (r"\bpass out\b", "faint unconscious"),
+    (r"\bblacked out\b", "fainted unconscious"),
+    (r"\bblack out\b", "faint unconscious"),
+    (r"\bhang(ing)? out with\b", "spending time together with"),
+    (r"\bhang(ing)? out\b", "spending time together"),
+    (r"\bhear (me|him|her|us|them) out\b", r"listen to \1 until the end"),
+    (r"\bcheck (this|that|it) out\b", r"look at \1"),
+    (r"\bwatch out\b", "be careful"),
+    (r"\blook out\b", "be careful"),
+    (r"\bin the nick of time\b", "just in time at the critical moment"),
+    (r"\bget the hang of (it|this|that)\b", r"get used to mastering \1"),
+    (r"\bgot the hang of (it|this|that)\b", r"got used to mastering \1"),
+    (r"\bout of (my|your|his|her|our) league\b", r"far beyond \1 level"),
+    (r"\bjump(ing)? to conclusions\b", "making hasty assumptions"),
+    (r"\bgive it a (?:shot|try|whirl)\b", "try doing it"),
+    (r"\bcall(ing)? the shots\b", "in full command"),
+    (r"\bno biggie\b", "not a big problem"),
+    (r"\bno big deal\b", "not a big problem"),
+    (r"\blose track of time\b", "forget the time"),
+    (r"\blost track of time\b", "forgot the time"),
+    (r"\bdon't rub it in\b", "do not keep teasing about it"),
+    (r"\brub(bing)? it in\b", "teasing about the mistake"),
+    (r"\bkeep an eye on\b", "watch and guard"),
+    (r"\bcatch (my|your|his|her|our) breath\b", r"rest and breathe for a moment"),
+    (r"\bhold(ing)? a grudge\b", "keeping resentment"),
+    (r"\bpull(ing)? (my|your|his|her) leg\b", r"joking and tricking"),
+    (r"\bpull(ed|ing)? a fast one\b", "played a trick"),
+    (r"\boff the hook\b", "free from trouble"),
+    (r"\bthrow in the towel\b", "surrender and give up"),
+    (r"\bthrew in the towel\b", "surrendered and gave up"),
+    (r"\bchicken(ed|ing)? out\b", "lost courage and backed out"),
+    (r"\bpush(ing)? (your|my|his|her) luck\b", "being too greedy and reckless"),
+    (r"\byou asked for it\b", "you brought this upon yourself"),
+    (r"\bmean(s)? business\b", "completely serious"),
+    (r"\bbuy (some|us|me|them) time\b", "stall for time"),
+    (r"\bplay(ing)? dumb\b", "pretending not to know"),
+    (r"\bplay(ing)? innocent\b", "pretending to be innocent"),
+    (r"\bplay(ing)? hard to get\b", "acting aloof and hard to win"),
+    (r"\bthird wheel\b", "awkward extra person on a date"),
+    (r"\bhead over heels\b", "deeply in love"),
+    (r"\bbutterflies in (my|your|his|her) stomach\b", "feeling very nervous and fluttering"),
+    (r"\b(spacing|spaced|zoning|zoned) out\b", "daydreaming blankly"),
+    (r"\bspace out\b", "daydream blankly"),
+    (r"\b(i'm|i am) all ears\b", "I am listening carefully"),
+    (r"\b(my|our) hands are tied\b", "we have no other choice and cannot help"),
+    (r"\bslipped my mind\b", "I completely forgot"),
+    (r"\bslip of the tongue\b", "accidental spoken mistake"),
+    (r"\bdoes that ring a bell\b", "does that sound familiar"),
+    (r"\bring(s)? a bell\b", "sound familiar"),
+    (r"\bgood[- ]for[- ]nothing\b", "completely useless"),
+    (r"\bpain in the (?:neck|ass|butt)\b", "very annoying trouble"),
+    (r"\bwrapped around (his|her|your|my) (?:little )?finger\b", "completely obedient to"),
+    (r"\bbeat it!\b", "go away right now!"),
+    (r"\bscram!\b", "get lost right now!"),
+    (r"\bbuzz off!\b", "go away right now!"),
+    (r"\bway to go!\b", "great job!"),
+    (r"\blong time no see\b", "it has been a long time since we met"),
+    (r"\beasier said than done\b", "easy to say but hard to do"),
+    (r"\blet it slide\b", "forgive and ignore it this time"),
+    (r"\bgot carried away\b", "got too excited"),
+    (r"\bget carried away\b", "get too excited"),
+    (r"\bgo(ing)? overboard\b", "acting too excessively"),
+    (r"\byou have a point\b", "what you say makes sense"),
+    (r"\bbeside the point\b", "irrelevant to the main issue"),
+    (r"\bon second thought\b", "after thinking about it again"),
+    (r"\bfor the time being\b", "for now temporarily"),
+    (r"\bout of the question\b", "completely impossible to allow"),
+    (r"\bcall it quits\b", "stop and end it now"),
+    (r"\blose (my|your|his|her) temper\b", "get angry and lose patience"),
+    (r"\blost (my|your|his|her) temper\b", "got angry and lost patience"),
+    (r"\bget(s|ting)? on my nerves\b", "making me very annoyed"),
+    (r"\bhit(s)? the spot\b", "feels very satisfying and refreshing"),
+    (r"\btake a breather\b", "rest for a moment"),
+    (r"\bpull(ed|ing)? an all[- ]nighter\b", "stayed awake all night"),
+    (r"\bsleep like a log\b", "sleep very deeply"),
+    (r"\bout like a light\b", "fast asleep immediately"),
+    (r"\bin over (my|your|his|her) head\b", "facing a problem beyond ability"),
+    (r"\boff the top of my head\b", "from spontaneous memory"),
+    (r"\bby the skin of (my|your|his|her|our) teeth\b", "narrowly by a tiny margin"),
+    (r"\bturn(ed|ing)? the tables\b", "reversed the situation"),
+    (r"\bread between the lines\b", "understand the hidden meaning"),
+    (r"\bin the same boat\b", "in the same difficult situation"),
+    (r"\blet the cat out of the bag\b", "accidentally reveal the secret"),
+    (r"\badd(ing)? fuel to the fire\b", "making the situation worse"),
+    # Stage-1: Spoken English Contractions (Agar Struktur Kalimat Tidak Rusak di GTX)
+    (r"\bwhatcha\b", "what are you"),
+    (r"\bgotcha\b", "I understand"),
+    (r"\blemme\b", "let me"),
+    (r"\bgimme\b", "give me"),
+    (r"\bdunno\b", "do not know"),
+    (r"\bkinda\b", "kind of"),
+    (r"\bsorta\b", "sort of"),
+    (r"\boutta\b", "out of"),
+    (r"\bhafta\b", "have to"),
+    (r"\boughta\b", "ought to"),
 ]
 _COMPILED_PRE_GTX_EN_SLANG = [(_re.compile(pat, _re.IGNORECASE), repl) for pat, repl in _PRE_GTX_EN_SLANG_RULES]
+
+_STUTTER_EN_START_RE = _re.compile(r"^(\s*(?:-\s*)?)([A-Za-z])-\2([a-zA-Z]{2,})\b")
+_STUTTER_EN_ANY_RE = _re.compile(r"\b([A-Za-z])-\1([a-zA-Z]{2,})\b")
+
+
+def _preprocess_stutter_en(text: str):
+    """Deteksi dan bersihkan gagap bahasa Inggris (mis. 'W-What?!' -> 'What?!') sebelum masuk GTX.
+    Mengembalikan tuple (clean_text, had_leading_stutter)."""
+    if not text:
+        return text, False
+    had_leading = bool(_STUTTER_EN_START_RE.search(text))
+    cleaned = _STUTTER_EN_ANY_RE.sub(lambda m: m.group(1) + m.group(2), text)
+    return cleaned, had_leading
+
+
+def _postprocess_stutter_id(orig_en: str, translated_id: str) -> str:
+    """Jika teks sumber bahasa Inggris memiliki gagap di awal kalimat ('W-What?!', 'S-Stop!'),
+    pasangkan kembali awalan gagap bahasa Indonesia yang sesuai ('A-Apa?!', 'B-Berhenti!')."""
+    if not orig_en or not translated_id:
+        return translated_id
+    if not _STUTTER_EN_START_RE.search(orig_en):
+        return translated_id
+    # Jangan gandakan jika sudah memiliki gagap (misal 'A-Apa')
+    if _re.match(r"^\s*(?:-\s*)?[A-Za-z]-[A-Za-z]", translated_id):
+        return translated_id
+    m = _re.match(r"^(\s*(?:-\s*)?)([A-Za-z])([a-zA-Z]{1,})(.*)$", translated_id, _re.DOTALL)
+    if not m:
+        return translated_id
+    prefix, first_char, rest_word, tail = m.group(1), m.group(2), m.group(3), m.group(4)
+    return f"{prefix}{first_char}-{first_char}{rest_word}{tail}"
+
 
 def _pre_normalize_en_slang(text: str) -> str:
     """Pra-pemrosesan teks sumber bahasa Inggris sebelum masuk ke Google Translate (GTX).
     Menggantikan idiom dan slang bahasa Inggris ambigu yang sering rusak saat diterjemahkan mesin."""
     if not text:
         return text
-    result = text
+    result, _ = _preprocess_stutter_en(text)
     for rx, repl in _COMPILED_PRE_GTX_EN_SLANG:
         result = rx.sub(repl, result)
     return result
@@ -1306,6 +1543,90 @@ _UNIVERSAL_FANSUB_RULES = [
     (r"\bhadiah yang jelas\b", "hadiah penyelesaian misi"),
     (r"\bkelas yang hebat\b", "kelas epik"),
     (r"\bpekerjaan yang luar biasa\b", "pekerjaan kelas epik"),
+
+    # --- 16. Koreksi Terjemahan Kaku Literal (Calque Fixes) & Idiom Inggris ---
+    (r"\bmembuat masuk akal\b", "masuk akal"),
+    (r"\btidak membuat masuk akal\b", "tidak masuk akal"),
+    (r"\bmembuat rasa\b", "masuk akal"),
+    (r"\bambil perhatian\b", "hati-hati"),
+    (r"\bambil hati-hati\b", "hati-hati"),
+    (r"\bambil waktumu\b", "santai saja, tidak usah buru-buru"),
+    (r"\bambil waktu anda\b", "silakan santai saja"),
+    (r"\bmemegang kembali\b", "menahan diri"),
+    (r"\bjangan memegang kembali\b", "jangan menahan diri"),
+    (r"\bberdiri kembali\b", "mundur"),
+    (r"\bmelangkah kembali\b", "mundur"),
+    (r"\bmemanggil tembakan\b", "memegang kendali"),
+    (r"\bmemanggil semua tembakan\b", "memegang semua keputusan"),
+    (r"\bmengambil kesempatan\b", "mencoba peruntungan"),
+    (r"\bmemberinya tembakan\b", "mencobanya"),
+    (r"\bmemberi tembakan\b", "mencobanya"),
+    (r"\bdi luar ligaku\b", "terlalu tinggi untukku"),
+    (r"\bdi luar liga saya\b", "terlalu tinggi untuk saya"),
+    (r"\bdi luar ligamu\b", "bukan tandinganmu"),
+    (r"\bmelompat ke kesimpulan\b", "buru-buru menyimpulkan"),
+    (r"\bmenarik kakiku\b", "mengerjaiku"),
+    (r"\bmenarik kaki saya\b", "mengerjai saya"),
+    (r"\bmelempar handuk\b", "menyerah"),
+    (r"\bmelemparkan handuk\b", "menyerah"),
+    (r"\bmendorong keberuntunganmu\b", "ngelunjak"),
+    (r"\bmendorong keberuntungan anda\b", "bertindak terlalu jauh"),
+    (r"\bmembeli waktu\b", "mengulur waktu"),
+    (r"\bmembeli beberapa waktu\b", "mengulur waktu"),
+    (r"\bbermain bodoh\b", "pura-pura tidak tahu"),
+    (r"\broda ketiga\b", "obat nyamuk"),
+    (r"\btergelincir pikiranku\b", "aku kelupaan"),
+    (r"\btergelincir dari pikiranku\b", "aku kelupaan"),
+    (r"\bmembunyikan lonceng\b", "terdengar tidak asing"),
+    (r"\bmembalikkan meja\b", "membalikkan keadaan"),
+    (r"\bkupu-kupu di perutku\b", "perutku rasanya mulas karena gugup"),
+    (r"\bsemua telinga\b", "siap mendengarkan"),
+    (r"\baku semua telinga\b", "aku siap mendengarkan"),
+    (r"\bmenangkap napasku\b", "mengatur napasku"),
+    (r"\bmenangkap napas\b", "mengatur napas"),
+
+    # --- 17. Honorifik Jepang, Sapaan Keluarga & RomCom/School ---
+    (r"\bonii-chan\b", "Kakak"),
+    (r"\bonii-san\b", "Kakak"),
+    (r"\bonee-chan\b", "Kakak"),
+    (r"\bonee-san\b", "Kakak"),
+    (r"\baniki\b", "Bang"),
+    (r"\bojou-sama\b", "Nona Muda"),
+    (r"\botou-san\b", "Ayah"),
+    (r"\bokaa-san\b", "Ibu"),
+    (r"\bojii-san\b", "Kakek"),
+    (r"\bojii-chan\b", "Kakek"),
+    (r"\bobaa-san\b", "Nenek"),
+    (r"\bobaa-chan\b", "Nenek"),
+    (r"\bosananajimi\b", "teman masa kecil"),
+    (r"\bgyaru\b", "cewek gyaru"),
+    (r"\bchuunibyou\b", "sindrom chuunibyou"),
+    (r"\bkokuhaku\b", "nembak perasaan"),
+
+    # --- 18. Kultivasi, Murim, Wuxia, Xianxia & Donghua ---
+    (r"\binti emas\b", "Inti Emas (Golden Core)"),
+    (r"\bpembentukan inti\b", "Pembentukan Inti"),
+    (r"\bpembangunan fondasi\b", "Tahap Fondasi"),
+    (r"\bjiwa baru lahir\b", "Jiwa Nascent"),
+    (r"\bkesengsaraan surgawi\b", "Kesengsaraan Langit (Tribulation)"),
+    (r"\bkesengsaraan petir\b", "Petir Kesengsaraan"),
+    (r"\bsaudara senior\b", "Kakak Senior"),
+    (r"\bsaudari senior\b", "Kakak Senior"),
+    (r"\bsaudara junior\b", "Adik Junior"),
+    (r"\bsaudari junior\b", "Adik Junior"),
+    (r"\bsekte seni bela diri\b", "Sekte Bela Diri"),
+    (r"\benergi sejati\b", "Qi Sejati"),
+    (r"\benergi spiritual\b", "Qi Spiritual"),
+    (r"\bqi dalam\b", "Tenaga Dalam"),
+    (r"\bkaisar langit\b", "Kaisar Langit"),
+    (r"\btetua agung\b", "Tetua Agung"),
+    (r"\bpemimpin sekte\b", "Ketua Sekte"),
+
+    # --- 19. Istana Dalam / Apothecary / Historical (Kusuriya dll.) ---
+    (r"\bistana belakang\b", "Istana Dalam"),
+    (r"\bselir tingkat tinggi\b", "Selir Utama"),
+    (r"\bpencicip makanan\b", "Pencicip Racun"),
+    (r"\bapoteker istana\b", "Tabib Istana"),
 ]
 
 # Aturan khusus adegan kasual/santai (tidak diterapkan jika konteks formal/kerajaan).
@@ -1432,6 +1753,51 @@ _CASUAL_FANSUB_RULES = [
     (r"\btenang sedikit\b", "santai dikit dong"),
     (r"\bapa maumu\b", "mau apa sih kamu"),
     (r"\bapa yang kamu inginkan\b", "kamu mau apa sih"),
+    # Question tags & penghalusan kalimat tanya / perintah lisan
+    (r",\s*bukan\s*\?", ", kan?"),
+    (r",\s*tidakkah begitu\s*\?", ", kan?"),
+    (r",\s*bukankah begitu\s*\?", ", kan?"),
+    (r",\s*benar kan\s*\?", ", ya kan?"),
+    (r"\bapakah kamu baik-baik saja\b", "kamu nggak apa-apa"),
+    (r"\bapakah kamu nggak apa-apa\b", "kamu nggak apa-apa"),
+    (r"\bapakah kau baik-baik saja\b", "kamu nggak apa-apa"),
+    (r"\bapakah kamu yakin\b", "kamu yakin"),
+    (r"\bapakah kau yakin\b", "kamu yakin"),
+    (r"\bapakah kamu sudah gila\b", "kamu udah gila ya"),
+    (r"\bapakah kamu gila\b", "kamu gila ya"),
+    (r"\bapakah itu mungkin\b", "memangnya mungkin"),
+    (r"\bapakah kamu mengerti\b", "kamu ngerti kan"),
+    (r"\baku mengerti sekarang\b", "oh, sekarang aku paham"),
+    (r"\baku tidak mengerti\b", "aku nggak ngerti"),
+    (r"\bnggak mengerti\b", "nggak ngerti"),
+    (r"\bcepatlah sedikit\b", "cepetan dikit dong"),
+    (r"\btunggu aku\b", "tungguin aku"),
+    (r"\blihat itu\b", "lihat deh itu"),
+    (r"\bhentikan itu\b", "udah dong, hentikan"),
+    (r"\bserahkan padaku\b", "serahin aja padaku"),
+    (r"\bserahkan saja padaku\b", "serahin aja padaku"),
+    (r"\bpercayalah padaku\b", "percaya deh sama aku"),
+    (r"\bjangan khawatir tentang itu\b", "nggak usah dipikirin"),
+    (r"\baku baru saja\b", "aku barusan"),
+    (r"\bbaru saja\b", "barusan"),
+    (r"\bbenar-benar hebat\b", "keren banget"),
+    (r"\bluar biasa sekali\b", "keren banget"),
+    (r"\bsangat keren\b", "keren banget"),
+    (r"\bsangat manis\b", "manis banget"),
+    (r"\bsangat imut\b", "imut banget"),
+    (r"\bsangat kuat\b", "kuat banget"),
+    (r"\bsangat cepat\b", "cepet banget"),
+    (r"\bsangat lambat\b", "lambat banget"),
+    (r"\bsangat lezat\b", "enak banget"),
+    (r"\bsangat enak\b", "enak banget"),
+    (r"\bsangat menakutkan\b", "serem banget"),
+    (r"\bsangat aneh\b", "aneh banget"),
+    (r"\bsangat berisik\b", "berisik banget"),
+    (r"\baku sangat senang\b", "aku seneng banget"),
+    (r"\baku sangat lelah\b", "aku capek banget"),
+    (r"\bsangat lelah\b", "capek banget"),
+    (r"\baku sangat lapar\b", "aku laper banget"),
+    (r"\bsangat lapar\b", "laper banget"),
 ]
 
 _AIGTX_SMOOTH_RULES = [
@@ -1466,7 +1832,7 @@ _COMPILED_AIGTX_SMOOTH = [(_re.compile(pat, _re.IGNORECASE), repl) for pat, repl
 _COMPILED_GTXPLUS_SMOOTH = _COMPILED_AIGTX_SMOOTH
 
 
-def _sanitize_fansub_id(text: str) -> str:
+def _sanitize_fansub_id(text: str, force_formal: bool = False) -> str:
     """Normalisasi kata kaku/literal secara adaptif (menjaga adegan formal tetap sopan)."""
     if not text:
         return text
@@ -1488,7 +1854,7 @@ def _sanitize_fansub_id(text: str) -> str:
         result = rx.sub(lambda m, r=repl: _replace_match(m, r), result)
 
     # 2. Jalankan normalisasi santai jika BUKAN adegan formal/kerajaan
-    is_formal = bool(_FORMAL_INDICATORS_RE.search(result))
+    is_formal = force_formal or bool(_FORMAL_INDICATORS_RE.search(result))
     if not is_formal:
         for rx, repl in _COMPILED_CASUAL:
             result = rx.sub(lambda m, r=repl: _replace_match(m, r), result)
@@ -1496,7 +1862,7 @@ def _sanitize_fansub_id(text: str) -> str:
     return result
 
 
-def _sanitize_gtxplus_id(text: str) -> str:
+def _sanitize_gtxplus_id(text: str, force_formal: bool = False) -> str:
     """GTX+ Sanitizer: Menggabungkan deteksi adegan (Scene Detection) adaptif
     dan kamus fansub percakapan santai (casual conversation) secara otomatis.
     Jika adegan santai/sekolah/komedi/isekai: terapkan leksikon anime universal,
@@ -1523,7 +1889,7 @@ def _sanitize_gtxplus_id(text: str) -> str:
         result = rx.sub(lambda m, r=repl: _replace_match(m, r), result)
 
     # 2. Scene detector: formal vs casual
-    is_formal = bool(_FORMAL_INDICATORS_RE.search(result))
+    is_formal = force_formal or bool(_FORMAL_INDICATORS_RE.search(result))
     if not is_formal:
         for rx, repl in _COMPILED_CASUAL:
             result = rx.sub(lambda m, r=repl: _replace_match(m, r), result)
@@ -1534,6 +1900,50 @@ def _sanitize_gtxplus_id(text: str) -> str:
 
 
 _sanitize_aigtx_id = _sanitize_gtxplus_id
+
+
+def sanitize_cues_with_context(cues, mode: str = "gtx+", window: int = 3, max_gap_sec: float = 15.0):
+    """Sanitasi daftar cues dengan Sliding-Window Scene Context (±window cues dalam jarak waktu <= max_gap_sec).
+    Jika terdapat indikator adegan formal/kerajaan/militer pada tetangga dekat dalam satu adegan,
+    cue di sekitarnya tetap mempertahankan register sopan (tidak tiba-tiba berubah menjadi gaul/kasual)."""
+    if not cues:
+        return []
+    n = len(cues)
+    # 1. Deteksi indikator formal pada masing-masing cue terlebih dahulu
+    direct_formal = []
+    for c in cues:
+        txt = c.get("text") or ""
+        direct_formal.append(bool(_FORMAL_INDICATORS_RE.search(txt)))
+
+    # 2. Propagasi konteks formal ke tetangga dalam jendela ±window dan selisih waktu <= max_gap_sec
+    contextual_formal = list(direct_formal)
+    for i in range(n):
+        if direct_formal[i]:
+            continue
+        c_start = float(cues[i].get("start", 0.0))
+        c_end = float(cues[i].get("end", c_start))
+        for j in range(max(0, i - window), min(n, i + window + 1)):
+            if j == i or not direct_formal[j]:
+                continue
+            n_start = float(cues[j].get("start", 0.0))
+            n_end = float(cues[j].get("end", n_start))
+            gap = max(0.0, c_start - n_end) if j < i else max(0.0, n_start - c_end)
+            if gap <= max_gap_sec:
+                contextual_formal[i] = True
+                break
+
+    out = []
+    for i, c in enumerate(cues):
+        txt = c.get("text") or ""
+        is_f = contextual_formal[i]
+        if mode in ("pure", "pure_gtx", "gtx"):
+            sanitized = txt
+        elif mode == "fansub":
+            sanitized = _sanitize_fansub_id(txt, force_formal=is_f)
+        else:
+            sanitized = _sanitize_gtxplus_id(txt, force_formal=is_f)
+        out.append({"start": c["start"], "end": c["end"], "text": sanitized})
+    return out
 
 
 
@@ -1799,10 +2209,19 @@ async def call_gtx_translate(cues, src="en", tgt="id", timeout=20.0, mode="gtx+"
     
     from concurrent.futures import ThreadPoolExecutor
 
+    def _restore_html_chunk(raw_chunk: str, fallback: str) -> str:
+        val = _re.sub(r"<br\s*/?>", "\n", raw_chunk or "", flags=_re.IGNORECASE)
+        val = _html.unescape(val).strip()
+        return val if val else fallback
+
     def _fetch_single_chunk_sync(batch_lines):
         html_chunks = []
         for i, line in enumerate(batch_lines):
-            safe_text = _html.escape(line) if line else ""
+            if line:
+                escaped_lines = [_html.escape(part) for part in line.split("\n")]
+                safe_text = "<br>".join(escaped_lines)
+            else:
+                safe_text = ""
             html_chunks.append(f'<p id="{i}">{safe_text}</p>')
         joined = "".join(html_chunks)
 
@@ -1848,8 +2267,7 @@ async def call_gtx_translate(cues, src="en", tgt="id", timeout=20.0, mode="gtx+"
                         if matches:
                             res = []
                             for i in range(len(batch_lines)):
-                                unescaped = _html.unescape(matches.get(str(i), batch_lines[i])).strip()
-                                res.append(unescaped)
+                                res.append(_restore_html_chunk(matches.get(str(i), batch_lines[i]), batch_lines[i]))
                             return res, True
             except Exception:
                 pass
@@ -1873,8 +2291,7 @@ async def call_gtx_translate(cues, src="en", tgt="id", timeout=20.0, mode="gtx+"
                         if matches:
                             res = []
                             for i in range(len(batch_lines)):
-                                unescaped = _html.unescape(matches.get(str(i), batch_lines[i])).strip()
-                                res.append(unescaped)
+                                res.append(_restore_html_chunk(matches.get(str(i), batch_lines[i]), batch_lines[i]))
                             return res, True
             except Exception:
                 pass
@@ -1901,7 +2318,7 @@ async def call_gtx_translate(cues, src="en", tgt="id", timeout=20.0, mode="gtx+"
                         matches = dict(_re.findall(r'<p\s+id=[\"\']?\s*(\d+)\s*[\"\']?\s*>(.*?)</p>', raw_out, _re.DOTALL))
                         if matches:
                             res = [
-                                _html.unescape(matches.get(str(i), batch_lines[i])).strip()
+                                _restore_html_chunk(matches.get(str(i), batch_lines[i]), batch_lines[i])
                                 for i in range(len(batch_lines))
                             ]
                             return res, True
@@ -1930,10 +2347,12 @@ async def call_gtx_translate(cues, src="en", tgt="id", timeout=20.0, mode="gtx+"
 
     loop = _asyncio.get_running_loop()
     def _prep_line(text: str) -> str:
-        clean = (text or "").replace("\n", " ").strip()
+        raw_lines = [ln.strip() for ln in (text or "").split("\n") if ln.strip()]
+        if not raw_lines:
+            return ""
         if (src or "").lower() == "en" and (tgt or "").lower() == "id" and mode not in ("pure", "pure_gtx", "gtx"):
-            clean = _pre_normalize_en_slang(clean)
-        return clean
+            raw_lines = [_pre_normalize_en_slang(ln) for ln in raw_lines]
+        return "\n".join(raw_lines)
 
     batch_lines_list = [[_prep_line(cue["text"]) for cue in b] for b in batches]
     with ThreadPoolExecutor(max_workers=3) as executor:
@@ -1957,18 +2376,16 @@ async def call_gtx_translate(cues, src="en", tgt="id", timeout=20.0, mode="gtx+"
     if len(batches) > 0 and success_count == 0:
         raise RuntimeError(f"Semua endpoint Google Translate gagal atau terblokir (0/{len(batches)} batch berhasil).")
 
-    out = []
+    raw_cues = []
     for i, c in enumerate(cues):
         tr_text = all_translated[i] if i < len(all_translated) else c["text"]
-        if (tgt or "").lower() == "id":
-            if mode in ("pure", "pure_gtx", "gtx"):
-                pass
-            elif mode == "fansub":
-                tr_text = _sanitize_fansub_id(tr_text)
-            else:  # "gtx+", "aigtx", default
-                tr_text = _sanitize_gtxplus_id(tr_text)
-        out.append({"start": c["start"], "end": c["end"], "text": tr_text})
-    return out
+        if (tgt or "").lower() == "id" and mode not in ("pure", "pure_gtx", "gtx"):
+            tr_text = _postprocess_stutter_id(c.get("text", ""), tr_text)
+        raw_cues.append({"start": c["start"], "end": c["end"], "text": tr_text})
+
+    if (tgt or "").lower() == "id":
+        return sanitize_cues_with_context(raw_cues, mode=mode, window=3)
+    return raw_cues
 
 
 async def call_mymemory_translate(cues, src, tgt, timeout=30.0):

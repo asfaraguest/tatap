@@ -3,6 +3,7 @@ var cur = {slug:"", title:"", ep:1, mode:"sub", quality:"best", res:null, eps:[]
             activeSub:null,       // URL track subtitle yang sedang aktif (live switch)
             cues:[],              // cue subtitle hasil parse VTT (render overlay milik app)
             subSize:"m",          // ukuran subtitle overlay: s|m|l
+            subDelay:0.0,         // sinkronisasi waktu subtitle (detik, mis. -0.5, +0.5)
             translate:false,      // toggle translate subtitle Indonesia (persist localStorage)
             eps_counter:"",
             intro:null,           // {start, end} opening
@@ -16,6 +17,29 @@ window.settings = window.settings || {};
 var _playTokenCounter = 0;
 var PLAYBACK_SPEEDS = [0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0];
 var currentPlaybackSpeed = 1.0;
+
+function setSubDelay(sec, notify){
+  var val = parseFloat(sec);
+  if(isNaN(val)) val = 0.0;
+  val = Math.round(val * 4) / 4; // presisi 0.25s
+  val = Math.max(-30.0, Math.min(30.0, val));
+  cur.subDelay = val;
+  var el = $("pm-sub-delay-val");
+  if(el){
+    var sign = val > 0 ? "+" : "";
+    el.textContent = sign + val.toFixed(val % 0.5 === 0 ? 1 : 2) + "s";
+    el.classList.toggle("active", Math.abs(val) > 0.01);
+  }
+  paintCue();
+  if(notify){
+    var signStr = val > 0 ? "+" : "";
+    toast("Sinkronisasi Subtitle: " + signStr + val.toFixed(2) + " detik", 1500);
+  }
+}
+
+function adjustSubDelay(delta){
+  setSubDelay((cur.subDelay || 0.0) + delta, true);
+}
 
 function setPlaySpeed(spd, notify){
   var num = parseFloat(spd);
@@ -1425,8 +1449,8 @@ function pickSubtitleUrl(subtitles, preferLang){
       }
     }
     // Kalau prefer Indonesian / translate on dan tidak ada track ID asli:
-    // auto-pilih track GTX+, AI Fansub, atau Pure GTX translate dari track English.
-    if((low==="indonesian"||low==="id"||low==="indonesian (gtx+)"||low==="indonesian (aigtx)"||low==="indonesian (ai)"||low==="indonesian (gtx)"||cur.translate)){
+    // auto-pilih track GTX+, Bilingual, AI Fansub, atau Pure GTX translate dari track English.
+    if((low==="indonesian"||low==="id"||low==="indonesian (gtx+)"||low==="indonesian (gtx+ bilingual)"||low==="indonesian (aigtx)"||low==="indonesian (ai)"||low==="indonesian (gtx)"||cur.translate)){
       var enTrack=null;
       for(var e=0;e<subtitles.length;e++){
         if(isExactEnglishSubTrack(subtitles[e])){
@@ -1441,6 +1465,7 @@ function pickSubtitleUrl(subtitles, preferLang){
         }
       }
       if(enTrack&&enTrack.url){
+        if(low==="indonesian (gtx+ bilingual)") return "gtx+_dual:"+enTrack.url;
         if(low==="indonesian (gtx+)"||low==="indonesian (aigtx)") return "gtx+:"+enTrack.url;
         if(low==="indonesian (ai)") return "ai:"+enTrack.url;
         return "gtx:"+enTrack.url;
@@ -1545,6 +1570,15 @@ function renderSubtitles(subtitles, activeUrl){
     }
     sel.appendChild(gtxplusOpt);
 
+    var gtxDualOpt=document.createElement("option");
+    gtxDualOpt.value="gtx+_dual:"+englishTrack.url;
+    gtxDualOpt.textContent="Indonesian (GTX+ Bilingual ID+EN)";
+    gtxDualOpt.setAttribute("data-gtxdual-source",englishTrack.url);
+    if(activeUrl&&(activeUrl===gtxDualOpt.value||(activeUrl.indexOf("gtx+_dual:")===0&&activeUrl.slice(10)===englishTrack.url))){
+      gtxDualOpt.selected=true;
+    }
+    sel.appendChild(gtxDualOpt);
+
     var aiOpt=document.createElement("option");
     aiOpt.value="ai:"+englishTrack.url;
     aiOpt.textContent="Indonesian (AI Fansub)";
@@ -1558,7 +1592,7 @@ function renderSubtitles(subtitles, activeUrl){
   // Opsi custom subtitle eksternal
   var optCustomFile=document.createElement("option");
   optCustomFile.value="__custom_file__";
-  optCustomFile.textContent="📁 [+] Muat File Subtitle (.srt / .vtt)...";
+  optCustomFile.textContent="📁 [+] Muat File Subtitle (.srt / .vtt / .ass)...";
   sel.appendChild(optCustomFile);
 
   var optCustomUrl=document.createElement("option");
@@ -1610,7 +1644,7 @@ function renderSubtitles(subtitles, activeUrl){
     }
     if(url==="__custom_url__"){
       sel.value=activeUrl||"";
-      var inUrl=prompt("Masukkan URL Subtitle (.srt / .vtt):");
+      var inUrl=prompt("Masukkan URL Subtitle (.srt / .vtt / .ass):");
       if(inUrl&&inUrl.trim()){
         inUrl=inUrl.trim();
         toast("Mengunduh subtitle dari URL...");
@@ -1633,6 +1667,14 @@ function renderSubtitles(subtitles, activeUrl){
     }
 
     cur.activeSub=url||null;
+    // Track GTX+ Bilingual: synthetic URL "gtx+_dual:<url>".
+    if(url&&url.indexOf("gtx+_dual:")===0){
+      cur.translate=false;
+      switchSubtitleTrack(url,"id");
+      cur.subLang="Indonesian (GTX+ Bilingual)";
+      window.Tatap.setSetting({sub_lang:"Indonesian (GTX+ Bilingual)"}).then(function(){}).catch(function(){});
+      return;
+    }
     // Track GTX+: synthetic URL "gtx+:<url>" (atau legacy "aigtx:<url>").
     if(url&&(url.indexOf("gtx+:")===0||url.indexOf("aigtx:")===0)){
       cur.translate=false;
@@ -1686,6 +1728,10 @@ function vttTime(s){
   var ms=m[4]?parseInt((m[4]+"000").slice(0,3),10):0;
   return (m[1]?parseInt(m[1],10)*3600:0)+parseInt(m[2],10)*60+parseInt(m[3],10)+ms/1000;
 }
+function cleanAssLine(s){
+  if(!s)return "";
+  return String(s).replace(/\{[^}]*\}/g,"").replace(/\\N/g,"\n").replace(/\\n/g,"\n").replace(/\\h/g," ");
+}
 function parseVtt(text){
   var out=[];
   var lines=String(text||"").replace(/\r\n?/g,"\n").split("\n");
@@ -1694,10 +1740,13 @@ function parseVtt(text){
   var start=-1,end=-1,buf=[];
   var flush=function(){
     if(start>=0&&end>start&&buf.length){
-      var plain=buf.map(function(x){return x.replace(/<[^>]+>/g,"");}).join("\n");
-      var html=buf.map(function(x){return esc(x);}).join("<br>");
-      html=html.replace(/&lt;[^&]*?&gt;/g,"");
-      out.push({start:start,end:end,html:html,plain:plain});
+      var cleaned=buf.map(cleanAssLine).join("\n").split("\n").map(function(x){return x.trim();}).filter(Boolean);
+      if(cleaned.length){
+        var plain=cleaned.map(function(x){return x.replace(/<[^>]+>/g,"");}).join("\n");
+        var html=cleaned.map(function(x){return esc(x);}).join("<br>");
+        html=html.replace(/&lt;[^&]*?&gt;/g,"");
+        out.push({start:start,end:end,html:html,plain:plain});
+      }
     }
     start=-1;end=-1;buf=[];
   };
@@ -1911,15 +1960,20 @@ function paintCue(){
   if(!s)return;
   if($("player-modal").classList.contains("hidden")){s.innerHTML="";return;}
   var t=v.currentTime||0;
+  var subTime = t - (cur.subDelay || 0.0);
   if(isVideoFullscreen() && !isDesktopEnv()){
     if(s._last!==""){s.innerHTML="";s._last="";}
     box.style.display="none";
   }else{
     box.style.display="";
-    var html="";
+    var activeParts=[];
     for(var i=0;i<cur.cues.length;i++){
-      if(t>=cur.cues[i].start&&t<=cur.cues[i].end){html=cur.cues[i].html;break;}
+      if(subTime>=cur.cues[i].start&&subTime<=cur.cues[i].end){
+        var h=cur.cues[i].html;
+        if(h && activeParts.indexOf(h)===-1) activeParts.push(h);
+      }
     }
+    var html=activeParts.join("<br>");
     if(s._last!==html){s.innerHTML=html;s._last=html;}
   }
   checkSkipTimes(t);
@@ -2004,7 +2058,13 @@ function prefetchSubtitleTrack(url, ref, langCode){
   var targetUrl = url;
   var targetLang = langCode || "";
   var mode = "";
-  if(targetUrl.indexOf("gtx+:")===0){
+  var isDual = false;
+  if(targetUrl.indexOf("gtx+_dual:")===0){
+    targetUrl = targetUrl.slice(10);
+    if(!targetLang) targetLang = "id";
+    mode = "gtx+_dual";
+    isDual = true;
+  }else if(targetUrl.indexOf("gtx+:")===0){
     targetUrl = targetUrl.slice(5);
     if(!targetLang) targetLang = "id";
     mode = "gtx+";
@@ -2024,6 +2084,7 @@ function prefetchSubtitleTrack(url, ref, langCode){
   var qs = "url=" + encodeURIComponent(targetUrl) + "&referer=" + encodeURIComponent(ref || "");
   if(targetLang) qs += "&lang=" + encodeURIComponent(targetLang);
   if(mode) qs += "&mode=" + encodeURIComponent(mode);
+  if(isDual) qs += "&dual=true";
   var prox = "/api/player/sub?" + qs;
 
   // Cek apakah promise untuk URL yang sama sudah berjalan
@@ -2067,7 +2128,11 @@ function switchSubtitleTrack(url, langCode){
   if(/^\d+$/.test(cleanSubUrl)) return;
   var originalUrl = url;
   var trackMode = "none";
-  if(url.indexOf("gtx+:")===0){
+  if(url.indexOf("gtx+_dual:")===0){
+    url=url.slice(10);
+    if(!langCode) langCode="id";
+    trackMode = "gtx+_dual";
+  }else if(url.indexOf("gtx+:")===0){
     url=url.slice(5);
     if(!langCode) langCode="id";
     trackMode = "gtx+";
@@ -2086,7 +2151,8 @@ function switchSubtitleTrack(url, langCode){
   }
   if(langCode==="id"){
     var waitMsg = "Menerjemahkan subtitle AI ke bahasa Indonesia...";
-    if(trackMode==="gtx+"||trackMode==="aigtx") waitMsg = "Menerjemahkan subtitle GTX+ (Smart Fansub & Scene Detection)...";
+    if(trackMode==="gtx+_dual") waitMsg = "Menerjemahkan subtitle GTX+ Bilingual (ID + EN)...";
+    else if(trackMode==="gtx+"||trackMode==="aigtx") waitMsg = "Menerjemahkan subtitle GTX+ (Smart Fansub & Scene Detection)...";
     else if(trackMode==="gtx") waitMsg = "Menerjemahkan subtitle Google GTX...";
     toast(waitMsg, 3000);
     var obox=$("pm-subs-overlay");
@@ -3074,6 +3140,8 @@ function onKeyPlayer(e){
   else if(e.key==="f"||e.key==="F"){e.preventDefault();toggleFullscreen();}
   else if(e.key==="n")stepEp(1);
   else if(e.key==="p")stepEp(-1);
+  else if(e.key===","||e.key==="<"){e.preventDefault();adjustSubDelay(-0.25);}
+  else if(e.key==="."||e.key===">"){e.preventDefault();adjustSubDelay(0.25);}
   else if(e.key==="["||e.key==="{"){e.preventDefault();adjustPlaySpeed(-1);}
   else if(e.key==="]"||e.key==="}"){e.preventDefault();adjustPlaySpeed(1);}
   else if(e.key==="m"||e.key==="M"){e.preventDefault();v.muted=!v.muted;}
@@ -3288,6 +3356,7 @@ App = {
   formatTimeSec:formatTimeSec,
   switchSource:switchSource,
   setPlaySpeed:setPlaySpeed, adjustPlaySpeed:adjustPlaySpeed,
+  setSubDelay:setSubDelay, adjustSubDelay:adjustSubDelay,
   openDrawer:openDrawer, closeDrawer:closeDrawer,
   openUpdateModal:openUpdateModal, closeUpdateModal:closeUpdateModal,
   checkForUpdate:checkForUpdate,
@@ -3352,6 +3421,12 @@ function init(){
   document.querySelectorAll(".sub-size button").forEach(function(b){
     b.addEventListener("click",function(){setSubSize(b.getAttribute("data-subsize"));});
   });
+  var sdMinus=$("pm-sub-delay-minus");
+  if(sdMinus) sdMinus.addEventListener("click",function(){adjustSubDelay(-0.25);});
+  var sdPlus=$("pm-sub-delay-plus");
+  if(sdPlus) sdPlus.addEventListener("click",function(){adjustSubDelay(0.25);});
+  var sdVal=$("pm-sub-delay-val");
+  if(sdVal) sdVal.addEventListener("click",function(){setSubDelay(0.0, true);});
   var v=$("vid");
   if(v){
     v.addEventListener("timeupdate",function(){
