@@ -6,6 +6,8 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.os.Bundle;
+import android.os.SystemClock;
+import android.view.KeyEvent;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -223,13 +225,39 @@ public class DetailActivity extends Activity {
         loadRelations();
     }
 
+    private long lastResumeTimeMs = 0;
+
     @Override
     protected void onResume() {
         super.onResume();
+        lastResumeTimeMs = SystemClock.uptimeMillis();
         updateQuickPlayButton();
         if (adapter != null) {
             adapter.notifyDataSetChanged();
         }
+        if (TvFocusHelper.isTv(this)) {
+            // Alihkan fokus remote TV ke tombol lanjutkan atau daftar episode (jangan tertinggal di btnBack)
+            getWindow().getDecorView().postDelayed(() -> {
+                if (!isFinishing() && !isDestroyed()) {
+                    if (btnQuickPlay != null && btnQuickPlay.getVisibility() == View.VISIBLE) {
+                        btnQuickPlay.requestFocus();
+                    } else if (rvEpisodes != null) {
+                        rvEpisodes.requestFocus();
+                    }
+                }
+            }, 150);
+        }
+    }
+
+    @Override
+    public boolean dispatchKeyEvent(KeyEvent event) {
+        if (event.getKeyCode() == KeyEvent.KEYCODE_BACK) {
+            // Filter debounce: abaikan pulsa back bocoran dalam 450ms pertama setelah kembali dari PlayerActivity
+            if (SystemClock.uptimeMillis() - lastResumeTimeMs < 450) {
+                return true;
+            }
+        }
+        return super.dispatchKeyEvent(event);
     }
 
     private void updateQuickPlayButton() {

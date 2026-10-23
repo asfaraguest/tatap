@@ -132,6 +132,8 @@ public class PlayerActivity extends Activity {
     private String slug;
     private int ep;
     private String title;
+    private String poster;
+    private String type;
     private List<Integer> episodeList = new ArrayList<>();
     private boolean isEpisodeListLoading = false;
     private View btnExoNext;
@@ -461,6 +463,8 @@ public class PlayerActivity extends Activity {
         requestMode = (passedMode != null && !passedMode.isEmpty() && "dub".equalsIgnoreCase(passedMode)) ? "dub" : "sub";
         ep = getIntent().getIntExtra("ep", 1);
         title = getIntent().getStringExtra("title");
+        poster = getIntent().getStringExtra("poster");
+        type = getIntent().getStringExtra("type");
         ArrayList<Integer> passedList = getIntent().getIntegerArrayListExtra("episode_list");
         if (passedList != null) {
             episodeList.addAll(passedList);
@@ -897,6 +901,21 @@ public class PlayerActivity extends Activity {
         if (!TvFocusHelper.isTv(this) && getResources().getConfiguration().orientation == Configuration.ORIENTATION_LANDSCAPE) {
             exitLandscapeFullscreen();
             return;
+        }
+
+        // Android TV Fallback Guard: Jika DetailActivity hilang dari task stack karena OS low-memory pruning,
+        // luncurkan eksplisit kembali ke DetailActivity agar pengguna tetap kembali ke daftar episode (bukan home).
+        if (TvFocusHelper.isTv(this) && isTaskRoot() && slug != null && !slug.isEmpty()) {
+            try {
+                Intent intent = new Intent(this, DetailActivity.class);
+                intent.putExtra("slug", slug);
+                intent.putExtra("title", title);
+                intent.putExtra("poster", poster);
+                intent.putExtra("type", type);
+                intent.putExtra("mode", requestMode);
+                intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+                startActivity(intent);
+            } catch (Throwable ignored) {}
         }
         finish();
     }
@@ -1580,15 +1599,50 @@ public class PlayerActivity extends Activity {
 
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
-        if (event.getAction() == KeyEvent.ACTION_DOWN) {
-            int keyCode = event.getKeyCode();
+        int keyCode = event.getKeyCode();
 
+        // Penanganan tombol BACK khusus untuk isolasi Android TV & proteksi kebocoran event
+        if (keyCode == KeyEvent.KEYCODE_BACK) {
             if (isScreenLocked) {
-                if (keyCode == KeyEvent.KEYCODE_BACK) {
+                if (event.getAction() == KeyEvent.ACTION_DOWN) {
                     showUnlockButtonBriefly();
                     Toast.makeText(this, "Layar terkunci. Buka kunci layar terlebih dahulu.", Toast.LENGTH_SHORT).show();
-                    return true;
                 }
+                return true;
+            }
+
+            boolean isSkipVisible = (btnSkipOpEd != null && btnSkipOpEd.getVisibility() == View.VISIBLE);
+            boolean isSkipFocused = isSkipVisible && (btnSkipOpEd.isFocused() || getCurrentFocus() == btnSkipOpEd);
+            if (isSkipFocused) {
+                if (event.getAction() == KeyEvent.ACTION_UP) {
+                    if (playerView != null) playerView.requestFocus();
+                    boolean inIntro = (introEndMs > introStartMs && player != null
+                            && player.getCurrentPosition() >= introStartMs && player.getCurrentPosition() < introEndMs);
+                    updateSkipButtonLabel(inIntro);
+                }
+                return true;
+            }
+
+            boolean isTopBarActive = (layoutTopBar != null && layoutTopBar.getVisibility() == View.VISIBLE);
+            if (isTopBarActive) {
+                if (event.getAction() == KeyEvent.ACTION_UP) {
+                    hideTopBar();
+                }
+                return true;
+            }
+
+            if (TvFocusHelper.isTv(this)) {
+                // Di Android TV, tangani tombol back secara tuntas agar tidak tembus/bocor ke Activity di bawahnya
+                if (event.getAction() == KeyEvent.ACTION_UP) {
+                    handleBackAction();
+                }
+                return true;
+            }
+        }
+
+        if (event.getAction() == KeyEvent.ACTION_DOWN) {
+
+            if (isScreenLocked) {
                 if (keyCode == KeyEvent.KEYCODE_VOLUME_UP || keyCode == KeyEvent.KEYCODE_VOLUME_DOWN || keyCode == KeyEvent.KEYCODE_VOLUME_MUTE) {
                     return super.dispatchKeyEvent(event);
                 }
@@ -1925,20 +1979,6 @@ public class PlayerActivity extends Activity {
                         } else {
                             playerView.showController();
                         }
-                        return true;
-                    }
-                    break;
-
-                case KeyEvent.KEYCODE_BACK:
-                    if (isSkipFocused) {
-                        if (playerView != null) playerView.requestFocus();
-                        boolean inIntro = (introEndMs > introStartMs && player != null
-                                && player.getCurrentPosition() >= introStartMs && player.getCurrentPosition() < introEndMs);
-                        updateSkipButtonLabel(inIntro);
-                        return true;
-                    }
-                    if (isTopBarActive) {
-                        hideTopBar();
                         return true;
                     }
                     break;

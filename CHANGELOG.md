@@ -13,6 +13,22 @@ Format versi menggunakan skema `MAJOR.MINOR.PATCH`:
 - **MINOR (x.Y.0):** Penambahan fitur atau kapabilitas baru yang tetap kompatibel ke belakang (*backward-compatible new features*). Digit PATCH direset ke 0.
 - **PATCH (x.y.Z):** Perbaikan bug, peningkatan stabilitas, atau perbaikan internal tanpa penambahan fitur baru (*backward-compatible bug fixes*).
 
+## [2.11.4] - 2026-10-23
+
+### Justifikasi SemVer 2.0.0 (PATCH: 2.11.3 -> 2.11.4)
+Kenaikan digit PATCH diterapkan secara mutlak sesuai kaidah Semantic Versioning 2.0.0 dan Direktif #3 [`AGENTS.md`](AGENTS.md) karena rilis ini berfokus pada perbaikan bug alur navigasi remote Android TV saat keluar dari media player (`PlayerActivity.java`) menuju layar daftar episode (`DetailActivity.java`), mengeliminasi masalah pengguna terlempar langsung ke Beranda/Katalog (`MainActivity.java`), serta menambahkan proteksi debounce pulsa tombol back dan rekonstruksi otomatis task stack tanpa modifikasi arsitektur yang merusak kompatibilitas ke belakang (*backward-compatible bug fix & UX navigation polish*):
+
+1. **Pencegahan Kebocoran Pulsa Tombol Back pada Android TV (`PlayerActivity.java`):**
+   - Mengonsumsi event `KeyEvent.KEYCODE_BACK` secara tuntas di `dispatchKeyEvent`: menelan `ACTION_DOWN` (return `true`) dan mengeksekusi `handleBackAction()` pada `ACTION_UP` (return `true`), mencegah delegasi mentah ke `super.dispatchKeyEvent` yang sebelumnya membocorkan sinyal tombol remote ke activity di bawahnya.
+   - Menghilangkan trigger ganda pada predictive back callback dan menyelaraskan penutupan jendela pemutar secara bersih.
+
+2. **Garansi Rekonstruksi Stack Low-RAM Android TV (`PlayerActivity.java`):**
+   - Menambahkan guard `isTaskRoot()` pada `handleBackAction()` khusus Android TV: apabila `DetailActivity` sempat dipangkas oleh OS *low-memory killer* pada TV stick 1GB-1.5GB saat pemutaran video aktif, `PlayerActivity` secara otomatis merekonstruksi dan meluncurkan kembali `DetailActivity` dengan metadata lengkap (`slug`, `title`, `poster`, `type`, `mode`) sebelum `finish()`, menjamin pengguna selalu kembali ke daftar episode anime tersebut dan tidak pernah terlempar ke Home.
+
+3. **Filter Debounce Back & Pemulihan Fokus D-Pad TV (`DetailActivity.java`):**
+   - Mengimplementasikan filter debounce 450ms pada `dispatchKeyEvent` di `DetailActivity` berdasarkan `lastResumeTimeMs` untuk memblokir sisa pulsa back pantulan saat `PlayerActivity` ditutup.
+   - Memulihkan fokus remote D-Pad secara cerdas saat `onResume()` ke tombol **Lanjutkan Episode** (`btnQuickPlay`) atau daftar episode (`rvEpisodes`), mencegah fokus default jatuh ke `btnBack` di bagian atas layout.
+
 ## [2.11.3] - 2026-10-23
 
 ### Justifikasi SemVer 2.0.0 (PATCH: 2.11.2 -> 2.11.3)
