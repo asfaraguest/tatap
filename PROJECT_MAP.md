@@ -203,6 +203,15 @@ Agent tidak perlu melakukan `grep` berulang kali. Gunakan indeks referensi fungs
 - [`HapticHelper.java`](file:///home/b-ict/tatap/android/app/src/main/java/id/tatap/app/HapticHelper.java):
   - Haptic feedback taktil untuk interaksi tombol dan efek getaran dinamis adegan anime.
 
+### Windows Launcher & Web Desktop UI
+- [`launcher/main.go`](file:///home/b-ict/tatap/launcher/main.go):
+  - `setNativeFullscreen(hwnd, fullscreen)`: Win32 borderless monitor fullscreen switcher via `GetWindowPlacement`, `GetWindowLongW` (`GWL_STYLE`), `MonitorFromWindow`, `GetMonitorInfoW`, dan `SetWindowPos` (`WS_POPUP`).
+  - Bridge `tatap_set_fullscreen`: Binding JavaScript native webview untuk sinkronisasi fullscreen monitor instan.
+- [`frontend/js/app.js`](file:///home/b-ict/tatap/frontend/js/app.js):
+  - `isDesktopEnv()`: Deteksi runtime desktop untuk mencegah pembajakan Closed Captions bawaan OS.
+  - `syncFullscreenSubtitles()`: Pengendalian dual-layer subtitle dan sinkronisasi host launcher fullscreen.
+  - `paintCue()`: Render cue subtitle HTML pada `#pm-subs-overlay`.
+
 ---
 
 ## 4. Alur Data Streaming & Subtitle (Data Pipeline)
