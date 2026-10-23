@@ -19,14 +19,21 @@ import (
 )
 
 var (
-	user32          = syscall.NewLazyDLL("user32.dll")
-	procMessageBoxW = user32.NewProc("MessageBoxW")
-	dwmapi          = syscall.NewLazyDLL("dwmapi.dll")
+	user32                    = syscall.NewLazyDLL("user32.dll")
+	procMessageBoxW           = user32.NewProc("MessageBoxW")
+	dwmapi                    = syscall.NewLazyDLL("dwmapi.dll")
 	procDwmSetWindowAttribute = dwmapi.NewProc("DwmSetWindowAttribute")
-	kernel32          = syscall.NewLazyDLL("kernel32.dll")
-	procGetModuleHandleW = kernel32.NewProc("GetModuleHandleW")
-	procLoadImageW    = user32.NewProc("LoadImageW")
-	procSendMessageW  = user32.NewProc("SendMessageW")
+	kernel32                  = syscall.NewLazyDLL("kernel32.dll")
+	procGetModuleHandleW      = kernel32.NewProc("GetModuleHandleW")
+	procLoadImageW            = user32.NewProc("LoadImageW")
+	procSendMessageW          = user32.NewProc("SendMessageW")
+	procGetWindowPlacement    = user32.NewProc("GetWindowPlacement")
+	procSetWindowPlacement    = user32.NewProc("SetWindowPlacement")
+	procGetWindowLongW        = user32.NewProc("GetWindowLongW")
+	procSetWindowLongW        = user32.NewProc("SetWindowLongW")
+	procSetWindowPos          = user32.NewProc("SetWindowPos")
+	procMonitorFromWindow     = user32.NewProc("MonitorFromWindow")
+	procGetMonitorInfoW       = user32.NewProc("GetMonitorInfoW")
 )
 
 const (
@@ -38,7 +45,117 @@ const (
 	// 19 untuk build lama. Border/titlebar ikut tema sistem.
 	DWMWA_USE_IMMERSIVE_DARK_MODE_NEW = 20
 	DWMWA_USE_IMMERSIVE_DARK_MODE_OLD = 19
+
+	// Win32 constants untuk fullscreen monitor
+	WS_OVERLAPPEDWINDOW      = 0x00CF0000
+	WS_POPUP                 = 0x80000000
+	WS_VISIBLE               = 0x10000000
+	SWP_NOSIZE               = 0x0001
+	SWP_NOMOVE               = 0x0002
+	SWP_NOZORDER             = 0x0004
+	SWP_NOOWNERZORDER        = 0x0200
+	SWP_FRAMECHANGED         = 0x0020
+	SWP_SHOWWINDOW           = 0x0040
+	MONITOR_DEFAULTTONEAREST = 0x00000002
 )
+
+type RECT struct {
+	Left   int32
+	Top    int32
+	Right  int32
+	Bottom int32
+}
+
+type POINT struct {
+	X int32
+	Y int32
+}
+
+type WINDOWPLACEMENT struct {
+	Length           uint32
+	Flags            uint32
+	ShowCmd          uint32
+	PtMinPosition    POINT
+	PtMaxPosition    POINT
+	RcNormalPosition RECT
+}
+
+type MONITORINFO struct {
+	CbSize    uint32
+	RcMonitor RECT
+	RcWork    RECT
+	DwFlags   uint32
+}
+
+var (
+	isNativeFullscreen bool
+	prevPlacement      WINDOWPLACEMENT
+	prevStyle          uint32
+)
+
+func setNativeFullscreen(hwnd uintptr, fullscreen bool) {
+	if hwnd == 0 {
+		return
+	}
+	if fullscreen == isNativeFullscreen {
+		return
+	}
+
+	var idx int32 = -16 // GWL_STYLE
+	if fullscreen {
+		prevPlacement.Length = uint32(unsafe.Sizeof(prevPlacement))
+		ret, _, _ := procGetWindowPlacement.Call(hwnd, uintptr(unsafe.Pointer(&prevPlacement)))
+		if ret == 0 {
+			return
+		}
+
+		styleRet, _, _ := procGetWindowLongW.Call(hwnd, uintptr(idx))
+		prevStyle = uint32(styleRet)
+
+		hMon, _, _ := procMonitorFromWindow.Call(hwnd, MONITOR_DEFAULTTONEAREST)
+		if hMon == 0 {
+			return
+		}
+
+		var mi MONITORINFO
+		mi.CbSize = uint32(unsafe.Sizeof(mi))
+		ret, _, _ = procGetMonitorInfoW.Call(hMon, uintptr(unsafe.Pointer(&mi)))
+		if ret == 0 {
+			return
+		}
+
+		newStyle := (prevStyle &^ WS_OVERLAPPEDWINDOW) | WS_POPUP | WS_VISIBLE
+		procSetWindowLongW.Call(hwnd, uintptr(idx), uintptr(newStyle))
+
+		width := mi.RcMonitor.Right - mi.RcMonitor.Left
+		height := mi.RcMonitor.Bottom - mi.RcMonitor.Top
+
+		procSetWindowPos.Call(
+			hwnd,
+			0, // HWND_TOP
+			uintptr(mi.RcMonitor.Left),
+			uintptr(mi.RcMonitor.Top),
+			uintptr(width),
+			uintptr(height),
+			SWP_NOOWNERZORDER|SWP_FRAMECHANGED|SWP_SHOWWINDOW,
+		)
+		isNativeFullscreen = true
+	} else {
+		if prevStyle != 0 {
+			procSetWindowLongW.Call(hwnd, uintptr(idx), uintptr(prevStyle))
+		}
+		if prevPlacement.Length != 0 {
+			procSetWindowPlacement.Call(hwnd, uintptr(unsafe.Pointer(&prevPlacement)))
+		}
+		procSetWindowPos.Call(
+			hwnd,
+			0,
+			0, 0, 0, 0,
+			SWP_NOMOVE|SWP_NOSIZE|SWP_NOZORDER|SWP_NOOWNERZORDER|SWP_FRAMECHANGED,
+		)
+		isNativeFullscreen = false
+	}
+}
 
 func showMessage(title, text string, flags uint) {
 	t, _ := syscall.UTF16PtrFromString(title)
@@ -203,6 +320,13 @@ func runWebView(appURL, dataPath string) {
 	// Backup: pastikan icon tampil di taskbar/alt-tab dengan WM_SETICON
 	// (beberapa Windows theme abaikan HIconSm dari WNDCLASSEX).
 	setWindowIcons(hwnd)
+
+	// Bridge JS tatap_set_fullscreen untuk monitor fullscreen tanpa border
+	_ = w.Bind("tatap_set_fullscreen", func(fullscreen bool) error {
+		setNativeFullscreen(hwnd, fullscreen)
+		return nil
+	})
+
 	w.Navigate(appURL)
 	w.Run()
 }

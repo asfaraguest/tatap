@@ -851,10 +851,25 @@ body.no-ambient #ambient,body.no-ambient #ambient-fallback{display:none}
   font-size:clamp(22px,2.1vw + .85rem,34px);
 }
 
-/* Native video cues (rendered when browser fullscreens the <video> directly) */
+/* Native video cues suppression (prevents browser/Windows closed captions hijack; #pm-subs-overlay handles presentation) */
 video::cue {
-  color:#fff;background:rgba(0,0,0,.78);font-family:inherit;font-weight:600;line-height:1.45;font-size:1.25rem;
-  text-shadow:-1px -1px 0 #000,1px -1px 0 #000,-1px 1px 0 #000,1px 1px 0 #000;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  background: transparent !important;
+  color: transparent !important;
+  font-size: 0px !important;
+  height: 0 !important;
+  line-height: 0 !important;
+}
+/* Fallback if mobile native video fullscreen (e.g. iOS Safari) is explicitly triggered */
+body.mobile-native-sub video::cue {
+  visibility: visible !important;
+  opacity: 1 !important;
+  color: #fff !important;
+  background: rgba(0,0,0,.78) !important;
+  font-size: 1.25rem !important;
+  line-height: 1.45 !important;
+  text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000 !important;
 }
 .player-foot{padding:8px 4px}
 .player-foot>.variants{flex:0 1 auto;max-width:55%}

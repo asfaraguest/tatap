@@ -1719,6 +1719,12 @@ function clearOverlay(){
   var s=box.querySelector("span");
   if(s){s.innerHTML="";s._last="";}
 }
+function isDesktopEnv(){
+  if(typeof window.tatap_set_fullscreen === "function") return true;
+  var ua = (navigator.userAgent || "").toLowerCase();
+  var isMobile = /android|iphone|ipad|ipod|windows phone|blackberry|mobile/i.test(ua);
+  return !isMobile;
+}
 function isVideoFullscreen(){
   var v=$("vid");
   if(!v)return false;
@@ -1735,13 +1741,17 @@ function isFullscreenActive(){
   return false;
 }
 function syncFullscreenSubtitles(){
+  var isFs = isFullscreenActive();
+  if(typeof window.tatap_set_fullscreen === "function"){
+    try{ window.tatap_set_fullscreen(isFs); }catch(_){}
+  }
   var v=$("vid");
   if(!v||!v.textTracks)return;
   var isVidFs=isVideoFullscreen();
   for(var i=0;i<v.textTracks.length;i++){
     var t=v.textTracks[i];
     if(t.label&&t.label.indexOf("Tatap")>=0){
-      t.mode=isVidFs?"showing":"hidden";
+      t.mode=(isVidFs && !isDesktopEnv())?"showing":"hidden";
     }
   }
   paintCue();
@@ -1790,7 +1800,7 @@ function syncNativeTextTrack(vttText, cues, langCode){
 
     var applyMode=function(){
       if(trackEl.track){
-        trackEl.track.mode=isVideoFullscreen()?"showing":"hidden";
+        trackEl.track.mode=(isVideoFullscreen() && !isDesktopEnv())?"showing":"hidden";
       }
     };
 
@@ -1832,6 +1842,9 @@ function toggleFullscreen(){
     }
     if(v&&v.webkitExitFullscreen&&v.webkitDisplayingFullscreen){
       try{v.webkitExitFullscreen();}catch(e){}
+    }
+    if(typeof window.tatap_set_fullscreen === "function"){
+      try{ window.tatap_set_fullscreen(false); }catch(_){}
     }
     return;
   }
@@ -1895,7 +1908,7 @@ function paintCue(){
   if(!s)return;
   if($("player-modal").classList.contains("hidden")){s.innerHTML="";return;}
   var t=v.currentTime||0;
-  if(isVideoFullscreen()){
+  if(isVideoFullscreen() && !isDesktopEnv()){
     if(s._last!==""){s.innerHTML="";s._last="";}
     box.style.display="none";
   }else{

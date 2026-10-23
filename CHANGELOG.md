@@ -13,6 +13,21 @@ Format versi menggunakan skema `MAJOR.MINOR.PATCH`:
 - **MINOR (x.Y.0):** Penambahan fitur atau kapabilitas baru yang tetap kompatibel ke belakang (*backward-compatible new features*). Digit PATCH direset ke 0.
 - **PATCH (x.y.Z):** Perbaikan bug, peningkatan stabilitas, atau perbaikan internal tanpa penambahan fitur baru (*backward-compatible bug fixes*).
 
+## [2.11.3] - 2026-10-23
+
+### Justifikasi SemVer 2.0.0 (PATCH: 2.11.2 -> 2.11.3)
+Kenaikan digit PATCH diterapkan secara mutlak sesuai kaidah Semantic Versioning 2.0.0 dan Direktif #3 [`AGENTS.md`](AGENTS.md) karena rilis ini berfokus pada perbaikan bug dan kompatibilitas platform Windows Portable Launcher (`launcher/main.go` / `Tatap.exe`) terkait penanganan mode monitor fullscreen native tanpa batas jendela (borderless fullscreen) serta isolasi rendering subtitle HTML kustom agar tidak dibajak oleh subtitle bawaan Windows Closed Captions:
+
+1. **Perbaikan Fullscreen Monitor Native Launcher Windows Portable (`launcher/main.go`):**
+   - **Native Win32 Fullscreen Bridge (`setNativeFullscreen`):** Mengimplementasikan penanganan fullscreen Win32 berbasis `GetWindowPlacement`, `GetWindowLongW` (`GWL_STYLE`), `MonitorFromWindow` (`MONITOR_DEFAULTTONEAREST`), dan `GetMonitorInfoW`. Jendela aplikasi dialihkan ke style `WS_POPUP | WS_VISIBLE` dan diposisikan menutup penuh seluruh resolusi monitor aktif via `SetWindowPos`, menyelesaikan masalah video terkurung di dalam batas jendela 1280x800.
+   - **Bidirectional Bridge `tatap_set_fullscreen`:** Menghubungkan event fullscreen DOM JavaScript webview ke host launcher Go secara instan, sehingga tombol fullscreen UI, shortcut keyboard `f`/`F`, double-click, serta tombol `Esc` secara mulus mengontrol ukuran jendela native.
+   - **Restorasi Posisi & Ukuran Jendela Bersih:** Saat keluar dari mode layar penuh, status style asli (`prevStyle`) dan posisi jendela sebelumnya (`prevPlacement`) dikembalikan secara deterministik via `SetWindowPlacement`.
+
+2. **Isolasi Rendering Subtitle Desktop & Pencegahan Pembajakan Windows Closed Captions (`frontend/js/app.js`, `style.css`, `index.html`):**
+   - **Pencegahan Aktivasi Native `<track>` di Desktop:** Di lingkungan desktop (`isDesktopEnv()`), mode track bawaan selalu disetel ke `"hidden"` agar engine Chromium / WebView2 Microsoft Edge tidak memicu rendering subs bawaan Windows Closed Captioning yang merusak tampilan.
+   - **Preservasi `#pm-subs-overlay`:** Memastikan kontainer custom subtitle HTML Tatap tetap aktif dan dirender pada mode fullscreen desktop tanpa pernah disembunyikan (`display: none`).
+   - **Suppression CSS `video::cue`:** Menambahkan aturan CSS peredaman penuh untuk `video::cue` pada WebView desktop (`visibility: hidden !important; font-size: 0px !important;`) dan membatasi kontrol native `<video>` via `controlsList="nodownload nofullscreen noremoteplayback" disablePictureInPicture`.
+
 ## [2.11.2] - 2026-10-22
 
 ### Justifikasi SemVer 2.0.0 (PATCH: 2.11.1 -> 2.11.2)
