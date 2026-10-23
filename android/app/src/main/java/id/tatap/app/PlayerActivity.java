@@ -2040,16 +2040,32 @@ public class PlayerActivity extends Activity {
         tvOsdIcon.setText(icon);
         pbOsdBar.setProgress(pct);
         tvOsdVal.setText(pct + "%");
-        hudOsd.setVisibility(View.VISIBLE);
+        if (hudOsd.getVisibility() != View.VISIBLE) {
+            hudOsd.setAlpha(0f);
+            hudOsd.setVisibility(View.VISIBLE);
+            hudOsd.animate().alpha(1f).setDuration(120).start();
+        } else {
+            hudOsd.animate().cancel();
+            hudOsd.setAlpha(1f);
+        }
         handler.removeCallbacks(hideOsdRunnable);
         handler.postDelayed(hideOsdRunnable, 1200);
     }
 
-    private final Runnable hideOsdRunnable = () -> hudOsd.setVisibility(View.GONE);
+    private final Runnable hideOsdRunnable = () -> {
+        if (hudOsd != null && hudOsd.getVisibility() == View.VISIBLE) {
+            hudOsd.animate().alpha(0f).setDuration(180).withEndAction(() -> hudOsd.setVisibility(View.GONE)).start();
+        }
+    };
 
     private void showRipple(TextView tv) {
+        if (tv == null) return;
+        tv.animate().cancel();
+        tv.setAlpha(0f);
         tv.setVisibility(View.VISIBLE);
-        handler.postDelayed(() -> tv.setVisibility(View.GONE), 350);
+        tv.animate().alpha(1f).setDuration(100).withEndAction(() -> {
+            tv.animate().alpha(0f).setDuration(220).setStartDelay(80).withEndAction(() -> tv.setVisibility(View.GONE)).start();
+        }).start();
     }
 
     private Vibrator cachedVibrator = null;
@@ -4559,6 +4575,13 @@ public class PlayerActivity extends Activity {
         if (playerView == null) return;
 
         androidx.media3.ui.TimeBar timeBar = playerView.findViewById(androidx.media3.ui.R.id.exo_progress);
+        if (timeBar instanceof androidx.media3.ui.DefaultTimeBar) {
+            androidx.media3.ui.DefaultTimeBar dtb = (androidx.media3.ui.DefaultTimeBar) timeBar;
+            dtb.setPlayedColor(0xFF38BDF8);
+            dtb.setScrubberColor(0xFF38BDF8);
+            dtb.setBufferedColor(0x6638BDF8);
+            dtb.setUnplayedColor(0x33FFFFFF);
+        }
         if (timeBar != null && !isTimeBarListenerAttached) {
             isTimeBarListenerAttached = true;
             timeBar.addListener(new androidx.media3.ui.TimeBar.OnScrubListener() {
@@ -5149,19 +5172,19 @@ public class PlayerActivity extends Activity {
                 holder.tvBadge.setTextColor(0xFF0A84FF);
             } else if (watchedSet.contains(itemEp)) {
                 // Watched episode
-                holder.card.setCardBackgroundColor(0xFF0E1017);
-                holder.card.setStrokeColor(0xFF1C202C);
+                holder.card.setCardBackgroundColor(0xFF18181C);
+                holder.card.setStrokeColor(0xFF26262C);
                 holder.card.setStrokeWidth(dpToPx(1));
-                holder.tvTitle.setTextColor(0xFF64748B);
+                holder.tvTitle.setTextColor(0xFF8E8E93);
                 holder.tvBadge.setVisibility(View.VISIBLE);
                 holder.tvBadge.setText("DITONTON");
-                holder.tvBadge.setTextColor(0xFF10B981);
+                holder.tvBadge.setTextColor(0xFF30D158);
             } else {
                 // Unwatched episode
-                holder.card.setCardBackgroundColor(0xFF11141C);
-                holder.card.setStrokeColor(0xFF1C202C);
+                holder.card.setCardBackgroundColor(0xFF1E1E22);
+                holder.card.setStrokeColor(0xFF2C2C34);
                 holder.card.setStrokeWidth(dpToPx(1));
-                holder.tvTitle.setTextColor(0xFFF1F5F9);
+                holder.tvTitle.setTextColor(0xFFF5F5F7);
                 holder.tvBadge.setVisibility(View.GONE);
             }
 
@@ -5216,13 +5239,13 @@ public class PlayerActivity extends Activity {
             holder.tvLabel.setText(r.label);
             boolean isSel = (selectedRange != null && selectedRange.label.equals(r.label));
             if (isSel) {
-                holder.card.setCardBackgroundColor(0xFF1E293B);
+                holder.card.setCardBackgroundColor(0xFF1E2B45);
                 holder.card.setStrokeColor(0xFF38BDF8);
                 holder.tvLabel.setTextColor(0xFF38BDF8);
             } else {
-                holder.card.setCardBackgroundColor(0xFF161B26);
-                holder.card.setStrokeColor(0xFF2A3347);
-                holder.tvLabel.setTextColor(0xFF94A3B8);
+                holder.card.setCardBackgroundColor(0xFF1E1E22);
+                holder.card.setStrokeColor(0xFF2C2C34);
+                holder.tvLabel.setTextColor(0xFFA1A1A6);
             }
             holder.itemView.setOnClickListener(v -> {
                 HapticHelper.performTick(v);

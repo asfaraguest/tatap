@@ -13,6 +13,27 @@ Format versi menggunakan skema `MAJOR.MINOR.PATCH`:
 - **MINOR (x.Y.0):** Penambahan fitur atau kapabilitas baru yang tetap kompatibel ke belakang (*backward-compatible new features*). Digit PATCH direset ke 0.
 - **PATCH (x.y.Z):** Perbaikan bug, peningkatan stabilitas, atau perbaikan internal tanpa penambahan fitur baru (*backward-compatible bug fixes*).
 
+## [2.12.1] - 2026-10-24
+
+### Justifikasi SemVer 2.0.0 (PATCH: 2.12.0 -> 2.12.1)
+Kenaikan digit PATCH diterapkan sesuai kaidah Semantic Versioning 2.0.0 dan Direktif #3 [`AGENTS.md`](AGENTS.md) karena rilis ini berfokus pada penyempurnaan visual & estetika antarmuka (**UI/UX Visual Polish**) pada pemutar video Web Desktop, Windows Portable, Linux AppImage, serta ExoPlayer di Android Mobile dan Android TV tanpa penambahan modul arsitektur baru, perubahan skema database SQLite, ataupun modifikasi kontrak API eksternal.
+
+### Changed
+1. **Penyempurnaan Estetika Sinematik Video Player Web & Desktop (`frontend/css/style.css`):**
+   - **Floating Cinema Header & Footer Bar (`.player-head`, `.player-foot`):** Menyempurnakan bilah kontrol atas dan bawah player menjadi *dark cinema bar* berlapis gradien halus (`linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02))`), *specular top highlight* (`inset 0 1px 0 rgba(255,255,255,0.09)`), serta badge kapsul cyan pada indikator meta episode (`.player-title .dim`).
+   - **Panggung Video & Bingkai Ambient (`.ambient-stage`):** Menambahkan bingkai sinematik tipis (`1px solid rgba(255,255,255,0.08)`), sudut membulat `10px`, dan bayangan kedalaman saat mode windowed (otomatis direset menjadi `0px` pada mode `:fullscreen`).
+   - **Segmented Concentric Subtitle Picker (`.sub-picker`, `.sub-size`, `.sub-delay-ctrl`, `.sub-translate`):** Merapikan pemilih subtitle, ukuran font (`S` / `M` / `L`), pengatur sinkronisasi waktu (`-` / `0.0s` / `+`), dan toggle terjemahan `ID` menjadi segmen kapsul konsentris yang bersih dan ergonomis.
+   - **OSD Gesture, Double-Tap Seek Arc & Loading Spinner (`.gesture-osd`, `.gesture-ripple`, `.spinner`):** Memperindah indikator OSD volume/kecerahan dengan progress bar berpendar cyan (`#38bdf8`), memperhalus lengkungan radial *double-tap seek* `-10s`/`+10s`, serta membungkus teks status pemuatan stream (`#pm-status`) dalam kapsul monospasi modern tanpa *backdrop-filter blur tax* demi menjaga performa perangkat low-end.
+2. **Penyempurnaan Estetika ExoPlayer Android Mobile & Android TV (`activity_player.xml`, `PlayerActivity.java`, `TvFocusHelper.java`, `drawable/`):**
+   - **Top Overlay Gradient Scrim (`bg_player_top_scrim.xml`):** Mengganti latar blok hitam datar `#99000000` pada `layout_top_bar` dengan gradien vertikal lembut (`#E606080D` → `#8C06080D` → `#00000000`), sehingga judul anime dan deretan tombol kapsul (`PiP`, `Fit`, `HD`, `1.0x`, `Gaya Sub`, `Subtitle`) menyatu mulus di atas panggung video.
+   - **Kapsul Kontrol Header & Sorotan Fokus D-Pad Android TV (`cornerRadius="18dp"` & `TvFocusHelper.java`):** Mengubah tombol kontrol header menjadi kapsul penuh (`18dp`) dan menambahkan transisi `backgroundTintList` (`#1E2B45`) saat menerima fokus remote D-Pad Android TV agar posisi fokus terlihat sangat kontras dari jarak 3 meter tanpa memicu `requestLayout()`.
+   - **Kustomisasi Timeline Scrubber ExoPlayer (`DefaultTimeBar`):** Menyelaraskan warna timeline `exo_progress` secara programatis di `PlayerActivity.java` dengan warna aksen khas Tatap (`playedColor = #38BDF8`, `scrubberColor = #38BDF8`, `bufferedColor = #6638BDF8`, `unplayedColor = #33FFFFFF`).
+   - **Kapsul HUD Gesture & Lengkungan Double-Tap Seek (`bg_player_hud_pill.xml`, `bg_ripple_seek_left.xml`, `bg_ripple_seek_right.xml`):** Memperbarui tampilan pill `hud_osd` dan `hud_hold_speed` (`2X Cepat` / `Rewind`) serta mengganti indikator *double-tap seek* `-5s`/`+5s` menjadi lengkungan semi-oval lembut beranimasi fade-in/out.
+   - **Harmonisasi Panel Bawah Mode Portrait Mobile (`layout_portrait_bottom`):** Menyeragamkan palet warna panel daftar episode portrait dengan permukaan **Apple Dark (`@color/bg_root`, `@color/bg_surface`, `@color/bg_surface_elevated`)** serta tombol aksi cepat berbentuk kapsul (`cornerRadius="16dp"`).
+
+### Tests
+- Menambahkan suite pengujian otomatis `tests/test_player_visual_polish.py` untuk memverifikasi keabsahan XML drawable baru, kustomisasi `DefaultTimeBar`, serta aturan estetika CSS & layout ExoPlayer.
+
 ## [2.12.0] - 2026-10-23
 
 ### Justifikasi SemVer 2.0.0 (MINOR: 2.11.6 -> 2.12.0)

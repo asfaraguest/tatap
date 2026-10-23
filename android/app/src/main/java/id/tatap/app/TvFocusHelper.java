@@ -70,6 +70,7 @@ public class TvFocusHelper {
             } else if (v instanceof MaterialButton) {
                 MaterialButton btn = (MaterialButton) v;
                 btn.setStrokeColor(ColorStateList.valueOf(hasFocus ? COLOR_FOCUSED_STROKE : Color.parseColor("#33FFFFFF")));
+                btn.setBackgroundTintList(ColorStateList.valueOf(hasFocus ? Color.parseColor("#1E2B45") : Color.parseColor("#CC161B26")));
             } else if (v instanceof ImageButton) {
                 ImageButton ib = (ImageButton) v;
                 ib.setBackgroundColor(hasFocus ? Color.parseColor("#3338BDF8") : Color.TRANSPARENT);
