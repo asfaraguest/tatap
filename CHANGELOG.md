@@ -13,6 +13,33 @@ Format versi menggunakan skema `MAJOR.MINOR.PATCH`:
 - **MINOR (x.Y.0):** Penambahan fitur atau kapabilitas baru yang tetap kompatibel ke belakang (*backward-compatible new features*). Digit PATCH direset ke 0.
 - **PATCH (x.y.Z):** Perbaikan bug, peningkatan stabilitas, atau perbaikan internal tanpa penambahan fitur baru (*backward-compatible bug fixes*).
 
+## [2.12.4] - 2026-10-25
+
+### Justifikasi SemVer 2.0.0 (PATCH: 2.12.3 -> 2.12.4)
+Kenaikan digit PATCH diterapkan sesuai kaidah Semantic Versioning 2.0.0 dan Direktif #3 [`AGENTS.md`](AGENTS.md) untuk perbaikan bug hilangnya tombol Skip OP/ED dan tidak berjalannya fitur auto-skip pada anime on-going/terbaru (koreksi skema parameter wajib `episodeLength` pada API AniSkip v2, resolusi otomatis `mal_id` dari AniList GraphQL & pencarian judul, serta propagasi parameter title dari client ke backend resolver).
+
+### Fixed
+1. **Kepatuhan Parameter Wajib `episodeLength` pada AniSkip API v2 (`backend/api/aniskip.py`, Paritas Chaquopy):**
+   - **Koreksi Parameter Schema v2:** Mengoreksi logika pembentukan URL permintaan ke AniSkip v2 agar selalu menyertakan `episodeLength` (`episodeLength=0` secara default jika durasi video belum diketahui), mencegah respon penolakan `HTTP 400 Bad Request` dari server AniSkip.
+   - **User-Agent Header Modern:** Memperbarui header User-Agent permintaan AniSkip agar terstandarisasi.
+   - **In-Memory Cache Dua Arah (`store_mal_id` & `get_mal_id_from_cache`):** Menyediakan penyimpanan in-memory cepat untuk pemetaan slug, judul mentah, dan judul normalisasi ke `mal_id` dengan pembersihan ID numerik otomatis.
+
+2. **Ekstraksi `idMal` pada AniList GraphQL & Katalog Airing/Seasonal (`backend/api/anilist.py`, Paritas Chaquopy):**
+   - **Ekstraksi Komprehensif `idMal`:** Menambahkan field `idMal` ke seluruh query AniList utama: `QUERY` (katalog umum), `RECENTLY_FINISHED_QUERY`, `SCHEDULE_QUERY`, `SCHEDULE_PAGED_QUERY` (jadwal rilis mingguan), `MEDIA_BY_ID_QUERY`, `RELATIONS_QUERY`, dan `SEARCH_METADATA_QUERY`.
+   - **Pencarian Cerdas Judul-ke-MAL (`resolve_mal_id_by_title`):** Mengimplementasikan pencari `idMal` cerdas berbasis AniList GraphQL dengan fallback pemendekan kata otomatis jika judul anime terlalu panjang atau memuat subtitle khusus.
+
+3. **Resolusi Otomatis `_resolve_mal_id` di Endpoint Stream (`backend/main.py`, Paritas Chaquopy):**
+   - **Resolusi Otomatis Multi-Tier:** Mengimplementasikan fungsi `_resolve_mal_id` yang memeriksa cache in-memory, `anilist_id`, dan pencarian AniList GraphQL untuk menyelesaikan `mal_id` saat provider stream (HiAnime/Otakudesu/AniChan) mengembalikan `mal_id: ""` kosong.
+   - **Injeksi Skip Times Dinamis:** Menghubungkan resolusi `mal_id` pada cabang cache hit (`if hit:`) maupun cache miss untuk secara otomatis memanggil `aniskip.get_skip_times`, menginjeksi intro/outro ke dalam payload stream, dan memperbarui cache database `episode_cache`.
+   - **Pre-seeding Otomatis di Feed Musiman & Jadwal:** Mengaitkan `idMal` langsung ke memori saat memproses anime di `/api/seasonal` dan `/api/schedule`.
+
+4. **Propagasi Judul Anime dari Client ke Stream Resolver (`PlayerActivity.java`, `frontend/js/api.js`, `frontend/js/app.js`):**
+   - **Android Player (`PlayerActivity.java`):** Menyertakan parameter `&title=` pada permintaan `/api/episode` dan `/api/stream/resolve` (termasuk prefetch tetangga) agar backend dapat langsung mencocokkan `mal_id` tanpa menebak dari slug.
+   - **Web UI (`api.js`, `app.js`):** Mengirimkan parameter `title` pada `window.Tatap.resolve` saat memutar episode.
+
+### Tests
+- Menambahkan test suite `test_aniskip_query_episode_length_v2_spec`, `test_aniskip_mal_id_in_memory_cache`, dan `test_resolve_mal_id_and_stream_skip_injection` pada `tests/test_skip_times.py` untuk menguji kepatuhan schema AniSkip v2, cache dua arah judul-ke-MAL, dan injeksi otomatis OP/ED pada endpoint stream.
+
 ## [2.12.3] - 2026-10-24
 
 ### Justifikasi SemVer 2.0.0 (PATCH: 2.12.2 -> 2.12.3)

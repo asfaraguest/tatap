@@ -34,6 +34,7 @@ query ($season: MediaSeason, $year: Int, $page: Int, $perPage: Int, $statusIn: [
     pageInfo { total perPage currentPage lastPage hasNextPage }
     media(season: $season, seasonYear: $year, status_in: $statusIn, type: ANIME, sort: POPULARITY_DESC) {
       id
+      idMal
       status
       title { romaji english }
       format
@@ -96,6 +97,7 @@ query AiringFinished($page: Int, $perPage: Int) {
     pageInfo { total perPage currentPage lastPage hasNextPage }
     media(format: TV, status: FINISHED, type: ANIME, sort: [END_DATE_DESC, POPULARITY_DESC]) {
       id
+      idMal
       status
       title { romaji english }
       format
@@ -245,7 +247,7 @@ query ($now: Int, $end: Int, $perPage: Int) {
     airingSchedules(airingAt_greater: $now, airingAt_lesser: $end, sort: TIME) {
       id airingAt episode
       media {
-        id title { romaji english }
+        id idMal title { romaji english }
         season seasonYear format
         coverImage { large medium }
       }
@@ -263,7 +265,7 @@ query GetSchedule($page: Int, $now: Int, $end: Int, $perPage: Int) {
     airingSchedules(airingAt_greater: $now, airingAt_lesser: $end, sort: TIME) {
       id airingAt episode
       media {
-        id title { romaji english }
+        id idMal title { romaji english }
         season seasonYear format
         genres averageScore
         coverImage { large medium }
@@ -322,6 +324,7 @@ RELATIONS_QUERY = """
 query ($search: String) {
   Media(search: $search, type: ANIME) {
     id
+    idMal
     title { romaji english }
     format
     seasonYear
@@ -330,6 +333,7 @@ query ($search: String) {
         relationType
         node {
           id
+          idMal
           title { romaji english }
           format
           seasonYear
@@ -347,6 +351,7 @@ MEDIA_BY_ID_QUERY = """
 query ($id: Int) {
   Media(id: $id, type: ANIME) {
     id
+    idMal
     title { romaji english }
     format
     seasonYear
@@ -357,6 +362,7 @@ query ($id: Int) {
         relationType
         node {
           id
+          idMal
           title { romaji english }
           format
           seasonYear
@@ -486,6 +492,7 @@ query ($search: String, $perPage: Int) {
   Page(page: 1, perPage: $perPage) {
     media(search: $search, type: ANIME, sort: SEARCH_MATCH) {
       id
+      idMal
       title { romaji english native }
       season
       seasonYear
@@ -497,7 +504,7 @@ query ($search: String, $perPage: Int) {
 
 
 def search_anime_metadata(search_query: str, per_page: int = 12) -> list:
-    """Cari metadata anime (season, year, title) dari AniList untuk memperkaya hasil pencarian."""
+    """Cari metadata anime (season, year, title, idMal) dari AniList untuk memperkaya hasil pencarian."""
     if not search_query or not search_query.strip() or _is_rate_limited():
         return []
     try:
@@ -513,6 +520,39 @@ def search_anime_metadata(search_query: str, per_page: int = 12) -> list:
         return data or []
     except Exception:
         return []
+
+
+def resolve_mal_id_by_title(search_query: str) -> int:
+    """Cari MAL ID (idMal) dari AniList berdasarkan judul anime.
+    Mendukung fallback pemendekan kata jika query terlalu panjang atau spesifik."""
+    if not search_query or not search_query.strip() or _is_rate_limited():
+        return 0
+    clean = search_query.strip()
+    words = clean.split()
+    c = _get_al_client()
+    attempts = [clean]
+    if len(words) > 3:
+        attempts.append(" ".join(words[:4]))
+        attempts.append(" ".join(words[:3]))
+    for att in attempts:
+        try:
+            r = c.post(ANILIST_URL, json={
+                "query": SEARCH_METADATA_QUERY,
+                "variables": {"search": att, "perPage": 5}
+            })
+            if r.status_code != 200:
+                _record_rate_limit(r)
+                continue
+            media_list = r.json().get("data", {}).get("Page", {}).get("media", []) or []
+            for m in media_list:
+                if m.get("idMal"):
+                    try:
+                        return int(m["idMal"])
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+    return 0
 
 
 

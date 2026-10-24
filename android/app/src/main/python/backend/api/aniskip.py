@@ -13,6 +13,44 @@ import httpx
 _CACHE = {}
 _CACHE_TTL = 86400         # 24 jam untuk hasil valid
 _NEGATIVE_CACHE_TTL = 900  # 15 menit untuk 404 / empty (belum ada data di AniSkip)
+_TITLE_TO_MAL = {}         # Cache in-memory pemetaan slug/judul -> mal_id
+
+
+def store_mal_id(identifier: str, mal_id) -> None:
+    """Simpan pemetaan judul atau slug ke mal_id di memori."""
+    if not identifier or not mal_id or not isinstance(identifier, str):
+        return
+    try:
+        m_int = int(str(mal_id).strip())
+        if m_int <= 0:
+            return
+        clean_raw = str(identifier).strip().lower()
+        if clean_raw:
+            _TITLE_TO_MAL[clean_raw] = m_int
+            no_id = re.sub(r"-\d+$", "", clean_raw)
+            if no_id != clean_raw:
+                _TITLE_TO_MAL[no_id] = m_int
+        norm = normalize_title(identifier)
+        if norm:
+            _TITLE_TO_MAL[norm] = m_int
+    except Exception:
+        pass
+
+
+def get_mal_id_from_cache(identifier: str) -> int:
+    """Ambil mal_id dari cache in-memory berdasarkan identifier (slug atau judul)."""
+    if not identifier or not isinstance(identifier, str):
+        return 0
+    clean_raw = str(identifier).strip().lower()
+    if clean_raw in _TITLE_TO_MAL:
+        return _TITLE_TO_MAL[clean_raw]
+    no_id = re.sub(r"-\d+$", "", clean_raw)
+    if no_id in _TITLE_TO_MAL:
+        return _TITLE_TO_MAL[no_id]
+    norm = normalize_title(identifier)
+    if norm and norm in _TITLE_TO_MAL:
+        return _TITLE_TO_MAL[norm]
+    return 0
 
 
 def is_valid_interval(start, end) -> bool:
@@ -28,14 +66,16 @@ def is_valid_interval(start, end) -> bool:
 
 def normalize_title(title: str) -> str:
     """Normalisasi judul anime untuk pencocokan cache lintas provider.
-    Menghilangkan prefix provider (otakudesu/hianime), tag sub indo, nomor episode, batch, dan karakter non-alphanumeric."""
-    if not title:
+    Menghilangkan prefix provider (otakudesu/hianime), tag sub indo, nomor episode, batch, trailing numeric ID, dan karakter non-alphanumeric."""
+    if not title or not isinstance(title, str):
         return ""
     s = title.lower().replace("&", "and")
     # Ganti separator umum dengan spasi
     s = re.sub(r"[:\-_/.]+", " ", s)
     # Hapus provider prefix dan tag umum
     s = re.sub(r"\b(otakudesu|hianime|sub\s*indo|episode\s*\d+|ep\s*\d+|batch|complete|bd|season\s*\d+|s\d+)\b", " ", s)
+    # Hapus trailing numeric ID (seperti ID 19319 pada hianime slug)
+    s = re.sub(r"\s+\d+\s*$", " ", s)
     return re.sub(r"[^a-z0-9]", "", s).strip()
 
 
@@ -138,17 +178,18 @@ def get_skip_times(mal_id, episode_num: int, episode_length: float = 0, timeout:
             if now - ts < ttl:
                 return entry
 
-    # Jangan sertakan episodeLength jika 0
-    url = f"https://api.aniskip.com/v2/skip-times/{mal_int}/{ep_int}?types=op&types=ed&types=mixed-op&types=mixed-ed"
+    # AniSkip API v2 mewajibkan parameter episodeLength (default 0 jika durasi belum diketahui)
+    ep_len_val = 0.0
     try:
-        ep_len_val = float(episode_length or 0)
-        if ep_len_val > 0:
-            url += f"&episodeLength={round(ep_len_val, 2)}"
+        if episode_length is not None:
+            ep_len_val = max(0.0, float(episode_length))
     except Exception:
-        pass
+        ep_len_val = 0.0
+    ep_len_param = str(round(ep_len_val, 2)) if ep_len_val > 0 else "0"
+    url = f"https://api.aniskip.com/v2/skip-times/{mal_int}/{ep_int}?types=op&types=ed&types=mixed-op&types=mixed-ed&episodeLength={ep_len_param}"
 
     headers = {
-        "User-Agent": "Tatap/2.5.0 (https://github.com/asfaraguest/tatap)",
+        "User-Agent": "Tatap (https://github.com/asfaraguest/tatap)",
         "Accept": "application/json"
     }
 

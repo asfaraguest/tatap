@@ -604,6 +604,10 @@ async def seasonal(which: str = Query("", pattern="^(now|prev|airing)$|^$"),
                 if not slug or slug in seen_slugs:
                     continue
                 seen_slugs.add(slug)
+                m_mal_id = str(m.get("idMal") or "")
+                if m_mal_id:
+                    aniskip.store_mal_id(slug, m_mal_id)
+                    aniskip.store_mal_id(title, m_mal_id)
                 cover = (m.get("coverImage") or {})
                 tot = m.get("episodes") or 0
                 studio_nodes = (m.get("studios") or {}).get("nodes") or []
@@ -631,6 +635,7 @@ async def seasonal(which: str = Query("", pattern="^(now|prev|airing)$|^$"),
                     "lane": "seasonal",
                     "synopsis": al.clean_synopsis_text(m.get("description") or ""),
                     "anilist_id": m.get("id"),
+                    "mal_id": m_mal_id,
                     "matched": True,
                 })
 
@@ -790,6 +795,10 @@ async def seasonal(which: str = Query("", pattern="^(now|prev|airing)$|^$"),
             else:
                 eps_cnt = f"{eps_rel}/{eps_tot}" if eps_tot > 0 else (f"{eps_rel}/?" if eps_rel > 0 else "")
                 badge = "ONGOING"
+            m_mal_id = str(m.get("idMal") or "")
+            if m_mal_id:
+                aniskip.store_mal_id(slug, m_mal_id)
+                aniskip.store_mal_id(title, m_mal_id)
             studio_nodes = (m.get("studios") or {}).get("nodes") or []
             studio_name = studio_nodes[0].get("name", "") if studio_nodes else ""
             items_out.append({
@@ -813,6 +822,7 @@ async def seasonal(which: str = Query("", pattern="^(now|prev|airing)$|^$"),
                 "is_finished": is_finished,
                 "synopsis": al.clean_synopsis_text(m.get("description") or ""),
                 "anilist_id": m.get("id"),
+                "mal_id": m_mal_id,
                 "site": m.get("siteUrl") or "",
                 "matched": True,
             })
@@ -1087,6 +1097,11 @@ async def anime_schedule(day: str = Query("today")):
                 if not slug:
                     continue
 
+                s_mal = str((s.get("media") or {}).get("idMal") or "")
+                if s_mal:
+                    aniskip.store_mal_id(slug, s_mal)
+                    aniskip.store_mal_id(title, s_mal)
+
                 airing_at = int(s["airingAt"])
                 dt_wib = _dt.datetime.fromtimestamp(airing_at, _dt.timezone(_dt.timedelta(hours=7)))
                 time_str = dt_wib.strftime("%H:%M WIB")
@@ -1111,6 +1126,7 @@ async def anime_schedule(day: str = Query("today")):
                     "poster": cover.get("large") or cover.get("medium") or "",
                     "type": _format_to_type(fmt),
                     "score": round(score / 10.0, 1) if score else 0.0,
+                    "mal_id": s_mal,
                     "matched": True,
                 }
                 buckets[day_cat].append(item)
@@ -1498,14 +1514,78 @@ def _has_valid_subtitles(ep_data: dict) -> bool:
     return False
 
 
+async def _resolve_mal_id(slug: str, title: str = "", anilist_id: str = "") -> str:
+    """Mencari MAL ID dari cache in-memory, anilist_id, slug, atau pencarian AniList GraphQL."""
+    if not slug and not title and not anilist_id:
+        return ""
+    clean_slug = slug.split(":", 1)[1] if ":" in slug else slug
+    # 1. Cek cache in-memory aniskip
+    cached_mal = aniskip.get_mal_id_from_cache(slug) or aniskip.get_mal_id_from_cache(clean_slug)
+    if not cached_mal and title:
+        cached_mal = aniskip.get_mal_id_from_cache(title)
+    if cached_mal:
+        return str(cached_mal)
+
+    loop = asyncio.get_running_loop()
+    # 2. Cek anilist_id jika tersedia
+    if anilist_id:
+        try:
+            al_id_int = int(str(anilist_id).strip())
+            c = al._get_al_client()
+            r = await loop.run_in_executor(None, lambda: c.post(al.ANILIST_URL, json={
+                "query": al.MEDIA_BY_ID_QUERY,
+                "variables": {"id": al_id_int}
+            }))
+            if r and r.status_code == 200:
+                m_data = r.json().get("data", {}).get("Media", {}) or {}
+                if m_data.get("idMal"):
+                    m_id = str(m_data["idMal"])
+                    aniskip.store_mal_id(slug, m_id)
+                    aniskip.store_mal_id(clean_slug, m_id)
+                    if title:
+                        aniskip.store_mal_id(title, m_id)
+                    return m_id
+        except Exception:
+            pass
+
+    # 3. Ekstraksi search query dari title atau slug
+    search_q = title.strip() if title else ""
+    if not search_q:
+        cs = clean_slug
+        cs = re.sub(r"-\d+$", "", cs)
+        cs = re.sub(r"-(sub-indo|episode-\d+|batch|complete)", "", cs, flags=re.I)
+        search_q = cs.replace("-", " ").strip()
+
+    if search_q:
+        try:
+            found_mal = await loop.run_in_executor(None, lambda: al.resolve_mal_id_by_title(search_q))
+            if found_mal:
+                m_id = str(found_mal)
+                aniskip.store_mal_id(slug, m_id)
+                aniskip.store_mal_id(clean_slug, m_id)
+                if title:
+                    aniskip.store_mal_id(title, m_id)
+                return m_id
+        except Exception:
+            pass
+
+    return ""
+
+
 @app.get("/api/stream/resolve")
 @app.get("/api/episode")
-async def resolve(slug: str = Query(""), ep: int = Query(1), mode: str = Query("sub"), q: str = Query("best"), source: str = Query(""), force: bool = Query(False), refresh: bool = Query(False)):
+async def resolve(slug: str = Query(""), ep: int = Query(1), mode: str = Query("sub"), q: str = Query("best"), source: str = Query(""), force: bool = Query(False), refresh: bool = Query(False), title: str = Query(""), mal_id: str = Query(""), anilist_id: str = Query("")):
     try:
         slug_str = str(slug or "") if isinstance(slug, str) else ""
         if "hentai" in slug_str.lower():
             return fail("Konten genre Hentai diblokir")
-        mode = "dub" if str(mode).lower() == "dub" else "sub"
+        mode = "dub" if (isinstance(mode, str) and str(mode).lower() == "dub") else "sub"
+        title = title if isinstance(title, str) else ""
+        mal_id = mal_id if isinstance(mal_id, str) else ""
+        anilist_id = anilist_id if isinstance(anilist_id, str) else ""
+        source = source if isinstance(source, str) else ""
+        q = q if isinstance(q, str) else "best"
+
         def _is_truthy(v):
             return v is True or (isinstance(v, str) and v.strip().lower() in ("true", "1", "yes"))
         should_refresh = _is_truthy(force) or _is_truthy(refresh)
@@ -1612,30 +1692,46 @@ async def resolve(slug: str = Query(""), ep: int = Query(1), mode: str = Query("
             # Cek cross-provider cache jika intro/outro belum lengkap
             clean_slug_hit = slug.split(":", 1)[1] if ":" in slug else slug
             raw_title_hit = clean_slug_hit.replace("-sub-indo", "").replace("-episode", "").replace("-", " ").strip() if (active_source == "otakudesu" or clean_slug_hit.startswith("otakudesu")) else ""
-            cached_sk = aniskip.get_cached_skip_times(mal_id=hit.get("mal_id"), title=raw_title_hit or clean_slug_hit, ep=ep)
+            eff_title_hit = title or raw_title_hit or clean_slug_hit
+            eff_mal_id = str(hit.get("mal_id") or mal_id or "").strip()
+            if not eff_mal_id:
+                eff_mal_id = await _resolve_mal_id(slug=slug, title=eff_title_hit, anilist_id=anilist_id)
+                if eff_mal_id:
+                    hit["mal_id"] = eff_mal_id
+
+            cached_sk = aniskip.get_cached_skip_times(mal_id=eff_mal_id, title=eff_title_hit, ep=ep)
             if cached_sk:
                 if hit["intro"].get("end", 0) == 0 and cached_sk.get("intro", {}).get("end", 0) > 0:
                     hit["intro"] = cached_sk["intro"]
                 if hit["outro"].get("end", 0) == 0 and cached_sk.get("outro", {}).get("end", 0) > 0:
                     hit["outro"] = cached_sk["outro"]
 
-            if (hit["intro"].get("end", 0) == 0 or hit["outro"].get("end", 0) == 0) and hit.get("mal_id"):
+            if (hit["intro"].get("end", 0) == 0 or hit["outro"].get("end", 0) == 0) and eff_mal_id:
                 try:
                     loop = asyncio.get_running_loop()
                     sk = await asyncio.wait_for(
-                        loop.run_in_executor(None, lambda: aniskip.get_skip_times(hit["mal_id"], ep)),
-                        timeout=1.2
+                        loop.run_in_executor(None, lambda: aniskip.get_skip_times(eff_mal_id, ep, episode_length=0)),
+                        timeout=1.8
                     )
+                    has_updated_sk = False
                     if sk.get("intro", {}).get("end", 0) > 0 and hit["intro"].get("end", 0) == 0:
                         hit["intro"] = sk["intro"]
+                        has_updated_sk = True
                     if sk.get("outro", {}).get("end", 0) > 0 and hit["outro"].get("end", 0) == 0:
                         hit["outro"] = sk["outro"]
+                        has_updated_sk = True
+                    if has_updated_sk:
+                        await set_episode_cache(cache_slug, ep, hit.get("mode") or mode, hit["master"], hit["variants"],
+                                                hit.get("sub"), hit.get("sub_lang"),
+                                                hit.get("referer"), hit.get("server"),
+                                                subtitles=hit.get("subtitles"),
+                                                intro=hit["intro"], outro=hit["outro"])
                 except Exception:
                     pass
 
             aniskip.store_skip_times(
-                mal_id=hit.get("mal_id"),
-                title=raw_title_hit or clean_slug_hit,
+                mal_id=eff_mal_id,
+                title=eff_title_hit,
                 ep=ep,
                 intro=hit["intro"],
                 outro=hit["outro"]
@@ -1748,8 +1844,16 @@ async def resolve(slug: str = Query(""), ep: int = Query(1), mode: str = Query("
         got["intro"] = got.get("intro") or {"start": 0, "end": 0}
         got["outro"] = got.get("outro") or {"start": 0, "end": 0}
 
+        # Resolusi mal_id jika belum tersedia
+        eff_title = title or raw_title or clean_slug
+        eff_mal_id = str(got.get("mal_id") or mal_id or "").strip()
+        if not eff_mal_id:
+            eff_mal_id = await _resolve_mal_id(slug=slug, title=eff_title, anilist_id=anilist_id)
+            if eff_mal_id:
+                got["mal_id"] = eff_mal_id
+
         # 1. Cek cross-provider cache terlebih dahulu
-        cached_sk = aniskip.get_cached_skip_times(mal_id=got.get("mal_id"), title=raw_title or clean_slug, ep=ep)
+        cached_sk = aniskip.get_cached_skip_times(mal_id=eff_mal_id, title=eff_title, ep=ep)
         if not cached_sk and hi_slug and hi_slug != clean_slug:
             cached_sk = aniskip.get_cached_skip_times(title=hi_slug, ep=ep)
         if cached_sk:
@@ -1758,12 +1862,11 @@ async def resolve(slug: str = Query(""), ep: int = Query(1), mode: str = Query("
             if got["outro"].get("end", 0) == 0 and cached_sk.get("outro", {}).get("end", 0) > 0:
                 got["outro"] = cached_sk["outro"]
 
-        mal_id = got.get("mal_id") or ""
-        if (got["intro"].get("end", 0) == 0 or got["outro"].get("end", 0) == 0) and mal_id:
+        if (got["intro"].get("end", 0) == 0 or got["outro"].get("end", 0) == 0) and eff_mal_id:
             try:
                 sk = await asyncio.wait_for(
-                    loop.run_in_executor(None, lambda: aniskip.get_skip_times(mal_id, ep)),
-                    timeout=1.2
+                    loop.run_in_executor(None, lambda: aniskip.get_skip_times(eff_mal_id, ep, episode_length=0)),
+                    timeout=1.8
                 )
                 if sk.get("intro", {}).get("end", 0) > 0 and got["intro"].get("end", 0) == 0:
                     got["intro"] = sk["intro"]
@@ -1774,15 +1877,15 @@ async def resolve(slug: str = Query(""), ep: int = Query(1), mode: str = Query("
 
         # 2. Simpan ke cross-provider cache jika valid
         aniskip.store_skip_times(
-            mal_id=mal_id or got.get("mal_id"),
-            title=raw_title or clean_slug,
+            mal_id=eff_mal_id,
+            title=eff_title,
             ep=ep,
             intro=got["intro"],
             outro=got["outro"]
         )
         if hi_slug and hi_slug != clean_slug:
             aniskip.store_skip_times(
-                mal_id=mal_id or got.get("mal_id"),
+                mal_id=eff_mal_id,
                 title=hi_slug,
                 ep=ep,
                 intro=got["intro"],

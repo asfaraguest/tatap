@@ -2681,6 +2681,7 @@ public class PlayerActivity extends Activity {
                 String effectiveMode = (requestMode != null && !requestMode.isEmpty()) ? requestMode : "sub";
                 String u = "http://127.0.0.1:8767/api/episode?slug=" + URLEncoder.encode(slug != null ? slug : "", "UTF-8")
                         + "&ep=" + ep + "&mode=" + URLEncoder.encode(effectiveMode, "UTF-8") + "&q=" + URLEncoder.encode(activeQuality != null ? activeQuality : "best", "UTF-8")
+                        + (title != null && !title.isEmpty() ? "&title=" + URLEncoder.encode(title, "UTF-8") : "")
                         + (forceRefresh ? "&refresh=1&force=true" : "");
                 HttpURLConnection conn = (HttpURLConnection) new URL(u).openConnection();
                 conn.setConnectTimeout(15000);
@@ -5682,6 +5683,7 @@ public class PlayerActivity extends Activity {
 
     private void executePreResolveNeighbors() {
         final String currentSlug = (slug != null) ? slug : "";
+        final String currentTitle = (title != null) ? title : "";
         final String currentQ = (activeQuality != null && !activeQuality.isEmpty()) ? activeQuality : "best";
         final String currentMode = (requestMode != null && !requestMode.isEmpty()) ? requestMode : "sub";
 
@@ -5704,7 +5706,8 @@ public class PlayerActivity extends Activity {
                             + URLEncoder.encode(currentSlug, "UTF-8")
                             + "&ep=" + targetEp
                             + "&mode=" + URLEncoder.encode(currentMode, "UTF-8")
-                            + "&q=" + URLEncoder.encode(currentQ, "UTF-8");
+                            + "&q=" + URLEncoder.encode(currentQ, "UTF-8")
+                            + (currentTitle != null && !currentTitle.isEmpty() ? "&title=" + URLEncoder.encode(currentTitle, "UTF-8") : "");
                     HttpURLConnection conn = (HttpURLConnection) new URL(u).openConnection();
                     conn.setConnectTimeout(15000);
                     conn.setReadTimeout(20000);

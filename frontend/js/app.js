@@ -1310,7 +1310,7 @@ function openPlayer(ep, resumeTime, forceRefresh){
   updatePrevNext();
   var t0=Date.now();
   var src=cur.source||"";
-  window.Tatap.resolve(cur.slug,ep,cur.mode,cur.quality,src,forceRefresh).then(function(r){
+  window.Tatap.resolve(cur.slug,ep,cur.mode,cur.quality,src,forceRefresh,cur.title).then(function(r){
     if(cur.playToken !== token || cur.slug !== reqSlug || $("player-modal").classList.contains("hidden")) return;
     if(!r || !r.success){
       if(!forceRefresh){

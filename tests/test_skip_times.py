@@ -43,8 +43,8 @@ def test_aniskip_empty_or_invalid():
     assert res2["outro"] == {"start": 0, "end": 0}
 
 
-def test_aniskip_query_without_hardcoded_episode_length():
-    """URL query AniSkip tidak boleh menyertakan episodeLength jika nilainya 0, dan hanya menyertakan jika > 0."""
+def test_aniskip_query_episode_length_v2_spec():
+    """AniSkip v2 mewajibkan parameter episodeLength (default 0 jika belum diketahui, atau nilai desimal jika ada)."""
     captured_urls = []
 
     def mock_get(url, **kwargs):
@@ -57,7 +57,7 @@ def test_aniskip_query_without_hardcoded_episode_length():
     with patch("httpx.Client.get", side_effect=mock_get):
         aniskip.get_skip_times(11111, 1, episode_length=0)
         assert len(captured_urls) == 1
-        assert "episodeLength" not in captured_urls[0]
+        assert "episodeLength=0" in captured_urls[0]
 
         aniskip.get_skip_times(22222, 2, episode_length=1420.5)
         assert len(captured_urls) == 2
@@ -176,3 +176,63 @@ async def test_database_episode_cache_intro_outro():
     assert cached is not None
     assert cached["intro"] == {"start": 85.0, "end": 175.0}
     assert cached["outro"] == {"start": 1250.0, "end": 1340.0}
+
+
+def test_aniskip_mal_id_in_memory_cache():
+    """Cache in-memory pemetaan slug/judul -> mal_id harus bekerja dua arah."""
+    aniskip._TITLE_TO_MAL.clear()
+    assert aniskip.get_mal_id_from_cache("dandadan-19319") == 0
+
+    aniskip.store_mal_id("dandadan-19319", 57334)
+    assert aniskip.get_mal_id_from_cache("dandadan-19319") == 57334
+    assert aniskip.get_mal_id_from_cache("dandadan") == 57334
+
+    aniskip.store_mal_id("Bleach: Thousand-Year Blood War", "56784")
+    assert aniskip.get_mal_id_from_cache("Bleach: Thousand-Year Blood War") == 56784
+    assert aniskip.get_mal_id_from_cache("bleach thousand year blood war") == 56784
+
+
+@pytest.mark.asyncio
+async def test_resolve_mal_id_and_stream_skip_injection(monkeypatch):
+    """Endpoint stream harus mampu menyelesaikan mal_id anime terbaru dan menginjeksi intro/outro dari AniSkip."""
+    from backend import main
+    await init_db()
+
+    slug = "dandadan-19319"
+    ep = 1
+
+    # Mock AniList resolve_mal_id_by_title
+    monkeypatch.setattr(main.al, "resolve_mal_id_by_title", lambda q: 57334)
+
+    # Mock AniSkip get_skip_times
+    def mock_get_skip(m_id, episode_num, episode_length=0, timeout=4.0):
+        if int(m_id) == 57334 and int(episode_num) == 1:
+            return {
+                "intro": {"start": 2.65, "end": 92.65},
+                "outro": {"start": 1348.45, "end": 1479.17}
+            }
+        return {"intro": {"start": 0, "end": 0}, "outro": {"start": 0, "end": 0}}
+
+    monkeypatch.setattr(aniskip, "get_skip_times", mock_get_skip)
+
+    # Mock hi resolver
+    monkeypatch.setattr(hi, "hianime_episodes", lambda s: [{"ep": 1, "ep_id": "111"}])
+    monkeypatch.setattr(hi, "hianime_m3u8", lambda maps, e, m, s: {
+        "master": "https://example.com/dandadan.m3u8",
+        "variants": [{"q": "1080p", "url": "https://example.com/dandadan.m3u8"}],
+        "sub": "https://example.com/sub.vtt",
+        "sub_lang": "English",
+        "referer": "https://megaplay.buzz/",
+        "server": "HD-1",
+        "subtitles": [{"label": "English", "url": "https://example.com/sub.vtt", "default": True}],
+        "intro": {"start": 0, "end": 0},
+        "outro": {"start": 0, "end": 0},
+        "mal_id": ""
+    })
+
+    res = await main.resolve(slug=slug, ep=ep, mode="sub", force=True, title="Dandadan")
+    assert res["success"] is True
+    data = res["data"]
+    assert data["mal_id"] == "57334"
+    assert data["intro"]["end"] == 92.65
+    assert data["outro"]["start"] == 1348.45
