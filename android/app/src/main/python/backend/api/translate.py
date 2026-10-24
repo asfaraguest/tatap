@@ -251,14 +251,16 @@ def merge_opensubtitles_with_builtin(
     merge_mode: str = "hybrid",
     translated_gaps: dict = None,
     offset: float = None,
+    target_lang: str = "id",
 ) -> tuple:
     """Gabungkan (merge) subtitle yang diunduh dari OpenSubtitles dengan subtitle bawaan anime.
 
     Mekanisme:
       1. Auto-Sync Offset: Menyelaraskan timeline os_cues dengan builtin_cues.
-      2. Timestamp Snapping: Menempelkan waktu cue OpenSubtitles ke timestamp presisi milik subtitle bawaan.
-      3. Gap Filling (Hybrid): Mengisi cue yang hilang di OpenSubtitles (Signs/OP/ED/Preview) dari subtitle bawaan.
-      4. Bilingual Mode (os_dual): Menyusun teks OpenSubtitles di baris atas & teks bawaan anime di baris bawah.
+      2. Kamus Istilah Anime: Pembersihan tag ASS/HTML serta koreksi leksikon anime universal.
+      3. Timestamp Snapping: Menempelkan waktu cue OpenSubtitles ke timestamp presisi milik subtitle bawaan.
+      4. Gap Filling (Hybrid): Mengisi cue yang hilang di OpenSubtitles (Signs/OP/ED/Preview) dari subtitle bawaan.
+      5. Bilingual Mode (os_dual): Menyusun teks OpenSubtitles di baris atas & teks bawaan anime di baris bawah.
 
     Mengembalikan (merged_cues, stats_dict).
     """
@@ -282,11 +284,24 @@ def merge_opensubtitles_with_builtin(
     snapped_count = 0
     gap_filled_count = 0
     matched_builtin_indices = set()
+    is_id_lang = (target_lang or "id").lower() in ("id", "ind", "indonesian")
 
     for oc in clean_os:
         os_s = max(0.0, float(oc["start"]) + offset)
         os_e = max(os_s + 0.1, float(oc["end"]) + offset)
-        os_txt = (oc.get("text") or "").strip()
+        raw_os_txt = (oc.get("text") or "").strip()
+        if not raw_os_txt:
+            continue
+
+        # 1. Bersihkan tag ASS override ({\an8}, {\pos}, \N, \h) & tag/entitas HTML
+        os_txt = clean_ass_tags(raw_os_txt).strip()
+        if os_txt and ("<" in os_txt or "&" in os_txt):
+            os_txt = _re.sub(r"<[^>]+>", "", _html.unescape(os_txt)).strip()
+
+        # 2. Terapkan Kamus Istilah Anime Universal (istilah anime saja, persona asli tetap terjaga)
+        if is_id_lang and os_txt:
+            os_txt = apply_universal_lexicon_id(os_txt)
+
         if not os_txt:
             continue
 
@@ -2012,6 +2027,28 @@ _COMPILED_UNIVERSAL = [(_re.compile(pat, _re.IGNORECASE), repl) for pat, repl in
 _COMPILED_CASUAL = [(_re.compile(pat, _re.IGNORECASE), repl) for pat, repl in _CASUAL_FANSUB_RULES]
 _COMPILED_AIGTX_SMOOTH = [(_re.compile(pat, _re.IGNORECASE), repl) for pat, repl in _AIGTX_SMOOTH_RULES]
 _COMPILED_GTXPLUS_SMOOTH = _COMPILED_AIGTX_SMOOTH
+
+
+def apply_universal_lexicon_id(text: str) -> str:
+    """Terapkan kamus istilah anime universal (glossary) tanpa mengubah persona/gaya kasual fansub."""
+    if not text:
+        return text
+
+    def _replace_match(m, repl):
+        expanded = m.expand(repl) if "\\" in repl else repl
+        orig = m.group(0)
+        if orig and orig.islower():
+            words = expanded.split(" ")
+            lowered = [w if (w.isupper() and len(w) >= 2) else w.lower() for w in words]
+            return " ".join(lowered)
+        if orig and orig[0].isupper():
+            return expanded[0].upper() + expanded[1:]
+        return expanded
+
+    result = text
+    for rx, repl in _COMPILED_UNIVERSAL:
+        result = rx.sub(lambda m, r=repl: _replace_match(m, r), result)
+    return result
 
 
 def _sanitize_fansub_id(text: str, force_formal: bool = False) -> str:

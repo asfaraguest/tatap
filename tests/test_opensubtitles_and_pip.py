@@ -17,6 +17,7 @@ from api.translate import (
     estimate_optimal_offset,
     find_unmatched_builtin_cues,
     merge_opensubtitles_with_builtin,
+    apply_universal_lexicon_id,
     build_vtt,
 )
 
@@ -144,3 +145,50 @@ def test_android_pip_dismiss_protection_in_code():
     pip_block = player_java[pip_changed_pos:pip_changed_pos + 2500]
     assert "isRestored" in pip_block
     assert "finish()" in pip_block
+
+
+def test_opensubtitles_universal_lexicon_and_tag_cleaning():
+    """Pastikan Kamus Istilah Anime Universal diterapkan pada OpenSubtitles merge,
+    tag ASS & HTML dibersihkan, dan persona asli fansub (saya/Anda) tetap terjaga."""
+    # 1. Test direct apply_universal_lexicon_id
+    raw_anime_term = "Kita harus pergi ke penjara bawah tanah dan mendaftar di serikat petualang."
+    normalized = apply_universal_lexicon_id(raw_anime_term)
+    assert "dungeon" in normalized
+    assert "guild petualang" in normalized
+
+    # Pastikan persona formal/sopan tetap terjaga (TIDAK diubah menjadi aku/kamu/nggak)
+    polite_text = "Saya tidak tahu apa yang Anda bicarakan."
+    assert apply_universal_lexicon_id(polite_text) == "Saya tidak tahu apa yang Anda bicarakan."
+
+    # 2. Test inside merge_opensubtitles_with_builtin
+    builtin_cues = [
+        {"start": 10.0, "end": 14.0, "text": "Let's explore the dungeon."},
+    ]
+    os_cues_dirty = [
+        {"start": 10.0, "end": 14.0, "text": "{\\an8}<i>Ayo jelajahi</i> penjara bawah tanah bersama serikat petualang &amp; kumpulkan energi spiritual.\\N{\\pos(192,200)}Saya siap, Tuan."},
+    ]
+
+    merged, stats = merge_opensubtitles_with_builtin(
+        builtin_cues=builtin_cues,
+        os_cues=os_cues_dirty,
+        merge_mode="hybrid",
+        target_lang="id",
+    )
+
+    assert len(merged) == 1
+    cleaned_txt = merged[0]["text"]
+
+    # Tag ASS dan HTML harus bersih
+    assert "{\\an8}" not in cleaned_txt
+    assert "{\\pos" not in cleaned_txt
+    assert "<i>" not in cleaned_txt
+    assert "&amp;" not in cleaned_txt
+    assert "\\N" not in cleaned_txt
+
+    # Istilah anime harus ternormalisasi
+    assert "dungeon" in cleaned_txt
+    assert "guild petualang" in cleaned_txt
+    assert "qi spiritual" in cleaned_txt.lower()
+
+    # Persona sopan asli tetap terjaga
+    assert "Saya siap, Tuan." in cleaned_txt

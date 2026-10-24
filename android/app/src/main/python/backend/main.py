@@ -2700,6 +2700,7 @@ async def _opensubtitles_merge_sub_job(
             merge_mode=merge_mode,
             translated_gaps=translated_gaps,
             offset=offset,
+            target_lang=target_lang,
         )
         new_text = build_vtt(merged_cues)
         if cache_key and ((target_lang != "id") or _is_valid_id_subtitle(new_text)):
@@ -2821,6 +2822,7 @@ async def api_merge_opensubtitle(body: dict = None):
             merge_mode="bilingual" if merge_mode in ("bilingual", "dual", "os_dual") else "hybrid",
             translated_gaps=translated_gaps,
             offset=offset,
+            target_lang=target_lang,
         )
         norm_vtt = build_vtt(merged_cues)
 
