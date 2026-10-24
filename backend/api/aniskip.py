@@ -66,14 +66,20 @@ def is_valid_interval(start, end) -> bool:
 
 def normalize_title(title: str) -> str:
     """Normalisasi judul anime untuk pencocokan cache lintas provider.
-    Menghilangkan prefix provider (otakudesu/hianime), tag sub indo, nomor episode, batch, trailing numeric ID, dan karakter non-alphanumeric."""
+    Menstandarisasi variasi season & part agar tidak bertabrakan, menghilangkan prefix provider
+    (otakudesu/hianime), tag sub indo, nomor episode, batch, trailing numeric ID, dan karakter non-alphanumeric."""
     if not title or not isinstance(title, str):
         return ""
     s = title.lower().replace("&", "and")
     # Ganti separator umum dengan spasi
     s = re.sub(r"[:\-_/.]+", " ", s)
-    # Hapus provider prefix dan tag umum
-    s = re.sub(r"\b(otakudesu|hianime|sub\s*indo|episode\s*\d+|ep\s*\d+|batch|complete|bd|season\s*\d+|s\d+)\b", " ", s)
+    # Standarisasi season, part, dan cour agar unik per-season (misal: "season 2" & "2nd season" -> "s2")
+    s = re.sub(r"\b(\d+)(?:st|nd|rd|th)\s+season\b", r" s\1 ", s)
+    s = re.sub(r"\bseason\s*(\d+)\b", r" s\1 ", s)
+    s = re.sub(r"\bpart\s*(\d+)\b", r" p\1 ", s)
+    s = re.sub(r"\bcour\s*(\d+)\b", r" c\1 ", s)
+    # Hapus provider prefix dan tag umum (namun pertahankan token season/part s<num>, p<num>, c<num>)
+    s = re.sub(r"\b(otakudesu|hianime|sub\s*indo|episode\s*\d+|ep\s*\d+|batch|complete|bd)\b", " ", s)
     # Hapus trailing numeric ID (seperti ID 19319 pada hianime slug)
     s = re.sub(r"\s+\d+\s*$", " ", s)
     return re.sub(r"[^a-z0-9]", "", s).strip()

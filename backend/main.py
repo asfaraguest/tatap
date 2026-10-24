@@ -6,7 +6,7 @@ from fastapi.responses import JSONResponse, FileResponse, Response, StreamingRes
 from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
 from config import APP_PORT, APP_HOST, HI_BASE, HI_UA
-from database import init_db, get_search_cache, set_search_cache, get_episode_cache, set_episode_cache, delete_episode_cache, clear_episode_cache_for_slug, get_cached_episode, cache_episode, add_history, get_history, clear_history, save_progress, get_progress, clear_progress, add_bookmark, remove_bookmark, get_bookmarks, is_bookmarked, clear_bookmarks, get_setting, set_setting, get_browse_cache, set_browse_cache, get_slug_map, set_slug_map, get_subtitle_cache, set_subtitle_cache, delete_subtitle_cache, get_today_char_count, add_today_char_count
+from database import init_db, get_search_cache, set_search_cache, get_episode_cache, set_episode_cache, delete_episode_cache, clear_episode_cache_for_slug, get_cached_episode, cache_episode, add_history, get_history, clear_history, save_progress, get_progress, clear_progress, add_bookmark, remove_bookmark, get_bookmarks, is_bookmarked, clear_bookmarks, get_setting, set_setting, get_browse_cache, set_browse_cache, get_slug_map, set_slug_map, get_mal_map, set_mal_map, get_subtitle_cache, set_subtitle_cache, delete_subtitle_cache, get_today_char_count, add_today_char_count
 from api import hianime as hi
 from api import anilist as al
 from api import otakudesu as otaku
@@ -1526,8 +1526,23 @@ async def _resolve_mal_id(slug: str, title: str = "", anilist_id: str = "") -> s
     if cached_mal:
         return str(cached_mal)
 
+    # 2. Cek database SQLite mal_map
+    try:
+        db_mal = await get_mal_map(slug) or await get_mal_map(clean_slug)
+        if not db_mal and title:
+            db_mal = await get_mal_map(title)
+        if db_mal:
+            m_id = str(db_mal)
+            aniskip.store_mal_id(slug, m_id)
+            aniskip.store_mal_id(clean_slug, m_id)
+            if title:
+                aniskip.store_mal_id(title, m_id)
+            return m_id
+    except Exception:
+        pass
+
     loop = asyncio.get_running_loop()
-    # 2. Cek anilist_id jika tersedia
+    # 3. Cek anilist_id jika tersedia
     if anilist_id:
         try:
             al_id_int = int(str(anilist_id).strip())
@@ -1542,13 +1557,16 @@ async def _resolve_mal_id(slug: str, title: str = "", anilist_id: str = "") -> s
                     m_id = str(m_data["idMal"])
                     aniskip.store_mal_id(slug, m_id)
                     aniskip.store_mal_id(clean_slug, m_id)
+                    await set_mal_map(slug, m_id)
+                    await set_mal_map(clean_slug, m_id)
                     if title:
                         aniskip.store_mal_id(title, m_id)
+                        await set_mal_map(title, m_id)
                     return m_id
         except Exception:
             pass
 
-    # 3. Ekstraksi search query dari title atau slug
+    # 4. Ekstraksi search query dari title atau slug
     search_q = title.strip() if title else ""
     if not search_q:
         cs = clean_slug
@@ -1565,8 +1583,11 @@ async def _resolve_mal_id(slug: str, title: str = "", anilist_id: str = "") -> s
                 m_id = str(found_mal)
                 aniskip.store_mal_id(slug, m_id)
                 aniskip.store_mal_id(clean_slug, m_id)
+                await set_mal_map(slug, m_id)
+                await set_mal_map(clean_slug, m_id)
                 if title:
                     aniskip.store_mal_id(title, m_id)
+                    await set_mal_map(title, m_id)
                 return m_id
         except Exception:
             pass

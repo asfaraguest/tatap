@@ -254,3 +254,50 @@ async def test_apostrophe_normalization_and_token_overlap():
     resolved = await main._resolve_mal_id("the-world-s-strongest-witch-10525", title="")
     assert resolved == "64084"
 
+
+def test_multi_season_normalization_no_collision():
+    """Normalisasi judul harus membedakan Season 1, Season 2, dan Part tanpa tabrakan cache."""
+    s1 = aniskip.normalize_title("Re:Zero kara Hajimeru Isekai Seikatsu")
+    s2_hi = aniskip.normalize_title("Re:Zero kara Hajimeru Isekai Seikatsu 2nd Season")
+    s2_otaku = aniskip.normalize_title("otakudesu:re-zero-kara-hajimeru-isekai-seikatsu-season-2-sub-indo")
+    s3_hi = aniskip.normalize_title("Re:Zero kara Hajimeru Isekai Seikatsu 3rd Season")
+    s3_otaku = aniskip.normalize_title("otakudesu:re-zero-kara-hajimeru-isekai-seikatsu-season-3-sub-indo")
+
+    # Antar provider harus cocok untuk season yang sama
+    assert s2_hi == s2_otaku
+    assert s3_hi == s3_otaku
+
+    # Antar season TIDAK boleh bertabrakan
+    assert s1 != s2_hi
+    assert s2_hi != s3_hi
+    assert s1 != s3_hi
+
+    # Part / Cour juga harus terlindungi dari tabrakan
+    p2 = aniskip.normalize_title("Bleach: Thousand-Year Blood War Part 2")
+    p3 = aniskip.normalize_title("Bleach: Thousand-Year Blood War Part 3")
+    assert p2 != p3
+
+
+def test_apostrophe_nouns_and_curly_quote_matching():
+    """Kata kepemilikan tanpa spasi seperti journeys & heavens serta kutip lengkung harus cocok."""
+    from backend.api import anilist
+
+    assert anilist._match_title_tokens("frieren beyond journeys end", "Frieren: Beyond Journey’s End") is True
+    assert anilist._match_title_tokens("fate stay night heavens feel i presage flower", "Fate/stay night [Heaven's Feel] I. presage flower") is True
+    assert anilist._match_title_tokens("the worlds strongest witch", "The World's Strongest Witch") is True
+    assert anilist._match_title_tokens("the worlds strongest witch", "The World's Most Famous Tales") is False
+
+
+@pytest.mark.asyncio
+async def test_persistent_sqlite_mal_map():
+    """Pemetaan mal_map harus tersimpan persisten di database SQLite."""
+    from backend.database import init_db, set_mal_map, get_mal_map
+    await init_db()
+
+    test_slug = "frieren-beyond-journeys-end-18542"
+    await set_mal_map(test_slug, 52991)
+
+    fetched = await get_mal_map(test_slug)
+    assert fetched == 52991
+
+

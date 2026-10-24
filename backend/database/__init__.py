@@ -69,6 +69,8 @@ async def init_db():
             key TEXT PRIMARY KEY, payload TEXT, fetched_at INTEGER)""")
         await db.execute("""CREATE TABLE IF NOT EXISTS slug_map(
             title TEXT PRIMARY KEY, slug TEXT, fetched_at INTEGER)""")
+        await db.execute("""CREATE TABLE IF NOT EXISTS mal_map(
+            identifier TEXT PRIMARY KEY, mal_id INTEGER, fetched_at INTEGER)""")
         # Cache translated VTT — key: hash(src_url+referer+lang). TTL 30 hari.
         await db.execute("""CREATE TABLE IF NOT EXISTS subtitle_cache(
             key TEXT PRIMARY KEY, payload TEXT, fetched_at INTEGER)""")
@@ -426,6 +428,39 @@ async def set_slug_map(title, slug):
         await db.execute("INSERT OR REPLACE INTO slug_map(title,slug,fetched_at) VALUES(?,?,?)",
                          (key, slug, _now()))
         await db.commit()
+
+
+async def get_mal_map(identifier: str, ttl=30 * 24 * 3600) -> int:
+    """Ambil mal_id tersimpan dari tabel mal_map SQLite (TTL 30 hari)."""
+    if not identifier:
+        return 0
+    key = str(identifier).strip().lower()
+    async with _connect_db() as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("SELECT mal_id, fetched_at FROM mal_map WHERE identifier=?", (key,)) as cur:
+            row = await cur.fetchone()
+            if not row:
+                return 0
+            if _now() - row["fetched_at"] > ttl:
+                return 0
+            return int(row["mal_id"])
+
+
+async def set_mal_map(identifier: str, mal_id):
+    """Simpan pemetaan identifier (slug/judul) ke mal_id di database SQLite."""
+    if not identifier or not mal_id:
+        return
+    try:
+        m_id = int(str(mal_id).strip())
+        if m_id <= 0:
+            return
+        key = str(identifier).strip().lower()
+        async with _connect_db() as db:
+            await db.execute("INSERT OR REPLACE INTO mal_map(identifier, mal_id, fetched_at) VALUES(?,?,?)",
+                             (key, m_id, _now()))
+            await db.commit()
+    except Exception:
+        pass
 
 
 async def get_subtitle_cache(key, ttl=30 * 24 * 3600):

@@ -41,8 +41,19 @@ Kenaikan digit PATCH diterapkan sesuai kaidah Semantic Versioning 2.0.0 dan Dire
    - **Normalisasi Apostrof `-s-`:** Menangani slug dengan bentuk kepemilikan bahasa Inggris (seperti `the-world-s-strongest-witch`) agar dinormalisasi menjadi `the world's strongest witch` sebelum dikirim ke query AniList GraphQL, mencegah kegagalan pencarian judul anime terbaru.
    - **Validasi Ketat Kesamaan Token (`_match_title_tokens`):** Mencegah pencocokan salah (*false positive*) pada fallback pemendekan kata dengan mewajibkan rasio overlap token minimal 50%, sehingga anime baru tidak lagi salah dipetakan ke judul lawas yang tidak relevan.
 
+6. **Pencegahan Tabrakan Cache Multi-Season (`backend/api/aniskip.py`, Paritas Chaquopy):**
+   - **Standarisasi Token Season & Part:** Mengoreksi fungsi `normalize_title` agar menstandarisasi penanda season (`season 2`, `2nd season` -> `s2`, `season 3`, `3rd season` -> `s3`, `part 2` -> `p2`) alih-alih menghapusnya secara buta. Hal ini mencegah tabrakan cache antar-season dari waralaba anime yang sama (seperti Re:Zero, Bleach, Jujutsu Kaisen, Oshi no Ko) yang sebelumnya saling menimpa stempel waktu intro/outro.
+
+7. **Normalisasi Kata Kepemilikan Bahasa Inggris & Karakter Apostrof (`backend/api/anilist.py`, Paritas Chaquopy):**
+   - **Penanganan Kata Kepemilikan Slug:** Mengubah kata-kata benda umum yang kehilangan apostrof pada slug (seperti `journeys` pada *Frieren* dan `heavens` pada *Fate Heaven's Feel*) menjadi bentuk apostrof (`journey's`, `heaven's`) sebelum dikirim ke query AniList GraphQL, mencegah AniList mengembalikan 0 hasil pencarian.
+   - **Kesesuaian Karakter Kutip Lurus & Lengkung:** Menstandarisasi kutip lurus (`'`) dan kutip lengkung (`’`) pada `_match_title_tokens` agar pencocokan token tetap 100% akurat tanpa menurunkan batas proteksi false positive.
+
+8. **Persistensi Database SQLite Pemetaan Judul-ke-MAL (`backend/database/__init__.py`, `backend/main.py`, Paritas Chaquopy):**
+   - **Tabel Baru `mal_map`:** Menambahkan tabel SQLite `mal_map` dengan masa simpan TTL 30 hari untuk menyimpan pemetaan `slug/title -> mal_id`.
+   - **Eliminasi Penguerian Berulang:** Saat resolusi pertama berhasil, hasil disimpan secara persisten ke database SQLite sehingga aplikasi tidak lagi mengueri ulang server AniList saat dibuka kembali, mencegah terkena limit ketat 30 req/menit (HTTP 429).
+
 ### Tests
-- Menambahkan test suite `test_aniskip_query_episode_length_v2_spec`, `test_aniskip_mal_id_in_memory_cache`, dan `test_resolve_mal_id_and_stream_skip_injection` pada `tests/test_skip_times.py` untuk menguji kepatuhan schema AniSkip v2, cache dua arah judul-ke-MAL, dan injeksi otomatis OP/ED pada endpoint stream.
+- Menambahkan test suite `test_aniskip_query_episode_length_v2_spec`, `test_aniskip_mal_id_in_memory_cache`, `test_resolve_mal_id_and_stream_skip_injection`, `test_multi_season_normalization_no_collision`, `test_apostrophe_nouns_and_curly_quote_matching`, dan `test_persistent_sqlite_mal_map` pada `tests/test_skip_times.py` untuk menguji kepatuhan schema AniSkip v2, isolasi season tanpa tabrakan cache, normalisasi apostrof, dan persistensi SQLite.
 
 ## [2.12.3] - 2026-10-24
 

@@ -528,8 +528,11 @@ def _match_title_tokens(target_q: str, candidate_title: str) -> bool:
         return False
     import re
     stopwords = {"the", "a", "an", "of", "in", "to", "and", "und", "der", "die", "das", "no", "wa", "ga", "ni", "de", "series"}
-    tok_q = {w for w in re.sub(r"[^\w']", " ", target_q.lower()).split() if w} - stopwords
-    tok_c = {w for w in re.sub(r"[^\w']", " ", candidate_title.lower()).split() if w} - stopwords
+    # Normalisasi apostrof lurus (') dan lengkung (’) agar "journey's", "journey’s", dan "journeys" setara
+    t_q = re.sub(r"['’]", "", target_q.lower())
+    t_c = re.sub(r"['’]", "", candidate_title.lower())
+    tok_q = {w for w in re.sub(r"[^\w]", " ", t_q).split() if w} - stopwords
+    tok_c = {w for w in re.sub(r"[^\w]", " ", t_c).split() if w} - stopwords
     if not tok_q or not tok_c:
         return False
     overlap = len(tok_q & tok_c) / max(len(tok_q), 1)
@@ -538,19 +541,44 @@ def _match_title_tokens(target_q: str, candidate_title: str) -> bool:
 
 def resolve_mal_id_by_title(search_query: str) -> int:
     """Cari MAL ID (idMal) dari AniList berdasarkan judul anime.
-    Mendukung penanganan apostrof slug dan fallback pemendekan kata dengan validasi kemiripan judul ketat."""
+    Mendukung penanganan apostrof slug, normalisasi kepemilikan bahasa Inggris,
+    dan fallback pemendekan kata bertahap dengan validasi kemiripan judul ketat."""
     if not search_query or not search_query.strip() or _is_rate_limited():
         return 0
     import re
     clean = search_query.strip()
     clean = re.sub(r"\b(\w+)\s+s\b", r"\1's", clean, flags=re.I)
+    # Ubah bentuk kepemilikan umum yang sering kehilangan tanda apostrof di slug (misal: journeys, heavens)
+    clean_apo = re.sub(r"\b(journey|heaven|assassin|titan|demon|knight|king|queen|sorcerer|magician|witch|hero|god|world|children)s\b", r"\1's", clean, flags=re.I)
+
     words = clean.split()
+    words_apo = clean_apo.split()
     c = _get_al_client()
-    attempts = [clean]
-    if len(words) > 3:
-        attempts.append(" ".join(words[:4]))
-        attempts.append(" ".join(words[:3]))
+
+    attempts = []
+    for q in [clean_apo, clean]:
+        if q and q not in attempts:
+            attempts.append(q)
+
+    # Coba prefix sebelum separator (seperti colon atau tanda hubung pemisah judul dan subtitle)
+    for sep in [":", " - "]:
+        if sep in clean:
+            prefix = clean.split(sep)[0].strip()
+            if prefix and prefix not in attempts:
+                attempts.append(prefix)
+
+    # Fallback pemotongan kata bertahap
+    if len(words_apo) > 3:
+        w4 = " ".join(words_apo[:4])
+        w3 = " ".join(words_apo[:3])
+        w2 = " ".join(words_apo[:2])
+        for w in [w4, w3, w2]:
+            if w not in attempts:
+                attempts.append(w)
+
     for att in attempts:
+        if _is_rate_limited():
+            break
         try:
             r = c.post(ANILIST_URL, json={
                 "query": SEARCH_METADATA_QUERY,
@@ -558,7 +586,7 @@ def resolve_mal_id_by_title(search_query: str) -> int:
             })
             if r.status_code != 200:
                 _record_rate_limit(r)
-                continue
+                break
             media_list = r.json().get("data", {}).get("Page", {}).get("media", []) or []
             for m in media_list:
                 if m.get("idMal"):
