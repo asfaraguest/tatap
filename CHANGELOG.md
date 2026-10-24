@@ -13,6 +13,26 @@ Format versi menggunakan skema `MAJOR.MINOR.PATCH`:
 - **MINOR (x.Y.0):** Penambahan fitur atau kapabilitas baru yang tetap kompatibel ke belakang (*backward-compatible new features*). Digit PATCH direset ke 0.
 - **PATCH (x.y.Z):** Perbaikan bug, peningkatan stabilitas, atau perbaikan internal tanpa penambahan fitur baru (*backward-compatible bug fixes*).
 
+## [2.12.3] - 2026-10-24
+
+### Justifikasi SemVer 2.0.0 (PATCH: 2.12.2 -> 2.12.3)
+Kenaikan digit PATCH diterapkan sesuai kaidah Semantic Versioning 2.0.0 dan Direktif #3 [`AGENTS.md`](AGENTS.md) untuk perbaikan kendali remote Android TV pada pemutar video (Fast Forward, Rewind, dan penanda posisi menit video / Scrubber TimeBar) tanpa perubahan skema database maupun modifikasi antarmuka API backend.
+
+### Fixed
+1. **Perbaikan Tombol Fast Forward & Rewind Pemutar Video Android TV (`PlayerActivity.java`, `TvFocusHelper.java`):**
+   - **Dukungan Dual-ID Media3 1.2.1:** Mengoreksi pencarian tombol kontrol rewind dan fast forward agar mendukung ID dinamis `androidx.media3.ui.R.id.exo_rew_with_amount` dan `androidx.media3.ui.R.id.exo_ffwd_with_amount` selain `exo_rew`/`exo_ffwd`.
+   - **Responsivitas Remote D-Pad:** Menyematkan click listener dan penanganan event `DPAD_CENTER` / `ENTER` eksplisit untuk rewind (-5 detik) dan fast forward (+5 detik) dengan efek ripple dan haptic feedback.
+   - **Konsistensi Visual & Selektor Fokus TV:** Mengintegrasikan `exo_rew_with_amount` dan `exo_ffwd_with_amount` ke dalam `TvFocusHelper.attachFocusScale` dengan background selektor oval (`R.drawable.bg_exo_icon_btn`) dan animasi perbesaran fokus 1.15x.
+
+2. **Dukungan Navigasi Remote D-Pad pada Scrubber / Penanda Menit Video (`PlayerActivity.java`):**
+   - **Hirarki Navigasi D-Pad 3-Tingkat:** Menghubungkan navigasi vertikal D-Pad sehingga tombol panah Atas dari bilah kontrol bawah berpindah mulus ke `DefaultTimeBar` (Scrubber), dan tombol panah Bawah dari bilah atas/skip kembali ke `DefaultTimeBar`.
+   - **Inkrementasi Scrubbing Presisi (10 Detik):** Mengonfigurasi `dtb.setKeyTimeIncrement(10000)` agar penanda lingkaran menit video dapat dimajukan atau dimundurkan secara bertahap (10 detik per ketukan remote D-Pad Kiri/Kanan).
+   - **Pencegahan Intersepsi Fokus:** Memperbaiki penanganan `KEYCODE_DPAD_LEFT` dan `KEYCODE_DPAD_RIGHT` di `dispatchKeyEvent` agar saat `timeBar` aktif memegang fokus, event diteruskan langsung ke `DefaultTimeBar.onKeyDown` untuk mengeksekusi `scrubIncrementally` tanpa dibajak atau dipindahkan paksa ke tombol Play/Pause.
+   - **Indikator Visual Fokus Scrubber:** Memberikan animasi penebalan bar vertikal (`scaleY = 1.35f`) dan perubahan warna scrubber ke cyan terang (`#00E5FF`) saat kursor remote TV berada di penanda menit video.
+
+### Tests
+- Menambahkan test suite `test_player_tv_seek_and_timebar_navigation` pada `tests/test_android_tv_perf_and_typography.py` untuk menguji dual-ID rewind/ffwd, increment scrubbing 10s, dan integritas navigasi D-Pad vertikal/horizontal TimeBar.
+
 ## [2.12.2] - 2026-10-24
 
 ### Justifikasi SemVer 2.0.0 (PATCH: 2.12.1 -> 2.12.2)

@@ -63,6 +63,24 @@ def test_player_dpad_navigation_on_paused_tv():
     assert "btnSubSelector.requestFocus()" in content
 
 
+def test_player_tv_seek_and_timebar_navigation():
+    """Memastikan fallback ID rewind/ffwd dan konfigurasi D-Pad TimeBar untuk Android TV."""
+    player_path = os.path.join(JAVA_DIR, "id", "tatap", "app", "PlayerActivity.java")
+    with open(player_path, "r", encoding="utf-8") as f:
+        content = f.read()
+    # Verifikasi dual ID fallback untuk rewind dan fast forward
+    assert "androidx.media3.ui.R.id.exo_rew_with_amount" in content
+    assert "androidx.media3.ui.R.id.exo_ffwd_with_amount" in content
+    # Verifikasi increment D-Pad TimeBar 10 detik
+    assert "dtb.setKeyTimeIncrement(10000)" in content
+    # Verifikasi pengecualian DPAD_LEFT/RIGHT agar DefaultTimeBar.onKeyDown bisa mengeksekusi scrub
+    assert "isTimeBarFocusedLeft" in content
+    assert "isTimeBarFocusedRight" in content
+    # Verifikasi D-Pad UP dan DOWN melewati timeBar
+    assert "timeBarUp.requestFocus()" in content
+    assert "timeBarDown.requestFocus()" in content
+
+
 def test_semantic_typography_dimens():
     """Memastikan file values/dimens.xml, values-television/dimens.xml, dan values-sw600dp-land/dimens.xml valid dan konsisten."""
     default_dimens = os.path.join(RES_DIR, "values", "dimens.xml")

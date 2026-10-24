@@ -75,14 +75,17 @@ public class TvFocusHelper {
                 MaterialButton btn = (MaterialButton) v;
                 btn.setStrokeColor(ColorStateList.valueOf(hasFocus ? COLOR_FOCUSED_STROKE : Color.parseColor("#33FFFFFF")));
                 btn.setBackgroundTintList(ColorStateList.valueOf(hasFocus ? Color.parseColor("#1E2B45") : Color.parseColor("#CC161B26")));
-            } else if (v instanceof ImageButton) {
-                ImageButton ib = (ImageButton) v;
-                if (ib.getId() == androidx.media3.ui.R.id.exo_play_pause
-                        || ib.getId() == androidx.media3.ui.R.id.exo_play
-                        || ib.getId() == androidx.media3.ui.R.id.exo_pause) {
-                    ib.setBackgroundResource(R.drawable.bg_exo_play_center);
+            } else if (v instanceof ImageButton
+                    || (v != null && (v.getId() == androidx.media3.ui.R.id.exo_rew
+                    || v.getId() == androidx.media3.ui.R.id.exo_rew_with_amount
+                    || v.getId() == androidx.media3.ui.R.id.exo_ffwd
+                    || v.getId() == androidx.media3.ui.R.id.exo_ffwd_with_amount))) {
+                if (v.getId() == androidx.media3.ui.R.id.exo_play_pause
+                        || v.getId() == androidx.media3.ui.R.id.exo_play
+                        || v.getId() == androidx.media3.ui.R.id.exo_pause) {
+                    v.setBackgroundResource(R.drawable.bg_exo_play_center);
                 } else {
-                    ib.setBackgroundResource(R.drawable.bg_exo_icon_btn);
+                    v.setBackgroundResource(R.drawable.bg_exo_icon_btn);
                 }
             } else if (v.getBackground() instanceof GradientDrawable) {
                 GradientDrawable gd = (GradientDrawable) v.getBackground().mutate();
