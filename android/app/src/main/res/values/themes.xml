@@ -8,5 +8,6 @@
         <item name="android:statusBarColor">#090A0F</item>
         <item name="android:navigationBarColor">#090A0F</item>
         <item name="android:windowBackground">#090A0F</item>
+        <item name="android:windowLayoutInDisplayCutoutMode">shortEdges</item>
     </style>
 </resources>

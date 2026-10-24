@@ -56,6 +56,8 @@ def test_android_exoplayer_layout_and_timebar_polish():
     assert '@drawable/bg_ripple_seek_right' in xml_text
     assert '@+id/layout_legacy_top_pills' in xml_text
     assert '@drawable/bg_exo_icon_btn' in xml_text
+    assert 'app:show_subtitle_button="true"' in xml_text
+    assert 'app:show_vr_button="true"' in xml_text
 
     java_text = PLAYER_JAVA.read_text(encoding="utf-8")
     assert "DefaultTimeBar" in java_text
@@ -68,6 +70,12 @@ def test_android_exoplayer_layout_and_timebar_polish():
     assert "navigateBottomBarHorizontal(" in java_text
     assert "Mode Picture-in-Picture (PiP)" in java_text
     assert "Sinkronisasi Waktu Subtitle (Offset:" in java_text
+    assert "enforceExoCustomButtons()" in java_text
+    assert "playerView.setShowSubtitleButton(true)" in java_text
+    assert "playerView.setShowVrButton(!TvFocusHelper.isTv(this) && isPipSupported())" in java_text
+    assert "LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS" in java_text
+    assert "window.setDecorFitsSystemWindows(false)" in java_text
+    assert "ScaleGestureDetector" in java_text
 
     tv_focus = TV_FOCUS_JAVA.read_text(encoding="utf-8")
     assert "btn.setBackgroundTintList" in tv_focus

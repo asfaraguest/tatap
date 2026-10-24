@@ -23,6 +23,8 @@
         app:show_timeout="3000"
         app:show_next_button="true"
         app:show_previous_button="true"
+        app:show_subtitle_button="true"
+        app:show_vr_button="true"
         app:resize_mode="fit"
         app:surface_type="surface_view" />
 

@@ -16,9 +16,11 @@ import android.view.GestureDetector;
 import android.view.HapticFeedbackConstants;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
+import android.view.ScaleGestureDetector;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
+import android.widget.ImageView;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -111,6 +113,7 @@ public class PlayerActivity extends Activity {
     private static final int PIP_ACTION_PLAY_PAUSE = 2;
     private static final int PIP_ACTION_FORWARD = 3;
     private GestureDetector gestureDetector;
+    private ScaleGestureDetector scaleGestureDetector;
     private AudioManager audioManager;
     private View hudOsd;
     private TextView tvOsdIcon, tvOsdVal, tvRippleLeft, tvRippleRight;
@@ -141,6 +144,7 @@ public class PlayerActivity extends Activity {
     private View btnExoPlayPause;
     private View btnExoRew;
     private View btnExoFfwd;
+    private View btnExoPip;
     private View btnExoSub;
     private View btnExoSettings;
     private View btnExoFullscreen;
@@ -451,7 +455,11 @@ public class PlayerActivity extends Activity {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                 WindowManager.LayoutParams lp = getWindow().getAttributes();
                 if (lp != null) {
-                    lp.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
+                    if (!TvFocusHelper.isTv(this) && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                        lp.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS;
+                    } else {
+                        lp.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
+                    }
                     getWindow().setAttributes(lp);
                 }
             }
@@ -462,6 +470,23 @@ public class PlayerActivity extends Activity {
         }
 
         setContentView(R.layout.activity_player);
+
+        if (!TvFocusHelper.isTv(this)) {
+            View playerRoot = findViewById(R.id.player_root);
+            if (playerRoot != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT_WATCH) {
+                playerRoot.setOnApplyWindowInsetsListener((v, insets) -> {
+                    boolean isLand = getResources().getConfiguration().orientation == Configuration.ORIENTATION_LANDSCAPE;
+                    if (isLand) {
+                        v.setPadding(0, 0, 0, 0);
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                            return android.view.WindowInsets.CONSUMED;
+                        }
+                        return insets.consumeSystemWindowInsets();
+                    }
+                    return v.onApplyWindowInsets(insets);
+                });
+            }
+        }
 
         slug = getIntent().getStringExtra("slug");
         String passedMode = getIntent().getStringExtra("mode");
@@ -733,15 +758,32 @@ public class PlayerActivity extends Activity {
             if (playerView == null) return;
             if (currentResizeMode == AspectRatioFrameLayout.RESIZE_MODE_FIT) {
                 currentResizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM;
-                Toast.makeText(this, "Mode Layar: ZOOM (Penuh)", Toast.LENGTH_SHORT).show();
+                applyResizeModeAndSave("ZOOM (Penuh Sampai Notch)");
             } else if (currentResizeMode == AspectRatioFrameLayout.RESIZE_MODE_ZOOM) {
                 currentResizeMode = AspectRatioFrameLayout.RESIZE_MODE_FILL;
-                Toast.makeText(this, "Mode Layar: FILL (Stretch)", Toast.LENGTH_SHORT).show();
+                applyResizeModeAndSave("FILL (Rentang Penuh Sampai Notch)");
             } else {
                 currentResizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT;
-                Toast.makeText(this, "Mode Layar: FIT (Skala Asli)", Toast.LENGTH_SHORT).show();
+                applyResizeModeAndSave("FIT (Skala Asli 16:9)");
+            }
+        } catch (Throwable ignored) {}
+    }
+
+    private void applyResizeModeAndSave(String toastLabel) {
+        try {
+            if (playerView == null) return;
+            if (toastLabel != null && !toastLabel.isEmpty()) {
+                Toast.makeText(this, "Mode Layar: " + toastLabel, Toast.LENGTH_SHORT).show();
             }
             playerView.setResizeMode(currentResizeMode);
+            View sv = playerView.getVideoSurfaceView();
+            if (sv != null) {
+                sv.requestLayout();
+            }
+            playerView.requestLayout();
+            if (!TvFocusHelper.isTv(this) && getResources().getConfiguration().orientation == Configuration.ORIENTATION_LANDSCAPE) {
+                hideSystemUi();
+            }
             getSharedPreferences("tatap_player_prefs", MODE_PRIVATE)
                     .edit().putInt("aspect_mode", currentResizeMode).apply();
             updateAspectButtonLabel();
@@ -773,24 +815,33 @@ public class PlayerActivity extends Activity {
             Window window = getWindow();
             if (window != null) {
                 window.addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    WindowManager.LayoutParams lp = window.getAttributes();
+                    if (lp != null) {
+                        lp.layoutInDisplayCutoutMode = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R
+                                ? WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
+                                : WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
+                        window.setAttributes(lp);
+                    }
+                }
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    window.setDecorFitsSystemWindows(false);
                     android.view.WindowInsetsController controller = window.getInsetsController();
                     if (controller != null) {
                         controller.hide(android.view.WindowInsets.Type.statusBars() | android.view.WindowInsets.Type.navigationBars());
                         controller.setSystemBarsBehavior(android.view.WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
                     }
-                } else {
-                    View decorView = window.getDecorView();
-                    if (decorView != null) {
-                        decorView.setSystemUiVisibility(
-                            View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
-                            | View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-                            | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-                            | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-                            | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-                            | View.SYSTEM_UI_FLAG_FULLSCREEN
-                        );
-                    }
+                }
+                View decorView = window.getDecorView();
+                if (decorView != null) {
+                    decorView.setSystemUiVisibility(
+                        View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                        | View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                        | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                        | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                        | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                        | View.SYSTEM_UI_FLAG_FULLSCREEN
+                    );
                 }
             }
         } catch (Throwable ignored) {}
@@ -802,6 +853,7 @@ public class PlayerActivity extends Activity {
             if (window != null) {
                 window.clearFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    window.setDecorFitsSystemWindows(true);
                     android.view.WindowInsetsController controller = window.getInsetsController();
                     if (controller != null) {
                         controller.show(android.view.WindowInsets.Type.statusBars() | android.view.WindowInsets.Type.navigationBars());
@@ -1103,6 +1155,8 @@ public class PlayerActivity extends Activity {
         playerView.setPlayer(forwardingPlayer);
         playerView.setShowNextButton(true);
         playerView.setShowPreviousButton(true);
+        playerView.setShowSubtitleButton(true);
+        playerView.setShowVrButton(!TvFocusHelper.isTv(this) && isPipSupported());
 
         // Hide default ExoPlayer subtitle view since we use seamless custom overlay
         SubtitleView subView = playerView.getSubtitleView();
@@ -1136,7 +1190,17 @@ public class PlayerActivity extends Activity {
 
         player.addListener(new Player.Listener() {
             @Override
+            public void onEvents(Player player, Player.Events events) {
+                // Pastikan tombol exo_subtitle (CC) di kedua platform & exo_vr (PiP) di Mobile
+                // tidak pernah dimatikan secara paksa oleh PlayerControlView.updateTrackLists() internal Media3
+                if (playerView != null) {
+                    playerView.post(PlayerActivity.this::enforceExoCustomButtons);
+                }
+            }
+
+            @Override
             public void onTracksChanged(androidx.media3.common.Tracks tracks) {
+                enforceExoCustomButtons();
                 // Saat manifest/tracks HLS baru selesai di-resolve pertama kali oleh ExoPlayer,
                 // kunci track selection HANYA SEKALI agar target (1080p dsb.) terikat ke TrackGroup yang valid.
                 // Proteksi boolean atomik mencegah loop rekursif pemanggilan setTrackSelectionParameters
@@ -1395,11 +1459,39 @@ public class PlayerActivity extends Activity {
             }
         });
 
+        if (!TvFocusHelper.isTv(this)) {
+            scaleGestureDetector = new ScaleGestureDetector(this, new ScaleGestureDetector.SimpleOnScaleGestureListener() {
+                @Override
+                public boolean onScale(ScaleGestureDetector detector) {
+                    if (isScreenLocked || TvFocusHelper.isTv(PlayerActivity.this) || playerView == null) return false;
+                    if (getResources().getConfiguration().orientation != Configuration.ORIENTATION_LANDSCAPE) return false;
+                    float factor = detector.getScaleFactor();
+                    if (factor > 1.08f && currentResizeMode != AspectRatioFrameLayout.RESIZE_MODE_ZOOM) {
+                        currentResizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM;
+                        applyResizeModeAndSave("Zoom (Penuh Sampai Notch)");
+                        performHapticClick();
+                        return true;
+                    } else if (factor < 0.92f && currentResizeMode != AspectRatioFrameLayout.RESIZE_MODE_FIT) {
+                        currentResizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT;
+                        applyResizeModeAndSave("Fit (Skala Asli 16:9)");
+                        performHapticClick();
+                        return true;
+                    }
+                    return false;
+                }
+            });
+        }
+
         playerView.setOnTouchListener((v, event) -> {
             if (isScreenLocked) {
                 if (event.getAction() == MotionEvent.ACTION_UP) {
                     showUnlockButtonBriefly();
                 }
+                return true;
+            }
+            if (!TvFocusHelper.isTv(PlayerActivity.this) && scaleGestureDetector != null && event.getPointerCount() > 1) {
+                scaleGestureDetector.onTouchEvent(event);
+                activeGestureZone = 0;
                 return true;
             }
             if (event.getAction() == MotionEvent.ACTION_DOWN) {
@@ -1612,7 +1704,7 @@ public class PlayerActivity extends Activity {
         if (current == null || current == playerView) return false;
         if (current == btnExoPrev || current == btnExoRew || current == btnExoPlayPause
                 || current == btnExoFfwd || current == btnExoNext || current == btnExoSub
-                || current == btnExoSettings || current == btnExoFullscreen) {
+                || current == btnExoPip || current == btnExoSettings || current == btnExoFullscreen) {
             return true;
         }
         return exoBottomBar != null && isChildOf(current, exoBottomBar);
@@ -1623,7 +1715,7 @@ public class PlayerActivity extends Activity {
         List<View> buttons = new ArrayList<>();
         View[] candidates = new View[]{
                 btnExoPrev, btnExoRew, btnExoPlayPause, btnExoFfwd,
-                btnExoNext, btnExoSub, btnExoSettings, btnExoFullscreen
+                btnExoNext, btnExoSub, btnExoPip, btnExoSettings, btnExoFullscreen
         };
         for (View v : candidates) {
             if (v != null && v.getVisibility() == View.VISIBLE && v.isEnabled()) {
@@ -1756,6 +1848,18 @@ public class PlayerActivity extends Activity {
                         }
                         if (focused == btnExoPrev || (btnExoPrev != null && focused.getId() == androidx.media3.ui.R.id.exo_prev)) {
                             playPrevEpisode();
+                            return true;
+                        }
+                        if (focused == btnExoSub || (btnExoSub != null && focused.getId() == androidx.media3.ui.R.id.exo_subtitle)) {
+                            showSubtitleSelectorDialog();
+                            return true;
+                        }
+                        if (focused == btnExoSettings || (btnExoSettings != null && focused.getId() == androidx.media3.ui.R.id.exo_settings)) {
+                            showPlayerUnifiedSettingsDialog();
+                            return true;
+                        }
+                        if (focused == btnExoFullscreen || (btnExoFullscreen != null && focused.getId() == androidx.media3.ui.R.id.exo_fullscreen)) {
+                            cycleAspectRatio();
                             return true;
                         }
                         if (playerView != null && isChildOf(focused, playerView) && focused.isClickable()) {
@@ -4744,13 +4848,19 @@ public class PlayerActivity extends Activity {
         if (btnExoSub == null) {
             btnExoSub = playerView.findViewById(androidx.media3.ui.R.id.exo_subtitle);
             if (btnExoSub != null) {
-                btnExoSub.setVisibility(View.VISIBLE);
                 btnExoSub.setBackgroundResource(R.drawable.bg_exo_icon_btn);
-                btnExoSub.setOnClickListener(v -> {
-                    HapticHelper.performClick(v);
-                    showSubtitleSelectorDialog();
-                });
                 TvFocusHelper.attachFocusScale(btnExoSub, 1.15f, 6f);
+            }
+        }
+        if (btnExoPip == null) {
+            btnExoPip = playerView.findViewById(androidx.media3.ui.R.id.exo_vr);
+            if (btnExoPip != null) {
+                btnExoPip.setBackgroundResource(R.drawable.bg_exo_icon_btn);
+                if (btnExoPip instanceof ImageView) {
+                    ((ImageView) btnExoPip).setImageResource(R.drawable.ic_pip);
+                }
+                btnExoPip.setContentDescription("Picture-in-Picture (PiP)");
+                TvFocusHelper.attachFocusScale(btnExoPip, 1.15f, 6f);
             }
         }
         if (btnExoSettings == null) {
@@ -4777,7 +4887,7 @@ public class PlayerActivity extends Activity {
                     } else {
                         int orient = getResources().getConfiguration().orientation;
                         if (orient == Configuration.ORIENTATION_LANDSCAPE) {
-                            exitLandscapeFullscreen();
+                            cycleAspectRatio();
                         } else {
                             setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
                         }
@@ -4785,19 +4895,71 @@ public class PlayerActivity extends Activity {
                 });
                 btnExoFullscreen.setOnLongClickListener(v -> {
                     HapticHelper.performClick(v);
-                    cycleAspectRatio();
+                    if (!TvFocusHelper.isTv(this) && getResources().getConfiguration().orientation == Configuration.ORIENTATION_LANDSCAPE) {
+                        exitLandscapeFullscreen();
+                    } else {
+                        cycleAspectRatio();
+                    }
                     return true;
                 });
                 TvFocusHelper.attachFocusScale(btnExoFullscreen, 1.15f, 6f);
             }
         }
+        enforceExoCustomButtons();
         setupBottomBarFocusChain();
+    }
+
+    private void enforceExoCustomButtons() {
+        // Tombol CC (exo_subtitle) wajib selalu aktif dan dapat ditekan di kedua platform (Android Mobile & Android TV)
+        if (btnExoSub != null) {
+            btnExoSub.setVisibility(View.VISIBLE);
+            btnExoSub.setEnabled(true);
+            btnExoSub.setClickable(true);
+            btnExoSub.setFocusable(true);
+            btnExoSub.setAlpha(subEnabled ? 1.0f : 0.55f);
+            if (btnExoSub instanceof ImageView) {
+                ((ImageView) btnExoSub).setColorFilter(subEnabled ? 0xFF38BDF8 : 0xFFFFFFFF);
+            }
+            btnExoSub.setOnClickListener(v -> {
+                HapticHelper.performClick(v);
+                showSubtitleSelectorDialog();
+            });
+        }
+        // Tombol bawaan ExoPlayer PiP (exo_vr) diisolasi hanya untuk Android Mobile
+        if (btnExoPip != null) {
+            boolean showPip = !TvFocusHelper.isTv(this) && isPipSupported();
+            btnExoPip.setVisibility(showPip ? View.VISIBLE : View.GONE);
+            btnExoPip.setEnabled(showPip);
+            btnExoPip.setClickable(showPip);
+            btnExoPip.setFocusable(showPip);
+            if (showPip) {
+                if (btnExoPip instanceof ImageView) {
+                    ((ImageView) btnExoPip).setImageResource(R.drawable.ic_pip);
+                }
+                btnExoPip.setOnClickListener(v -> {
+                    HapticHelper.performClick(v);
+                    enterPipMode();
+                });
+            }
+        }
+        if (btnExoSettings != null) {
+            btnExoSettings.setVisibility(View.VISIBLE);
+            btnExoSettings.setEnabled(true);
+            btnExoSettings.setClickable(true);
+            btnExoSettings.setFocusable(true);
+        }
+        if (btnExoFullscreen != null) {
+            btnExoFullscreen.setVisibility(View.VISIBLE);
+            btnExoFullscreen.setEnabled(true);
+            btnExoFullscreen.setClickable(true);
+            btnExoFullscreen.setFocusable(true);
+        }
     }
 
     private void setupBottomBarFocusChain() {
         View[] candidates = new View[]{
                 btnExoPrev, btnExoRew, btnExoPlayPause, btnExoFfwd,
-                btnExoNext, btnExoSub, btnExoSettings, btnExoFullscreen
+                btnExoNext, btnExoSub, btnExoPip, btnExoSettings, btnExoFullscreen
         };
         List<View> active = new ArrayList<>();
         for (View v : candidates) {
@@ -4832,6 +4994,7 @@ public class PlayerActivity extends Activity {
     private void updateExoButtonStates() {
         runOnUiThread(() -> {
             bindExoControlButtons();
+            enforceExoCustomButtons();
             boolean hasNext = hasNextEpisode();
             boolean hasPrev = hasPrevEpisode();
             boolean isTv = TvFocusHelper.isTv(this);
@@ -4850,9 +5013,6 @@ public class PlayerActivity extends Activity {
                 btnExoPrev.setEnabled(enablePrev);
                 btnExoPrev.setFocusable(enablePrev);
                 btnExoPrev.setAlpha(enablePrev ? 1.0f : 0.25f);
-            }
-            if (btnExoSub != null) {
-                btnExoSub.setAlpha(subEnabled ? 1.0f : 0.45f);
             }
             if (btnSubSelector != null) {
                 btnSubSelector.setAlpha(subEnabled ? 1.0f : 0.6f);
