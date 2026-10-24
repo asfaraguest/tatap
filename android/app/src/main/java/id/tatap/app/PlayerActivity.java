@@ -220,6 +220,7 @@ public class PlayerActivity extends Activity {
     private View btnScreenLock;
     private View btnScreenUnlock;
     private boolean isScreenLocked = false;
+    private boolean isNavigatingToSubDialog = false;
     private final Runnable hideUnlockButtonRunnable = () -> {
         if (btnScreenUnlock != null && isScreenLocked) {
             btnScreenUnlock.animate()
@@ -756,12 +757,13 @@ public class PlayerActivity extends Activity {
     private void cycleAspectRatio() {
         try {
             if (playerView == null) return;
+            boolean isTv = TvFocusHelper.isTv(this);
             if (currentResizeMode == AspectRatioFrameLayout.RESIZE_MODE_FIT) {
                 currentResizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM;
-                applyResizeModeAndSave("ZOOM (Penuh Sampai Notch)");
+                applyResizeModeAndSave(isTv ? "ZOOM (Pangkas Skala Layar Lebar)" : "ZOOM (Penuh Sampai Notch)");
             } else if (currentResizeMode == AspectRatioFrameLayout.RESIZE_MODE_ZOOM) {
                 currentResizeMode = AspectRatioFrameLayout.RESIZE_MODE_FILL;
-                applyResizeModeAndSave("FILL (Rentang Penuh Sampai Notch)");
+                applyResizeModeAndSave(isTv ? "FILL (Regang Penuh)" : "FILL (Rentang Penuh Sampai Notch)");
             } else {
                 currentResizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT;
                 applyResizeModeAndSave("FIT (Skala Asli 16:9)");
@@ -1789,9 +1791,17 @@ public class PlayerActivity extends Activity {
             }
 
             boolean isTopBarActive = (layoutTopBar != null && layoutTopBar.getVisibility() == View.VISIBLE);
-            if (isTopBarActive) {
+            boolean isControllerActive = (playerView != null && playerView.isControllerFullyVisible()) || isBottomBarFocused();
+
+            if (isTopBarActive || isControllerActive) {
                 if (event.getAction() == KeyEvent.ACTION_UP) {
-                    hideTopBar();
+                    if (isTopBarActive) {
+                        hideTopBar();
+                    }
+                    if (playerView != null) {
+                        playerView.hideController();
+                        playerView.requestFocus();
+                    }
                 }
                 return true;
             }
@@ -3326,7 +3336,7 @@ public class PlayerActivity extends Activity {
                 }
             }
         });
-        builder.show();
+        TvFocusHelper.applyDialogTvFocus(builder.show());
     }
 
     private void applyPlaybackSpeed(float speed) {
@@ -3402,7 +3412,7 @@ public class PlayerActivity extends Activity {
                 }
             }
         });
-        builder.show();
+        TvFocusHelper.applyDialogTvFocus(builder.show());
     }
 
     private void switchQuality(String newQ, String newUrl) {
@@ -3704,6 +3714,9 @@ public class PlayerActivity extends Activity {
         builder.setItems(options.toArray(new String[0]), (dialog, which) -> {
             if (which >= 0 && which < actions.size()) {
                 String chosen = options.get(which);
+                if (chosen.contains("[+]") || chosen.contains("[Sync]") || chosen.contains("Pengaturan Tampilan")) {
+                    isNavigatingToSubDialog = true;
+                }
                 actions.get(which).run();
                 if (!chosen.contains("[Refresh]") && !chosen.contains("[+]") && !chosen.contains("[Sync]") && !chosen.contains("Pengaturan Tampilan")) {
                     getSharedPreferences("tatap_player_prefs", MODE_PRIVATE).edit()
@@ -3719,6 +3732,10 @@ public class PlayerActivity extends Activity {
 
         builder.setNegativeButton("Tutup", (dialog, which) -> dialog.dismiss());
         builder.setOnDismissListener(dialog -> {
+            if (isNavigatingToSubDialog) {
+                isNavigatingToSubDialog = false;
+                return;
+            }
             if (playerView != null) {
                 playerView.showController();
                 if (btnSubSelector != null && btnSubSelector.isShown()) {
@@ -3728,7 +3745,7 @@ public class PlayerActivity extends Activity {
                 }
             }
         });
-        builder.show();
+        TvFocusHelper.applyDialogTvFocus(builder.show());
     }
 
     private void openSubtitleFilePicker() {
@@ -3931,7 +3948,7 @@ public class PlayerActivity extends Activity {
                             }
                         }
                     });
-                    b.show();
+                    TvFocusHelper.applyDialogTvFocus(b.show());
                 });
             } catch (Exception e) {
                 runOnUiThread(() -> Toast.makeText(this, "Gagal mencari subtitle: " + e.getMessage(), Toast.LENGTH_LONG).show());
@@ -4026,6 +4043,7 @@ public class PlayerActivity extends Activity {
         });
         b.setNegativeButton("Batal", (dialog, which) -> dialog.dismiss());
         AlertDialog dialog = b.create();
+        TvFocusHelper.applyDialogTvFocus(dialog);
         dialog.show();
     }
 
@@ -4239,6 +4257,9 @@ public class PlayerActivity extends Activity {
         };
 
         builder.setItems(menu, (dialog, which) -> {
+            if (which < 5) {
+                isNavigatingToSubDialog = true;
+            }
             if (which == 0) {
                 showPositionPicker(sp);
             } else if (which == 1) {
@@ -4261,6 +4282,10 @@ public class PlayerActivity extends Activity {
 
         builder.setNegativeButton("Tutup", (dialog, which) -> dialog.dismiss());
         builder.setOnDismissListener(dialog -> {
+            if (isNavigatingToSubDialog) {
+                isNavigatingToSubDialog = false;
+                return;
+            }
             if (playerView != null) {
                 playerView.showController();
                 if (btnSubStyle != null && btnSubStyle.isShown()) {
@@ -4270,7 +4295,7 @@ public class PlayerActivity extends Activity {
                 }
             }
         });
-        builder.show();
+        TvFocusHelper.applyDialogTvFocus(builder.show());
     }
 
     private void showPositionPicker(SharedPreferences sp) {
@@ -4282,7 +4307,7 @@ public class PlayerActivity extends Activity {
         String cur = sp.getString("sub_pos", "low");
         int checked = "high".equals(cur) ? 2 : ("mid".equals(cur) ? 1 : 0);
 
-        new AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+        TvFocusHelper.applyDialogTvFocus(new AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
                 .setTitle("Pilih Posisi Subtitle")
                 .setSingleChoiceItems(options, checked, (dialog, which) -> {
                     String val = which == 2 ? "high" : (which == 1 ? "mid" : "low");
@@ -4292,7 +4317,7 @@ public class PlayerActivity extends Activity {
                     Toast.makeText(this, "Posisi subtitle disimpan", Toast.LENGTH_SHORT).show();
                 })
                 .setNegativeButton("Batal", null)
-                .show();
+                .show());
     }
 
     private void showSubtitleOffsetPicker() {
@@ -4317,7 +4342,7 @@ public class PlayerActivity extends Activity {
                 break;
             }
         }
-        new AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+        TvFocusHelper.applyDialogTvFocus(new AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
                 .setTitle("Sinkronisasi Waktu Subtitle (Offset)")
                 .setSingleChoiceItems(options, checked, (dialog, which) -> {
                     if (which >= 0 && which < offsetValuesMs.length) {
@@ -4330,7 +4355,7 @@ public class PlayerActivity extends Activity {
                     dialog.dismiss();
                 })
                 .setNegativeButton("Batal", null)
-                .show();
+                .show());
     }
 
     private void showBackgroundPicker(SharedPreferences sp) {
@@ -4343,7 +4368,7 @@ public class PlayerActivity extends Activity {
         String cur = sp.getString("sub_bg", "subtle");
         int checked = "transparent".equals(cur) ? 0 : ("medium".equals(cur) ? 2 : ("dark".equals(cur) ? 3 : 1));
 
-        new AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+        TvFocusHelper.applyDialogTvFocus(new AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
                 .setTitle("Pilih Latar Belakang Subtitle")
                 .setSingleChoiceItems(options, checked, (dialog, which) -> {
                     String val = which == 0 ? "transparent" : (which == 2 ? "medium" : (which == 3 ? "dark" : "subtle"));
@@ -4353,7 +4378,7 @@ public class PlayerActivity extends Activity {
                     Toast.makeText(this, "Gaya latar subtitle disimpan", Toast.LENGTH_SHORT).show();
                 })
                 .setNegativeButton("Batal", null)
-                .show();
+                .show());
     }
 
     private void showSizePicker(SharedPreferences sp) {
@@ -4398,7 +4423,7 @@ public class PlayerActivity extends Activity {
         }
 
         final String[] finalValues = values;
-        new AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+        TvFocusHelper.applyDialogTvFocus(new AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
                 .setTitle("Pilih Ukuran Huruf Subtitle")
                 .setSingleChoiceItems(options, checked, (dialog, which) -> {
                     String val = (which >= 0 && which < finalValues.length) ? finalValues[which] : defaultSize;
@@ -4408,7 +4433,7 @@ public class PlayerActivity extends Activity {
                     Toast.makeText(this, "Ukuran subtitle disimpan", Toast.LENGTH_SHORT).show();
                 })
                 .setNegativeButton("Batal", null)
-                .show();
+                .show());
     }
 
     private void showWrapPicker(SharedPreferences sp) {
@@ -4420,7 +4445,7 @@ public class PlayerActivity extends Activity {
         String cur = sp.getString("sub_wrap", "compact");
         int checked = "wide".equals(cur) ? 2 : ("medium".equals(cur) ? 1 : 0);
 
-        new AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+        TvFocusHelper.applyDialogTvFocus(new AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
                 .setTitle("Pilih Lebar / Tumpukan Subtitle")
                 .setSingleChoiceItems(options, checked, (dialog, which) -> {
                     String val = which == 2 ? "wide" : (which == 1 ? "medium" : "compact");
@@ -4430,7 +4455,7 @@ public class PlayerActivity extends Activity {
                     Toast.makeText(this, "Format tumpukan subtitle disimpan", Toast.LENGTH_SHORT).show();
                 })
                 .setNegativeButton("Batal", null)
-                .show();
+                .show());
     }
 
     @Override
@@ -4873,6 +4898,7 @@ public class PlayerActivity extends Activity {
         });
 
         AlertDialog dialog = builder.create();
+        TvFocusHelper.applyDialogTvFocus(dialog);
         dialog.show();
 
         if (TvFocusHelper.isTv(this)) {
@@ -5245,12 +5271,22 @@ public class PlayerActivity extends Activity {
         String[] menuArray = menuList.toArray(new String[0]);
         builder.setItems(menuArray, (dialog, which) -> {
             if (which >= 0 && which < actionList.size()) {
+                String chosen = menuList.get(which);
+                if (chosen.contains("Pilihan Kualitas") || chosen.contains("Kecepatan Putar")
+                        || chosen.contains("Pilihan Subtitle") || chosen.contains("Pengaturan Tampilan")
+                        || chosen.contains("Sinkronisasi Waktu")) {
+                    isNavigatingToSubDialog = true;
+                }
                 actionList.get(which).run();
             }
         });
 
         builder.setNegativeButton("Tutup", (dialog, which) -> dialog.dismiss());
         builder.setOnDismissListener(dialog -> {
+            if (isNavigatingToSubDialog) {
+                isNavigatingToSubDialog = false;
+                return;
+            }
             if (playerView != null) {
                 playerView.showController();
                 if (btnExoSettings != null && btnExoSettings.getVisibility() == View.VISIBLE) {
@@ -5262,7 +5298,7 @@ public class PlayerActivity extends Activity {
                 }
             }
         });
-        builder.show();
+        TvFocusHelper.applyDialogTvFocus(builder.show());
     }
 
     private String getAspectLabel() {

@@ -166,3 +166,13 @@ def test_tv_catalog_pagination_dpad_navigation_and_isolation():
     assert "btnNextPage.setFocusable(canNext);" in activity_java
     assert "btnPrevPage.setFocusable(currentPage > 1);" in activity_java
 
+
+def test_desktop_player_key_typing_isolation():
+    """Memastikan hotkey player di Desktop tidak mengintersepsi saat mengetik di input field."""
+    app_js = APP_JS.read_text(encoding="utf-8")
+    assert "function onKeyPlayer(e){" in app_js
+    assert 'var typing=t==="INPUT"||t==="SELECT"||t==="TEXTAREA"||(e.target&&e.target.isContentEditable);' in app_js
+    assert 'if(typing){' in app_js
+    assert 'if(e.key==="Escape"){e.target.blur();}' in app_js
+    assert 'return;' in app_js
+

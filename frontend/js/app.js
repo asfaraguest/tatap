@@ -3119,8 +3119,11 @@ function handleTitleModalKey(e){
 
 function onKeyPlayer(e){
   var t=(e.target.tagName||"");
-  var typing=t==="INPUT"||t==="SELECT"||t==="TEXTAREA";
-  if(typing&&e.key==="Escape"){e.target.blur();return;}
+  var typing=t==="INPUT"||t==="SELECT"||t==="TEXTAREA"||(e.target&&e.target.isContentEditable);
+  if(typing){
+    if(e.key==="Escape"){e.target.blur();}
+    return;
+  }
   var v=$("vid");
   if(e.key==="Escape"){
     var fsEl=document.fullscreenElement||document.webkitFullscreenElement||document.mozFullScreenElement||document.msFullscreenElement;

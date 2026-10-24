@@ -1,7 +1,9 @@
 package id.tatap.app;
 
+import android.app.AlertDialog;
 import android.app.UiModeManager;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.pm.PackageManager;
 import android.content.res.ColorStateList;
 import android.content.res.Configuration;
@@ -13,7 +15,9 @@ import android.graphics.Paint;
 import android.graphics.drawable.Drawable;
 import android.text.style.ImageSpan;
 import android.view.View;
+import android.widget.Button;
 import android.widget.ImageButton;
+import android.widget.ListView;
 
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.card.MaterialCardView;
@@ -93,6 +97,53 @@ public class TvFocusHelper {
 
     public static void attachCardFocus(final MaterialCardView card) {
         attachFocusScale(card, 1.04f, 0f);
+    }
+
+    /**
+     * Menerapkan fokus otomatis kursor remote D-Pad pada AlertDialog di Android TV (10-Foot UI).
+     * Memastikan ListView dialog atau tombol aksi utama langsung mendapatkan fokus,
+     * mencegah kursor D-Pad tersangkut di view latar belakang player.
+     */
+    public static AlertDialog applyDialogTvFocus(AlertDialog dialog) {
+        if (dialog == null) return null;
+        Context context = dialog.getContext();
+        if (!isTv(context)) return dialog;
+
+        Runnable focusAction = () -> {
+            ListView lv = dialog.getListView();
+            if (lv != null) {
+                lv.setFocusable(true);
+                lv.setFocusableInTouchMode(false);
+                lv.requestFocus();
+                if (lv.getAdapter() != null && lv.getAdapter().getCount() > 0) {
+                    lv.setSelection(0);
+                }
+            } else {
+                Button btn = dialog.getButton(DialogInterface.BUTTON_POSITIVE);
+                if (btn != null && btn.getVisibility() == View.VISIBLE) {
+                    btn.setFocusable(true);
+                    btn.requestFocus();
+                } else {
+                    Button btnNeg = dialog.getButton(DialogInterface.BUTTON_NEGATIVE);
+                    if (btnNeg != null && btnNeg.getVisibility() == View.VISIBLE) {
+                        btnNeg.setFocusable(true);
+                        btnNeg.requestFocus();
+                    }
+                }
+            }
+        };
+
+        if (dialog.isShowing()) {
+            android.view.Window w = dialog.getWindow();
+            if (w != null && w.getDecorView() != null) {
+                w.getDecorView().post(focusAction);
+            } else {
+                focusAction.run();
+            }
+        } else {
+            dialog.setOnShowListener(di -> focusAction.run());
+        }
+        return dialog;
     }
 
     /**

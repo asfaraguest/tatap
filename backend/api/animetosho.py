@@ -101,6 +101,23 @@ def search_animetosho_indonesian(title: str, slug: str = "", ep: int = 1, season
     ep = max(1, int(ep or 1))
     season = max(1, int(season or 1))
 
+    if season <= 1:
+        # Ekstrak nomor season dari title atau slug jika ada indikasi Season 2+
+        combined_text = f"{title or ''} {slug or ''}"
+        m_s = re.search(r"\b(?:season\s*(\d+)|\b(\d+)(?:nd|rd|th|st)\s*season|part\s*(\d+)|cour\s*(\d+)|s(\d+))\b", combined_text, flags=re.I)
+        if m_s:
+            for g in m_s.groups():
+                if g and g.isdigit() and int(g) > 1:
+                    season = int(g)
+                    break
+        elif re.search(r"\b(?:season\s*iv|season\s*iii|season\s*ii)\b", combined_text, flags=re.I):
+            if re.search(r"\bseason\s*iv\b", combined_text, flags=re.I):
+                season = 4
+            elif re.search(r"\bseason\s*iii\b", combined_text, flags=re.I):
+                season = 3
+            elif re.search(r"\bseason\s*ii\b", combined_text, flags=re.I):
+                season = 2
+
     primary_title = clean_titles[0]
     cache_key = f"{primary_title.lower()}|s{season}|e{ep}|id"
     cached = _AT_SEARCH_CACHE.get(cache_key)
@@ -110,9 +127,14 @@ def search_animetosho_indonesian(title: str, slug: str = "", ep: int = 1, season
     # Bangun beberapa pola kueri pencarian AnimeTosho
     queries = []
     for c_title in clean_titles:
-        queries.append(f"{c_title} S{season:02d}E{ep:02d}")
-        queries.append(f"{c_title} {ep:02d}")
-        queries.append(f"{c_title} E{ep:02d}")
+        if season > 1:
+            queries.append(f"{c_title} S{season:02d}E{ep:02d}")
+            queries.append(f"{c_title} Season {season} {ep:02d}")
+            queries.append(f"{c_title} S{season} {ep:02d}")
+        else:
+            queries.append(f"{c_title} S{season:02d}E{ep:02d}")
+            queries.append(f"{c_title} {ep:02d}")
+            queries.append(f"{c_title} E{ep:02d}")
 
     results = []
     seen_urls = set()

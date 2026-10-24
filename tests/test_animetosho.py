@@ -100,3 +100,17 @@ Kau pikir kamu bisa mengalahkanku dengan armor itu?
     vtt_out = build_vtt(merged)
     assert "Kerajaan Eternal" in vtt_out
     assert "Satisfy" in vtt_out
+
+
+def test_search_animetosho_season_extraction(monkeypatch):
+    captured_queries = []
+
+    def mock_http_get_raw(url, **kwargs):
+        captured_queries.append(url)
+        return b"[]"
+
+    from api import animetosho
+    monkeypatch.setattr(animetosho, "_http_get_raw", mock_http_get_raw)
+
+    search_animetosho_indonesian("Solo Leveling Season 2", "solo-leveling-season-2", ep=3, season=1)
+    assert any("S02E03" in q for q in captured_queries)

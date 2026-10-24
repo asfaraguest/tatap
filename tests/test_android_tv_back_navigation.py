@@ -13,9 +13,15 @@ def test_player_activity_consumes_back_key_on_tv():
 
     # KEYCODE_BACK handling in dispatchKeyEvent
     assert "if (keyCode == KeyEvent.KEYCODE_BACK)" in content
+    assert "boolean isControllerActive = (playerView != null && playerView.isControllerFullyVisible()) || isBottomBarFocused();" in content
+    assert "if (isTopBarActive || isControllerActive)" in content
+    assert "playerView.hideController();" in content
     assert "if (TvFocusHelper.isTv(this))" in content
     assert "if (event.getAction() == KeyEvent.ACTION_UP)" in content
     assert "handleBackAction();" in content
+
+    # Dialog TV D-Pad Focus Utility Integration
+    assert "TvFocusHelper.applyDialogTvFocus" in content
 
     # Fallback reconstruction guard when isTaskRoot() is true on TV
     assert "if (TvFocusHelper.isTv(this) && isTaskRoot() && slug != null && !slug.isEmpty())" in content

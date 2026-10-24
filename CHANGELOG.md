@@ -61,6 +61,16 @@ Kenaikan digit PATCH diterapkan sesuai kaidah Semantic Versioning 2.0.0 dan Dire
    - **Kapsul HUD Gesture & Lengkungan Double-Tap Seek (`bg_player_hud_pill.xml`, `bg_ripple_seek_left.xml`, `bg_ripple_seek_right.xml`):** Memperbarui tampilan pill `hud_osd` dan `hud_hold_speed` (`2X Cepat` / `Rewind`) serta mengganti indikator *double-tap seek* `-5s`/`+5s` menjadi lengkungan semi-oval lembut beranimasi fade-in/out.
    - **Harmonisasi Panel Bawah Mode Portrait Mobile (`layout_portrait_bottom`):** Menyeragamkan palet warna panel daftar episode portrait dengan permukaan **Apple Dark (`@color/bg_root`, `@color/bg_surface`, `@color/bg_surface_elevated`)** serta tombol aksi cepat berbentuk kapsul (`cornerRadius="16dp"`).
 
+### Fixed
+1. **Navigasi D-Pad & Tombol Back Android TV (`TvFocusHelper.java`, `PlayerActivity.java`):**
+   - **Dismiss Kontrol Player via Tombol Back di TV:** Menekan tombol `BACK` di remote TV saat bilah scrubber kontrol atau bottom bar aktif kini menyembunyikan kontrol player terlebih dahulu (tanpa menutup video atau keluar dari activity), menyajikan perilaku standar aplikasi TV 10-foot modern.
+   - **Focus Stealing & D-Pad Focus Otomatis pada Dialog TV (`applyDialogTvFocus`):** Seluruh dialog pengaturan pemutar (subtitle selector, search open subtitles, unified settings, speed, quality, custom sub url, style pickers) otomatis mengarahkan kursor D-Pad ke item list pertama, serta meniadakan *focus stealing* ke bilah player di latar belakang saat membuka sub-dialog.
+   - **Label Aspek Rasio Layar TV:** Menyesuaikan label toast aspek rasio di TV menjadi `"ZOOM (Pangkas Skala Layar Lebar)"`, `"FILL (Regang Penuh)"`, dan `"FIT (Skala Asli 16:9)"` tanpa embel-embel "Notch" ponsel.
+2. **Ekstraksi Season Otomatis pada AnimeTosho (`backend/api/animetosho.py`, `android/app/src/main/python/backend/api/animetosho.py`):**
+   - Menambahkan deteksi nomor season otomatis dari judul/slug pada query AnimeTosho sehingga anime seperti *Solo Leveling Season 2* atau *Sousou no Frieren S2* dicari dengan parameter yang tepat (`S02E...`) alih-alih keliru sebagai season 1.
+3. **Isolasi Hotkey Player Desktop saat Mengetik (`frontend/js/app.js`):**
+   - Mengisolasi fungsi `onKeyPlayer(e)` agar tombol spasi, `f`, `s`, atau `m` tidak memicu aksi pemutar video ketika pengguna sedang fokus mengetik di elemen `<input>`, `<textarea>`, `<select>`, atau `contentEditable`.
+
 ### Tests
 - Menambahkan suite pengujian otomatis `tests/test_player_visual_polish.py` untuk memverifikasi keabsahan XML drawable baru, kustomisasi `DefaultTimeBar`, serta aturan estetika CSS & layout ExoPlayer.
 - Menambahkan suite pengujian otomatis `tests/test_opensubtitles_and_pip.py` untuk memvalidasi de-chunking/gzip DoH TLS desync, pembersihan metadata judul/musim OpenSubtitles, eliminasi watermark/iklan, algoritma scoring kandidat subtitle, estimasi offset optimal cross-correlation histogram, penggabungan smart merge (hybrid & bilingual), serta audit proteksi siklus hidup PiP Android.
