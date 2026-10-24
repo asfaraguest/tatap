@@ -13,8 +13,8 @@
   </p>
 
   <p>
-    <a href="https://github.com/asfaraguest/tatap/releases/latest/download/tatap-release-v2.12.2.apk"><img src="https://img.shields.io/badge/Download-Android%20Mobile-3DDC84?style=for-the-badge&logo=android&logoColor=white" alt="Android Mobile APK"></a>
-    <a href="https://github.com/asfaraguest/tatap/releases/latest/download/tatap-tv-release-v2.12.2.apk"><img src="https://img.shields.io/badge/Download-Android%20TV-0081C9?style=for-the-badge&logo=android&logoColor=white" alt="Android TV APK"></a>
+    <a href="https://github.com/asfaraguest/tatap/releases/latest/download/tatap-release-v2.12.3.apk"><img src="https://img.shields.io/badge/Download-Android%20Mobile-3DDC84?style=for-the-badge&logo=android&logoColor=white" alt="Android Mobile APK"></a>
+    <a href="https://github.com/asfaraguest/tatap/releases/latest/download/tatap-tv-release-v2.12.3.apk"><img src="https://img.shields.io/badge/Download-Android%20TV-0081C9?style=for-the-badge&logo=android&logoColor=white" alt="Android TV APK"></a>
     <a href="https://github.com/asfaraguest/tatap/releases/latest/download/tatap-windows-x64-portable.zip"><img src="https://img.shields.io/badge/Download-Windows%20x64-0078D6?style=for-the-badge&logo=windows&logoColor=white" alt="Windows Portable"></a>
     <a href="https://github.com/asfaraguest/tatap/releases/latest/download/Tatap-x86_64.AppImage"><img src="https://img.shields.io/badge/Download-Linux%20AppImage-FCC624?style=for-the-badge&logo=linux&logoColor=black" alt="Linux AppImage"></a>
   </p>
@@ -69,8 +69,8 @@ Pilih paket instalasi resmi sesuai perangkat Anda:
 
 | Platform Perangkat | Tombol Unduh Langsung | Format Berkas | Keterangan & Kompatibilitas |
 | :--- | :---: | :---: | :--- |
-| **Android Ponsel / Tablet** | [![Unduh Android APK](https://img.shields.io/badge/Download-Android%20APK-3DDC84?style=for-the-badge&logo=android&logoColor=white)](https://github.com/asfaraguest/tatap/releases/latest/download/tatap-release-v2.12.2.apk) | `.apk` (~35 MB) | Signed Production APK (Android 7.0 s/d 16, Watch Portrait View & Adaptive Icons) |
-| **Android TV / Google TV** | [![Unduh Android TV APK](https://img.shields.io/badge/Download-Android%20TV%20APK-0081C9?style=for-the-badge&logo=android&logoColor=white)](https://github.com/asfaraguest/tatap/releases/latest/download/tatap-tv-release-v2.12.2.apk) | `.apk` (~35 MB) | Signed Production APK khusus TV (Leanback 10-foot UI & Remote D-pad) |
+| **Android Ponsel / Tablet** | [![Unduh Android APK](https://img.shields.io/badge/Download-Android%20APK-3DDC84?style=for-the-badge&logo=android&logoColor=white)](https://github.com/asfaraguest/tatap/releases/latest/download/tatap-release-v2.12.3.apk) | `.apk` (~35 MB) | Signed Production APK (Android 7.0 s/d 16, Watch Portrait View & Adaptive Icons) |
+| **Android TV / Google TV** | [![Unduh Android TV APK](https://img.shields.io/badge/Download-Android%20TV%20APK-0081C9?style=for-the-badge&logo=android&logoColor=white)](https://github.com/asfaraguest/tatap/releases/latest/download/tatap-tv-release-v2.12.3.apk) | `.apk` (~35 MB) | Signed Production APK khusus TV (Leanback 10-foot UI & Remote D-pad) |
 | **Windows (x64)** | [![Unduh Windows Portable](https://img.shields.io/badge/Download-Windows%20Portable-0078D6?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/asfaraguest/tatap/releases/latest/download/tatap-windows-x64-portable.zip) | `.zip` (~26 MB) | Standalone Portable (Ekstrak zip & jalankan `Tatap.exe`) |
 | **Linux (x86_64)** | [![Unduh Linux AppImage](https://img.shields.io/badge/Download-Linux%20AppImage-FCC624?style=for-the-badge&logo=linux&logoColor=black)](https://github.com/asfaraguest/tatap/releases/latest/download/Tatap-x86_64.AppImage) | `.AppImage` (~58 MB) | Standalone AppImage (Berikan izin `chmod +x` lalu jalankan) |
 
