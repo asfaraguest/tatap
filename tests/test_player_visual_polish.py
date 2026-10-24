@@ -23,33 +23,53 @@ def test_web_desktop_player_cinema_polish():
 
 def test_android_player_drawables_valid_xml():
     """Pastikan drawable baru untuk ExoPlayer Android TV & Mobile valid dan terstruktur dengan benar."""
-    expected_drawables = [
+    shape_drawables = [
         "bg_player_top_scrim.xml",
+        "bg_player_bottom_scrim.xml",
         "bg_player_hud_pill.xml",
         "bg_ripple_seek_left.xml",
         "bg_ripple_seek_right.xml",
     ]
-    for name in expected_drawables:
+    for name in shape_drawables:
         path = DRAWABLE_DIR / name
         assert path.exists(), f"Drawable {name} tidak ditemukan"
         tree = ET.parse(path)
         assert tree.getroot().tag == "shape"
 
+    selector_drawables = [
+        "bg_exo_icon_btn.xml",
+        "bg_exo_play_center.xml",
+    ]
+    for name in selector_drawables:
+        path = DRAWABLE_DIR / name
+        assert path.exists(), f"Drawable {name} tidak ditemukan"
+        tree = ET.parse(path)
+        assert tree.getroot().tag == "selector"
+
 
 def test_android_exoplayer_layout_and_timebar_polish():
-    """Pastikan activity_player.xml dan PlayerActivity.java menerapkan scrim header, kapsul 18dp, dan warna DefaultTimeBar."""
+    """Pastikan activity_player.xml dan PlayerActivity.java menyatukan fungsi top pill ke ExoPlayer bottom bar & mendukung D-Pad TV."""
     xml_text = PLAYER_XML.read_text(encoding="utf-8")
     assert '@drawable/bg_player_top_scrim' in xml_text
     assert '@drawable/bg_player_hud_pill' in xml_text
     assert '@drawable/bg_ripple_seek_left' in xml_text
     assert '@drawable/bg_ripple_seek_right' in xml_text
-    assert 'app:cornerRadius="18dp"' in xml_text
-    assert 'app:cornerRadius="16dp"' in xml_text
+    assert '@+id/layout_legacy_top_pills' in xml_text
+    assert '@drawable/bg_exo_icon_btn' in xml_text
 
     java_text = PLAYER_JAVA.read_text(encoding="utf-8")
     assert "DefaultTimeBar" in java_text
     assert "dtb.setPlayedColor(0xFF38BDF8)" in java_text
     assert "dtb.setScrubberColor(0xFF38BDF8)" in java_text
+    assert "R.drawable.bg_player_bottom_scrim" in java_text
+    assert "R.drawable.bg_exo_play_center" in java_text
+    assert "R.drawable.bg_exo_icon_btn" in java_text
+    assert "setupBottomBarFocusChain()" in java_text
+    assert "navigateBottomBarHorizontal(" in java_text
+    assert "Mode Picture-in-Picture (PiP)" in java_text
+    assert "Sinkronisasi Waktu Subtitle (Offset:" in java_text
 
     tv_focus = TV_FOCUS_JAVA.read_text(encoding="utf-8")
     assert "btn.setBackgroundTintList" in tv_focus
+    assert "R.drawable.bg_exo_play_center" in tv_focus
+    assert "R.drawable.bg_exo_icon_btn" in tv_focus

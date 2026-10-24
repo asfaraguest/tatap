@@ -73,7 +73,13 @@ public class TvFocusHelper {
                 btn.setBackgroundTintList(ColorStateList.valueOf(hasFocus ? Color.parseColor("#1E2B45") : Color.parseColor("#CC161B26")));
             } else if (v instanceof ImageButton) {
                 ImageButton ib = (ImageButton) v;
-                ib.setBackgroundColor(hasFocus ? Color.parseColor("#3338BDF8") : Color.TRANSPARENT);
+                if (ib.getId() == androidx.media3.ui.R.id.exo_play_pause
+                        || ib.getId() == androidx.media3.ui.R.id.exo_play
+                        || ib.getId() == androidx.media3.ui.R.id.exo_pause) {
+                    ib.setBackgroundResource(R.drawable.bg_exo_play_center);
+                } else {
+                    ib.setBackgroundResource(R.drawable.bg_exo_icon_btn);
+                }
             } else if (v.getBackground() instanceof GradientDrawable) {
                 GradientDrawable gd = (GradientDrawable) v.getBackground().mutate();
                 if (hasFocus) {

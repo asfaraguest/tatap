@@ -138,9 +138,13 @@ public class PlayerActivity extends Activity {
     private boolean isEpisodeListLoading = false;
     private View btnExoNext;
     private View btnExoPrev;
+    private View btnExoPlayPause;
+    private View btnExoRew;
+    private View btnExoFfwd;
     private View btnExoSub;
     private View btnExoSettings;
     private View btnExoFullscreen;
+    private View exoBottomBar;
     private Button btnAspect;
     private Button btnQuality;
     private Button btnSpeed;
@@ -741,6 +745,7 @@ public class PlayerActivity extends Activity {
             getSharedPreferences("tatap_player_prefs", MODE_PRIVATE)
                     .edit().putInt("aspect_mode", currentResizeMode).apply();
             updateAspectButtonLabel();
+            updateSubStatusText(true);
         } catch (Throwable ignored) {}
     }
 
@@ -1015,13 +1020,15 @@ public class PlayerActivity extends Activity {
             private boolean isNextAllowed() {
                 boolean isTv = TvFocusHelper.isTv(PlayerActivity.this);
                 boolean isPaused = (player != null && !player.isPlaying());
-                return hasNextEpisode() && (!isTv || isPaused);
+                boolean isCtrlVisible = (playerView != null && playerView.isControllerFullyVisible());
+                return hasNextEpisode() && (!isTv || isPaused || isCtrlVisible);
             }
 
             private boolean isPrevAllowed() {
                 boolean isTv = TvFocusHelper.isTv(PlayerActivity.this);
                 boolean isPaused = (player != null && !player.isPlaying());
-                return hasPrevEpisode() && (!isTv || isPaused);
+                boolean isCtrlVisible = (playerView != null && playerView.isControllerFullyVisible());
+                return hasPrevEpisode() && (!isTv || isPaused || isCtrlVisible);
             }
 
             @Override
@@ -1600,6 +1607,69 @@ public class PlayerActivity extends Activity {
         return false;
     }
 
+    private boolean isBottomBarFocused() {
+        View current = getCurrentFocus();
+        if (current == null || current == playerView) return false;
+        if (current == btnExoPrev || current == btnExoRew || current == btnExoPlayPause
+                || current == btnExoFfwd || current == btnExoNext || current == btnExoSub
+                || current == btnExoSettings || current == btnExoFullscreen) {
+            return true;
+        }
+        return exoBottomBar != null && isChildOf(current, exoBottomBar);
+    }
+
+    private List<View> getActiveBottomBarButtons() {
+        bindExoControlButtons();
+        List<View> buttons = new ArrayList<>();
+        View[] candidates = new View[]{
+                btnExoPrev, btnExoRew, btnExoPlayPause, btnExoFfwd,
+                btnExoNext, btnExoSub, btnExoSettings, btnExoFullscreen
+        };
+        for (View v : candidates) {
+            if (v != null && v.getVisibility() == View.VISIBLE && v.isEnabled()) {
+                buttons.add(v);
+            }
+        }
+        return buttons;
+    }
+
+    private boolean navigateBottomBarHorizontal(boolean moveRight, boolean isSkipVisible) {
+        if (playerView != null) {
+            playerView.showController();
+        }
+        showTopBarBriefly();
+        updateExoButtonStates();
+        List<View> buttons = getActiveBottomBarButtons();
+        if (buttons.isEmpty()) return false;
+
+        View currentFocused = getCurrentFocus();
+        if (currentFocused == btnSkipOpEd && !moveRight) {
+            View last = buttons.get(buttons.size() - 1);
+            last.requestFocus();
+            return true;
+        }
+        int idx = buttons.indexOf(currentFocused);
+        if (idx >= 0) {
+            int nextIdx = moveRight ? (idx + 1) : (idx - 1);
+            if (nextIdx >= 0 && nextIdx < buttons.size()) {
+                buttons.get(nextIdx).requestFocus();
+                return true;
+            }
+            if (moveRight && isSkipVisible && btnSkipOpEd != null) {
+                btnSkipOpEd.requestFocus();
+                return true;
+            }
+            return true; // Tahan fokus di ujung bar tanpa lompat tak terduga
+        }
+        // Jika belum ada tombol di bottom bar yang terfokus, arahkan ke Play/Pause atau tombol terdekat
+        if (btnExoPlayPause != null && buttons.contains(btnExoPlayPause)) {
+            btnExoPlayPause.requestFocus();
+            return true;
+        }
+        buttons.get(0).requestFocus();
+        return true;
+    }
+
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
         int keyCode = event.getKeyCode();
@@ -1787,40 +1857,22 @@ public class PlayerActivity extends Activity {
 
                 case KeyEvent.KEYCODE_DPAD_LEFT:
                     if (isSkipFocused && playerView != null) {
+                        if (TvFocusHelper.isTv(this)) {
+                            return navigateBottomBarHorizontal(false, isSkipVisible);
+                        }
                         playerView.requestFocus();
                     }
                     boolean isTvLeft = TvFocusHelper.isTv(this);
                     boolean isPlayingLeft = (player != null && player.isPlaying());
-                    if (isTvLeft && !isPlayingLeft) {
-                        // Di Android TV saat video ter-pause: D-Pad Kiri mengarahkan ke Prev Episode atau Play
+                    boolean isCtrlLeft = (playerView != null && playerView.isControllerFullyVisible()) || isBottomBarFocused();
+                    if ((isTvLeft && !isPlayingLeft) || (isTvLeft && isCtrlLeft)) {
+                        // Di Android TV saat video ter-pause atau control bar bawah aktif:
+                        // D-Pad Kiri melangkah mulus antar seluruh tombol ExoPlayer bottom bar
                         if (hasFocusOnTopBar) {
                             showTopBarBriefly();
-                            break; // Biarkan navigasi horizontal antar tombol header di top bar
+                            break;
                         }
-                        if (playerView != null) {
-                            playerView.showController();
-                        }
-                        View currentFocused = getCurrentFocus();
-                        if (currentFocused == btnSkipOpEd && btnExoNext != null && btnExoNext.isEnabled()) {
-                            btnExoNext.requestFocus();
-                            return true;
-                        }
-                        if (currentFocused == btnExoNext) {
-                            View playBtn = playerView != null ? playerView.findViewById(androidx.media3.ui.R.id.exo_play_pause) : null;
-                            if (playBtn == null && playerView != null) playBtn = playerView.findViewById(androidx.media3.ui.R.id.exo_play);
-                            if (playBtn != null && playBtn.getVisibility() == View.VISIBLE) {
-                                playBtn.requestFocus();
-                                return true;
-                            }
-                        }
-                        if (btnExoPrev != null && btnExoPrev.isEnabled() && currentFocused != btnExoPrev) {
-                            btnExoPrev.requestFocus();
-                            return true;
-                        }
-                        View playBtn = playerView != null ? playerView.findViewById(androidx.media3.ui.R.id.exo_play_pause) : null;
-                        if (playBtn == null && playerView != null) playBtn = playerView.findViewById(androidx.media3.ui.R.id.exo_play);
-                        if (playBtn != null && playBtn.getVisibility() == View.VISIBLE) {
-                            playBtn.requestFocus();
+                        if (navigateBottomBarHorizontal(false, isSkipVisible)) {
                             return true;
                         }
                         break;
@@ -1846,34 +1898,15 @@ public class PlayerActivity extends Activity {
                     }
                     boolean isTvRight = TvFocusHelper.isTv(this);
                     boolean isPlayingRight = (player != null && player.isPlaying());
-                    if (isTvRight && !isPlayingRight) {
-                        // Di Android TV saat video ter-pause: D-Pad Kanan mengarahkan ke Next Episode atau Skip Op/Ed
+                    boolean isCtrlRight = (playerView != null && playerView.isControllerFullyVisible()) || isBottomBarFocused();
+                    if ((isTvRight && !isPlayingRight) || (isTvRight && isCtrlRight)) {
+                        // Di Android TV saat video ter-pause atau control bar bawah aktif:
+                        // D-Pad Kanan melangkah mulus antar seluruh tombol ExoPlayer bottom bar (Prev -> Rew -> Play -> Ffwd -> Next -> Sub -> Settings -> Aspect)
                         if (hasFocusOnTopBar) {
                             showTopBarBriefly();
-                            break; // Biarkan navigasi horizontal antar tombol header di top bar
+                            break;
                         }
-                        if (playerView != null) {
-                            playerView.showController();
-                        }
-                        View currentFocused = getCurrentFocus();
-                        if (currentFocused == btnExoPrev) {
-                            View playBtn = playerView != null ? playerView.findViewById(androidx.media3.ui.R.id.exo_play_pause) : null;
-                            if (playBtn == null && playerView != null) playBtn = playerView.findViewById(androidx.media3.ui.R.id.exo_play);
-                            if (playBtn != null && playBtn.getVisibility() == View.VISIBLE) {
-                                playBtn.requestFocus();
-                                return true;
-                            }
-                        }
-                        if (isSkipVisible && currentFocused == btnExoNext) {
-                            btnSkipOpEd.requestFocus();
-                            return true;
-                        }
-                        if (btnExoNext != null && btnExoNext.isEnabled() && currentFocused != btnExoNext) {
-                            btnExoNext.requestFocus();
-                            return true;
-                        }
-                        if (isSkipVisible && currentFocused != btnSkipOpEd) {
-                            btnSkipOpEd.requestFocus();
+                        if (navigateBottomBarHorizontal(true, isSkipVisible)) {
                             return true;
                         }
                         break;
@@ -1901,14 +1934,28 @@ public class PlayerActivity extends Activity {
                 case KeyEvent.KEYCODE_DPAD_UP:
                     if (TvFocusHelper.isTv(this)) {
                         showTopBarBriefly();
-                        if (btnSubSelector != null && btnSubSelector.getVisibility() == View.VISIBLE) {
+                        if (playerView != null) {
+                            playerView.showController();
+                        }
+                        updateExoButtonStates();
+                        if (isBottomBarFocused()) {
+                            if (isSkipVisible && btnSkipOpEd != null) {
+                                btnSkipOpEd.requestFocus();
+                                return true;
+                            }
+                            if (btnPlayerBack != null && btnPlayerBack.getVisibility() == View.VISIBLE) {
+                                btnPlayerBack.requestFocus();
+                                return true;
+                            }
+                        }
+                        if (btnSubSelector != null && btnSubSelector.isShown()) {
                             btnSubSelector.requestFocus();
                             return true;
-                        } else if (btnQuality != null && btnQuality.getVisibility() == View.VISIBLE) {
-                            btnQuality.requestFocus();
+                        } else if (btnExoSub != null && btnExoSub.getVisibility() == View.VISIBLE) {
+                            btnExoSub.requestFocus();
                             return true;
-                        } else if (btnAspect != null && btnAspect.getVisibility() == View.VISIBLE) {
-                            btnAspect.requestFocus();
+                        } else if (btnExoSettings != null && btnExoSettings.getVisibility() == View.VISIBLE) {
+                            btnExoSettings.requestFocus();
                             return true;
                         } else if (btnPlayerBack != null) {
                             btnPlayerBack.requestFocus();
@@ -1917,15 +1964,17 @@ public class PlayerActivity extends Activity {
                     }
                     if (isSkipFocused) {
                         showTopBarBriefly();
-                        if (btnSubSelector != null && btnSubSelector.getVisibility() == View.VISIBLE) {
+                        if (btnSubSelector != null && btnSubSelector.isShown()) {
                             btnSubSelector.requestFocus();
+                        } else if (btnPlayerBack != null && btnPlayerBack.getVisibility() == View.VISIBLE) {
+                            btnPlayerBack.requestFocus();
                         } else if (playerView != null) {
                             playerView.requestFocus();
                         }
                         return true;
                     }
                     showTopBarBriefly();
-                    if (btnSubSelector != null && btnSubSelector.getVisibility() == View.VISIBLE) {
+                    if (btnSubSelector != null && btnSubSelector.isShown()) {
                         btnSubSelector.requestFocus();
                         return true;
                     }
@@ -1936,17 +1985,24 @@ public class PlayerActivity extends Activity {
 
                 case KeyEvent.KEYCODE_DPAD_DOWN:
                     if (TvFocusHelper.isTv(this)) {
-                        if (isTopBarActive) {
-                            hideTopBar();
-                        }
+                        showTopBarBriefly();
                         if (playerView != null) {
                             playerView.showController();
                         }
-                        if (isSkipVisible && !isSkipFocused) {
+                        updateExoButtonStates();
+                        if (isSkipVisible && !isSkipFocused && !isBottomBarFocused()) {
                             btnSkipOpEd.requestFocus();
                             boolean inIntro = (introEndMs > introStartMs && player != null
                                     && player.getCurrentPosition() >= introStartMs && player.getCurrentPosition() < introEndMs);
                             updateSkipButtonLabel(inIntro);
+                            return true;
+                        }
+                        if (btnExoPlayPause != null && btnExoPlayPause.getVisibility() == View.VISIBLE) {
+                            btnExoPlayPause.requestFocus();
+                            return true;
+                        }
+                        if (btnExoSub != null && btnExoSub.getVisibility() == View.VISIBLE) {
+                            btnExoSub.requestFocus();
                             return true;
                         }
                         if (btnExoNext != null && btnExoNext.isEnabled() && btnExoNext.getVisibility() == View.VISIBLE) {
@@ -2948,7 +3004,10 @@ public class PlayerActivity extends Activity {
             offsetSuffix = String.format(java.util.Locale.US, " (%+.2fs)", sec).replaceAll("0+s\\)", "s)").replace(".s)", ".0s)");
         }
         String suffix = isLoaded ? "" : " [Memuat...]";
-        tvSubStatus.setText("Sub: " + activeSubLang.toUpperCase() + " • " + engineLabel + offsetSuffix + suffix);
+        String qBadge = (activeQuality != null && !activeQuality.isEmpty()) ? activeQuality.toUpperCase() : "HD";
+        String spdBadge = formatSpeedLabel(currentPlaybackSpeed);
+        String aspectBadge = (currentResizeMode != AspectRatioFrameLayout.RESIZE_MODE_FIT) ? (" • " + getAspectLabel()) : "";
+        tvSubStatus.setText("Sub: " + activeSubLang.toUpperCase() + " • " + engineLabel + offsetSuffix + suffix + "  |  " + qBadge + " • " + spdBadge + aspectBadge);
     }
 
     private static String cleanSubtitleText(String raw) {
@@ -3149,7 +3208,7 @@ public class PlayerActivity extends Activity {
         builder.setOnDismissListener(dialog -> {
             if (playerView != null) {
                 playerView.showController();
-                if (btnSpeed != null && btnSpeed.getVisibility() == View.VISIBLE) {
+                if (btnSpeed != null && btnSpeed.isShown()) {
                     btnSpeed.requestFocus();
                 } else if (btnExoSettings != null && btnExoSettings.getVisibility() == View.VISIBLE) {
                     btnExoSettings.requestFocus();
@@ -3167,6 +3226,7 @@ public class PlayerActivity extends Activity {
             } catch (Throwable ignored) {}
         }
         updateSpeedButtonLabel();
+        updateSubStatusText(true);
         Toast.makeText(this, "Kecepatan: " + formatSpeedLabel(speed), Toast.LENGTH_SHORT).show();
     }
 
@@ -3224,7 +3284,7 @@ public class PlayerActivity extends Activity {
         builder.setOnDismissListener(dialog -> {
             if (playerView != null) {
                 playerView.showController();
-                if (btnQuality != null && btnQuality.getVisibility() == View.VISIBLE) {
+                if (btnQuality != null && btnQuality.isShown()) {
                     btnQuality.requestFocus();
                 } else if (btnExoSettings != null && btnExoSettings.getVisibility() == View.VISIBLE) {
                     btnExoSettings.requestFocus();
@@ -3245,6 +3305,7 @@ public class PlayerActivity extends Activity {
         }
         getSharedPreferences("tatap_player_prefs", Context.MODE_PRIVATE)
                 .edit().putString("pref_quality", newQ).apply();
+        updateSubStatusText(true);
 
         hasFallbackAttempted = false;
         Toast.makeText(this, "Mengubah resolusi ke " + newQ.toUpperCase(), Toast.LENGTH_SHORT).show();
@@ -3565,7 +3626,7 @@ public class PlayerActivity extends Activity {
         builder.setOnDismissListener(dialog -> {
             if (playerView != null) {
                 playerView.showController();
-                if (btnSubSelector != null && btnSubSelector.getVisibility() == View.VISIBLE) {
+                if (btnSubSelector != null && btnSubSelector.isShown()) {
                     btnSubSelector.requestFocus();
                 } else if (btnExoSub != null && btnExoSub.getVisibility() == View.VISIBLE) {
                     btnExoSub.requestFocus();
@@ -3965,7 +4026,7 @@ public class PlayerActivity extends Activity {
         builder.setOnDismissListener(dialog -> {
             if (playerView != null) {
                 playerView.showController();
-                if (btnSubStyle != null && btnSubStyle.getVisibility() == View.VISIBLE) {
+                if (btnSubStyle != null && btnSubStyle.isShown()) {
                     btnSubStyle.requestFocus();
                 } else if (btnExoSettings != null && btnExoSettings.getVisibility() == View.VISIBLE) {
                     btnExoSettings.requestFocus();
@@ -4574,6 +4635,30 @@ public class PlayerActivity extends Activity {
     private void bindExoControlButtons() {
         if (playerView == null) return;
 
+        View controlsBg = playerView.findViewById(androidx.media3.ui.R.id.exo_controls_background);
+        if (controlsBg != null) {
+            controlsBg.setBackgroundColor(Color.TRANSPARENT);
+        }
+        if (exoBottomBar == null) {
+            exoBottomBar = playerView.findViewById(androidx.media3.ui.R.id.exo_bottom_bar);
+        }
+        if (exoBottomBar != null) {
+            exoBottomBar.setBackgroundResource(R.drawable.bg_player_bottom_scrim);
+        }
+
+        View posView = playerView.findViewById(androidx.media3.ui.R.id.exo_position);
+        if (posView instanceof TextView) {
+            TextView tvPos = (TextView) posView;
+            tvPos.setTextColor(0xFFF5F5F7);
+            tvPos.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+        }
+        View durView = playerView.findViewById(androidx.media3.ui.R.id.exo_duration);
+        if (durView instanceof TextView) {
+            TextView tvDur = (TextView) durView;
+            tvDur.setTextColor(0xFFA1A1A6);
+            tvDur.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+        }
+
         androidx.media3.ui.TimeBar timeBar = playerView.findViewById(androidx.media3.ui.R.id.exo_progress);
         if (timeBar instanceof androidx.media3.ui.DefaultTimeBar) {
             androidx.media3.ui.DefaultTimeBar dtb = (androidx.media3.ui.DefaultTimeBar) timeBar;
@@ -4610,9 +4695,34 @@ public class PlayerActivity extends Activity {
             });
         }
 
+        if (btnExoPlayPause == null) {
+            btnExoPlayPause = playerView.findViewById(androidx.media3.ui.R.id.exo_play_pause);
+            if (btnExoPlayPause == null) {
+                btnExoPlayPause = playerView.findViewById(androidx.media3.ui.R.id.exo_play);
+            }
+            if (btnExoPlayPause != null) {
+                btnExoPlayPause.setBackgroundResource(R.drawable.bg_exo_play_center);
+                TvFocusHelper.attachFocusScale(btnExoPlayPause, 1.15f, 6f);
+            }
+        }
+        if (btnExoRew == null) {
+            btnExoRew = playerView.findViewById(androidx.media3.ui.R.id.exo_rew);
+            if (btnExoRew != null) {
+                btnExoRew.setBackgroundResource(R.drawable.bg_exo_icon_btn);
+                TvFocusHelper.attachFocusScale(btnExoRew, 1.15f, 6f);
+            }
+        }
+        if (btnExoFfwd == null) {
+            btnExoFfwd = playerView.findViewById(androidx.media3.ui.R.id.exo_ffwd);
+            if (btnExoFfwd != null) {
+                btnExoFfwd.setBackgroundResource(R.drawable.bg_exo_icon_btn);
+                TvFocusHelper.attachFocusScale(btnExoFfwd, 1.15f, 6f);
+            }
+        }
         if (btnExoNext == null) {
             btnExoNext = playerView.findViewById(androidx.media3.ui.R.id.exo_next);
             if (btnExoNext != null) {
+                btnExoNext.setBackgroundResource(R.drawable.bg_exo_icon_btn);
                 btnExoNext.setOnClickListener(v -> {
                     HapticHelper.performClick(v);
                     playNextEpisode();
@@ -4623,6 +4733,7 @@ public class PlayerActivity extends Activity {
         if (btnExoPrev == null) {
             btnExoPrev = playerView.findViewById(androidx.media3.ui.R.id.exo_prev);
             if (btnExoPrev != null) {
+                btnExoPrev.setBackgroundResource(R.drawable.bg_exo_icon_btn);
                 btnExoPrev.setOnClickListener(v -> {
                     HapticHelper.performClick(v);
                     playPrevEpisode();
@@ -4634,6 +4745,7 @@ public class PlayerActivity extends Activity {
             btnExoSub = playerView.findViewById(androidx.media3.ui.R.id.exo_subtitle);
             if (btnExoSub != null) {
                 btnExoSub.setVisibility(View.VISIBLE);
+                btnExoSub.setBackgroundResource(R.drawable.bg_exo_icon_btn);
                 btnExoSub.setOnClickListener(v -> {
                     HapticHelper.performClick(v);
                     showSubtitleSelectorDialog();
@@ -4645,6 +4757,7 @@ public class PlayerActivity extends Activity {
             btnExoSettings = playerView.findViewById(androidx.media3.ui.R.id.exo_settings);
             if (btnExoSettings != null) {
                 btnExoSettings.setVisibility(View.VISIBLE);
+                btnExoSettings.setBackgroundResource(R.drawable.bg_exo_icon_btn);
                 btnExoSettings.setOnClickListener(v -> {
                     HapticHelper.performClick(v);
                     showPlayerUnifiedSettingsDialog();
@@ -4656,6 +4769,7 @@ public class PlayerActivity extends Activity {
             btnExoFullscreen = playerView.findViewById(androidx.media3.ui.R.id.exo_fullscreen);
             if (btnExoFullscreen != null) {
                 btnExoFullscreen.setVisibility(View.VISIBLE);
+                btnExoFullscreen.setBackgroundResource(R.drawable.bg_exo_icon_btn);
                 btnExoFullscreen.setOnClickListener(v -> {
                     HapticHelper.performClick(v);
                     if (TvFocusHelper.isTv(this)) {
@@ -4669,8 +4783,49 @@ public class PlayerActivity extends Activity {
                         }
                     }
                 });
+                btnExoFullscreen.setOnLongClickListener(v -> {
+                    HapticHelper.performClick(v);
+                    cycleAspectRatio();
+                    return true;
+                });
                 TvFocusHelper.attachFocusScale(btnExoFullscreen, 1.15f, 6f);
             }
+        }
+        setupBottomBarFocusChain();
+    }
+
+    private void setupBottomBarFocusChain() {
+        View[] candidates = new View[]{
+                btnExoPrev, btnExoRew, btnExoPlayPause, btnExoFfwd,
+                btnExoNext, btnExoSub, btnExoSettings, btnExoFullscreen
+        };
+        List<View> active = new ArrayList<>();
+        for (View v : candidates) {
+            if (v != null && v.getVisibility() == View.VISIBLE && v.isEnabled()) {
+                active.add(v);
+            }
+        }
+        int upId = (btnSkipOpEd != null && btnSkipOpEd.getVisibility() == View.VISIBLE)
+                ? R.id.btn_skip_op_ed
+                : R.id.btn_player_back;
+        for (int i = 0; i < active.size(); i++) {
+            View cur = active.get(i);
+            cur.setNextFocusUpId(upId);
+            if (i > 0) {
+                View prev = active.get(i - 1);
+                if (prev.getId() != View.NO_ID) {
+                    cur.setNextFocusLeftId(prev.getId());
+                }
+            }
+            if (i < active.size() - 1) {
+                View next = active.get(i + 1);
+                if (next.getId() != View.NO_ID) {
+                    cur.setNextFocusRightId(next.getId());
+                }
+            }
+        }
+        if (btnPlayerBack != null && btnExoPlayPause != null && btnExoPlayPause.getId() != View.NO_ID) {
+            btnPlayerBack.setNextFocusDownId(btnExoPlayPause.getId());
         }
     }
 
@@ -4681,9 +4836,10 @@ public class PlayerActivity extends Activity {
             boolean hasPrev = hasPrevEpisode();
             boolean isTv = TvFocusHelper.isTv(this);
             boolean isPaused = (player != null && !player.isPlaying());
+            boolean isCtrlVisible = (playerView != null && playerView.isControllerFullyVisible());
 
-            boolean enableNext = hasNext && (!isTv || isPaused);
-            boolean enablePrev = hasPrev && (!isTv || isPaused);
+            boolean enableNext = hasNext && (!isTv || isPaused || isCtrlVisible);
+            boolean enablePrev = hasPrev && (!isTv || isPaused || isCtrlVisible);
 
             if (btnExoNext != null) {
                 btnExoNext.setEnabled(enableNext);
@@ -4710,6 +4866,7 @@ public class PlayerActivity extends Activity {
                     btnPortraitSub.setText("Sub: " + langLbl);
                 }
             }
+            setupBottomBarFocusChain();
         });
     }
 
@@ -4723,6 +4880,7 @@ public class PlayerActivity extends Activity {
         String qLabel = activeQuality != null && !activeQuality.isEmpty() ? activeQuality.toUpperCase() : "AUTO";
         String subLabel = !subEnabled ? "Mati" : (activeSubLang.toUpperCase() + " [" + activeEngine + "]");
         String autoSkipLabel = autoSkip ? "Aktif" : "Mati";
+        String offsetLabel = subtitleOffsetMs == 0L ? "0.0s (Normal)" : String.format(java.util.Locale.US, "%+.2fs", subtitleOffsetMs / 1000.0).replaceAll("0+s$", "s").replace(".s", ".0s");
 
         List<String> menuList = new ArrayList<>();
         List<Runnable> actionList = new ArrayList<>();
@@ -4738,20 +4896,28 @@ public class PlayerActivity extends Activity {
             }
         }
 
+        menuList.add("Pilihan Kualitas Video (" + qLabel + ")");
+        actionList.add(this::showQualitySelectorDialog);
+
         menuList.add("Kecepatan Putar Video (" + spdLabel + ")");
         actionList.add(this::showSpeedSelectorDialog);
 
         menuList.add("Pilihan Subtitle & Terjemahan (" + subLabel + ")");
         actionList.add(this::showSubtitleSelectorDialog);
 
-        menuList.add("Pilihan Kualitas Video (" + qLabel + ")");
-        actionList.add(this::showQualitySelectorDialog);
-
         menuList.add("Pengaturan Tampilan & Gaya Subtitle");
         actionList.add(this::showSubtitleStyleDialog);
 
+        menuList.add("Sinkronisasi Waktu Subtitle (Offset: " + offsetLabel + ")");
+        actionList.add(this::showSubtitleOffsetPicker);
+
         menuList.add("Skala Layar / Rasio Aspek (" + getAspectLabel() + ")");
         actionList.add(this::cycleAspectRatio);
+
+        if (isPipSupported()) {
+            menuList.add("Mode Picture-in-Picture (PiP)");
+            actionList.add(this::enterPipMode);
+        }
 
         menuList.add("Otomatis Lewati Opening & Ending (" + autoSkipLabel + ")");
         actionList.add(() -> {
@@ -4774,9 +4940,9 @@ public class PlayerActivity extends Activity {
                 playerView.showController();
                 if (btnExoSettings != null && btnExoSettings.getVisibility() == View.VISIBLE) {
                     btnExoSettings.requestFocus();
-                } else if (btnSpeed != null && btnSpeed.getVisibility() == View.VISIBLE) {
+                } else if (btnSpeed != null && btnSpeed.isShown()) {
                     btnSpeed.requestFocus();
-                } else if (btnQuality != null && btnQuality.getVisibility() == View.VISIBLE) {
+                } else if (btnQuality != null && btnQuality.isShown()) {
                     btnQuality.requestFocus();
                 }
             }
