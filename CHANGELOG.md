@@ -37,6 +37,10 @@ Kenaikan digit PATCH diterapkan sesuai kaidah Semantic Versioning 2.0.0 dan Dire
    - **Android Player (`PlayerActivity.java`):** Menyertakan parameter `&title=` pada permintaan `/api/episode` dan `/api/stream/resolve` (termasuk prefetch tetangga) agar backend dapat langsung mencocokkan `mal_id` tanpa menebak dari slug.
    - **Web UI (`api.js`, `app.js`):** Mengirimkan parameter `title` pada `window.Tatap.resolve` saat memutar episode.
 
+5. **Normalisasi Apostrof Slug dan Validasi Token Overlap Judul Anime (`backend/api/anilist.py`, `backend/main.py`, Paritas Chaquopy):**
+   - **Normalisasi Apostrof `-s-`:** Menangani slug dengan bentuk kepemilikan bahasa Inggris (seperti `the-world-s-strongest-witch`) agar dinormalisasi menjadi `the world's strongest witch` sebelum dikirim ke query AniList GraphQL, mencegah kegagalan pencarian judul anime terbaru.
+   - **Validasi Ketat Kesamaan Token (`_match_title_tokens`):** Mencegah pencocokan salah (*false positive*) pada fallback pemendekan kata dengan mewajibkan rasio overlap token minimal 50%, sehingga anime baru tidak lagi salah dipetakan ke judul lawas yang tidak relevan.
+
 ### Tests
 - Menambahkan test suite `test_aniskip_query_episode_length_v2_spec`, `test_aniskip_mal_id_in_memory_cache`, dan `test_resolve_mal_id_and_stream_skip_injection` pada `tests/test_skip_times.py` untuk menguji kepatuhan schema AniSkip v2, cache dua arah judul-ke-MAL, dan injeksi otomatis OP/ED pada endpoint stream.
 

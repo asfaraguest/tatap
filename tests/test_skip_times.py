@@ -213,6 +213,7 @@ async def test_resolve_mal_id_and_stream_skip_injection(monkeypatch):
             }
         return {"intro": {"start": 0, "end": 0}, "outro": {"start": 0, "end": 0}}
 
+    monkeypatch.setattr(main.aniskip, "get_skip_times", mock_get_skip)
     monkeypatch.setattr(aniskip, "get_skip_times", mock_get_skip)
 
     # Mock hi resolver
@@ -236,3 +237,20 @@ async def test_resolve_mal_id_and_stream_skip_injection(monkeypatch):
     assert data["mal_id"] == "57334"
     assert data["intro"]["end"] == 92.65
     assert data["outro"]["start"] == 1348.45
+
+
+@pytest.mark.asyncio
+async def test_apostrophe_normalization_and_token_overlap():
+    """Slug kepemilikan Inggris seperti -s- harus dinormalisasi menjadi 's dan mencocokkan token."""
+    from backend import main
+    from backend.api import anilist
+
+    # Test token overlap helper
+    assert anilist._match_title_tokens("The World's Strongest Witch", "The World's Strongest Witch") is True
+    assert anilist._match_title_tokens("The World's Strongest Witch", "The World's Most Famous Tales") is False
+
+    # Test apostrophe normalization in main._resolve_mal_id
+    aniskip.store_mal_id("the world's strongest witch", "64084")
+    resolved = await main._resolve_mal_id("the-world-s-strongest-witch-10525", title="")
+    assert resolved == "64084"
+

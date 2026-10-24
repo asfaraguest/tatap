@@ -1554,7 +1554,9 @@ async def _resolve_mal_id(slug: str, title: str = "", anilist_id: str = "") -> s
         cs = clean_slug
         cs = re.sub(r"-\d+$", "", cs)
         cs = re.sub(r"-(sub-indo|episode-\d+|batch|complete)", "", cs, flags=re.I)
+        cs = re.sub(r"-s-(?=[a-z])", "'s-", cs)
         search_q = cs.replace("-", " ").strip()
+        search_q = re.sub(r"\b(\w+)\s+s\b", r"\1's", search_q)
 
     if search_q:
         try:

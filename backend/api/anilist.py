@@ -522,12 +522,28 @@ def search_anime_metadata(search_query: str, per_page: int = 12) -> list:
         return []
 
 
+def _match_title_tokens(target_q: str, candidate_title: str) -> bool:
+    """Validasi kemiripan judul berbasis token untuk mencegah false positive pada pencarian metadata."""
+    if not target_q or not candidate_title:
+        return False
+    import re
+    stopwords = {"the", "a", "an", "of", "in", "to", "and", "und", "der", "die", "das", "no", "wa", "ga", "ni", "de", "series"}
+    tok_q = {w for w in re.sub(r"[^\w']", " ", target_q.lower()).split() if w} - stopwords
+    tok_c = {w for w in re.sub(r"[^\w']", " ", candidate_title.lower()).split() if w} - stopwords
+    if not tok_q or not tok_c:
+        return False
+    overlap = len(tok_q & tok_c) / max(len(tok_q), 1)
+    return overlap >= 0.50
+
+
 def resolve_mal_id_by_title(search_query: str) -> int:
     """Cari MAL ID (idMal) dari AniList berdasarkan judul anime.
-    Mendukung fallback pemendekan kata jika query terlalu panjang atau spesifik."""
+    Mendukung penanganan apostrof slug dan fallback pemendekan kata dengan validasi kemiripan judul ketat."""
     if not search_query or not search_query.strip() or _is_rate_limited():
         return 0
+    import re
     clean = search_query.strip()
+    clean = re.sub(r"\b(\w+)\s+s\b", r"\1's", clean, flags=re.I)
     words = clean.split()
     c = _get_al_client()
     attempts = [clean]
@@ -546,10 +562,14 @@ def resolve_mal_id_by_title(search_query: str) -> int:
             media_list = r.json().get("data", {}).get("Page", {}).get("media", []) or []
             for m in media_list:
                 if m.get("idMal"):
-                    try:
-                        return int(m["idMal"])
-                    except Exception:
-                        pass
+                    t_obj = m.get("title") or {}
+                    t_en = (t_obj.get("english") or "").strip()
+                    t_ro = (t_obj.get("romaji") or "").strip()
+                    if _match_title_tokens(clean, t_en) or _match_title_tokens(clean, t_ro) or _match_title_tokens(att, t_en) or _match_title_tokens(att, t_ro) or clean.lower() in t_en.lower() or clean.lower() in t_ro.lower():
+                        try:
+                            return int(m["idMal"])
+                        except Exception:
+                            pass
         except Exception:
             pass
     return 0
