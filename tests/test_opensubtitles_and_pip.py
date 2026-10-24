@@ -18,6 +18,7 @@ from api.translate import (
     find_unmatched_builtin_cues,
     merge_opensubtitles_with_builtin,
     apply_universal_lexicon_id,
+    automate_opensubtitles_pronouns,
     build_vtt,
 )
 
@@ -192,3 +193,70 @@ def test_opensubtitles_universal_lexicon_and_tag_cleaning():
 
     # Persona sopan asli tetap terjaga
     assert "Saya siap, Tuan." in cleaned_txt
+
+
+def test_game_titles_anti_literal_protection():
+    """Pastikan judul game anime tidak diterjemahkan mentah dan dipulihkan ke nama resminya."""
+    # Satisfy (Overgeared)
+    assert "game Satisfy" in apply_universal_lexicon_id("Aku bermain game memuaskan setiap malam.")
+    assert "Di Satisfy" in apply_universal_lexicon_id("Di memuaskan, dia adalah pemain legendaris.")
+    assert "Satisfy adalah" in apply_universal_lexicon_id("Memuaskan adalah game realitas virtual terbaik.")
+
+    # SAO, GGO, ShanFro, Full Dive, Glory
+    assert "Sword Art Online" in apply_universal_lexicon_id("Dia terjebak di seni pedang daring.")
+    assert "Gun Gale Online" in apply_universal_lexicon_id("Turnamen badai senjata daring akan dimulai.")
+    assert "Shangri-La Frontier" in apply_universal_lexicon_id("Perbatasan Shangri-La sangat menantang.")
+    assert "Full Dive" in apply_universal_lexicon_id("Teknologi penyelaman penuh sangat canggih.")
+    assert "pemain pro Glory" in apply_universal_lexicon_id("Ye Xiu adalah pemain pro kejayaan.")
+    assert "Brain Burst" in apply_universal_lexicon_id("Program ledakan otak terpasang di neuro-linker.")
+
+
+def test_overgeared_lexicon_enrichment():
+    """Pastikan istilah khusus anime Overgeared (Ep 1-4) dinormalisasi akurat."""
+    t1 = apply_universal_lexicon_id("Shin Youngwoo adalah Pagma's Successor yang baru.")
+    assert "Keturunan Pagma" in t1
+
+    t2 = apply_universal_lexicon_id("Kami membutuhkan Blue Orichalcum dan Pavranium untuk menempanya.")
+    assert "Orichalcum Biru" in t2
+    assert "Pavranium" in t2
+
+    t3 = apply_universal_lexicon_id("Tzedakah Guild diundang oleh Earl Steim ke Winston Village.")
+    assert "Guild Tzedakah" in t3
+    assert "Earl Steim" in t3
+    assert "Desa Winston" in t3
+
+    t4 = apply_universal_lexicon_id("Paus Drevigo mengincar Kitab Langka Pagma.")
+    assert "Paus Drevigo" in t4
+    assert "Kitab Langka Pagma" in t4
+
+
+def test_automated_pronoun_disambiguation_saya_vs_aku():
+    """Pastikan otomasi kata ganti saya vs aku bekerja presisi sesuai konteks adegan."""
+    # 1. Monolog batin & kemarahan pertarungan beralih ke aku / kau
+    casual_cues = [
+        {"start": 10.0, "end": 12.0, "text": "Sialan! Saya tidak percaya NPC ini memberikan quest mustahil!"},
+        {"start": 13.0, "end": 15.0, "text": "(Saya harus mengumpulkan uang untuk membayar utang.)"},
+        {"start": 16.0, "end": 18.0, "text": "Beraninya Anda menghina saya, bajingan!"},
+        {"start": 19.0, "end": 21.0, "text": "Menurut saya, ini pedang terbaik milik saya."},
+    ]
+    res_casual = automate_opensubtitles_pronouns(casual_cues, target_lang="id")
+    txts_casual = [c["text"] for c in res_casual]
+
+    assert "Aku nggak percaya" in txts_casual[0]
+    assert "(Aku harus mengumpulkan uang" in txts_casual[1]
+    assert "Beraninya Kau menghina aku" in txts_casual[2]
+    assert "Menurutku" in txts_casual[3]
+    assert "milikku" in txts_casual[3]
+
+    # 2. Adegan formal menghadap bangsawan / raja / wawancara siaran TV tetap mempertahankan saya / Anda
+    formal_cues = [
+        {"start": 50.0, "end": 53.0, "text": "Yang Mulia Paduka Earl Steim, saya datang menghadap untuk melapor."},
+        {"start": 54.0, "end": 57.0, "text": "Saya telah menyelesaikan tugas yang Anda berikan."},
+        {"start": 58.0, "end": 61.0, "text": "Siaran langsung: Bersama saya pembawa acara siaran Satisfy."},
+    ]
+    res_formal = automate_opensubtitles_pronouns(formal_cues, target_lang="id")
+    txts_formal = [c["text"] for c in res_formal]
+
+    assert "Paduka Earl Steim, saya datang" in txts_formal[0]
+    assert "Saya telah menyelesaikan tugas yang Anda berikan" in txts_formal[1]
+    assert "Bersama saya pembawa acara" in txts_formal[2]

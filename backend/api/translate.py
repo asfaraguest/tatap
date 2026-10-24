@@ -286,6 +286,10 @@ def merge_opensubtitles_with_builtin(
     matched_builtin_indices = set()
     is_id_lang = (target_lang or "id").lower() in ("id", "ind", "indonesian")
 
+    # Jalankan otomasi cerdas pemilihan kata ganti (saya vs aku) berbasis konteks adegan
+    if is_id_lang and clean_os:
+        clean_os = automate_opensubtitles_pronouns(clean_os, target_lang=target_lang)
+
     for oc in clean_os:
         os_s = max(0.0, float(oc["start"]) + offset)
         os_e = max(os_s + 0.1, float(oc["end"]) + offset)
@@ -987,7 +991,7 @@ _SCENE_MILITARY_RE = _re.compile(
 )
 
 _SCENE_ROYAL_RE = _re.compile(
-    r"\b(paduka|yang mulia|baginda|hamba|tuan putri|putri mahkota|pangeran|pangeran mahkota|"
+    r"\b(paduka|yang mulia|baginda|hamba|tuan|nyonya|tuan putri|putri mahkota|pangeran|pangeran mahkota|"
     r"kaisar|permaisuri|ratu|raja|nobilitas|kaum bangsawan|bangsawan|adipati|duke|duchess|baron|"
     r"baroness|marquis|marquess|count|viscount|lord|lady|nona besar|tuan muda|tuanku|takhta|"
     r"istana kekaisaran|dewan kekaisaran|titah baginda|titah kaisar|uskup agung|paus|kardinal|"
@@ -1004,9 +1008,23 @@ _SCENE_GAMING_RE = _re.compile(
     _re.I
 )
 
-_FORMAL_INDICATORS_RE = _re.compile(
-    _SCENE_MILITARY_RE.pattern + "|" + _SCENE_ROYAL_RE.pattern,
+_SCENE_BROADCAST_RE = _re.compile(
+    r"\b(siaran langsung|pemirsa|bintang tamu|hadirin|yang terhormat|dewi rebecca|dewa yatan|earl steim|earl ashur|paus drevigo)\b",
     _re.I
+)
+
+_FORMAL_INDICATORS_RE = _re.compile(
+    _SCENE_MILITARY_RE.pattern + "|" + _SCENE_ROYAL_RE.pattern + "|" + _SCENE_BROADCAST_RE.pattern,
+    _re.I
+)
+
+_RAGE_OUTBURST_RE = _re.compile(
+    r"\b(sial|sialan|keparat|brengsek|bajingan|mampus|gila|bodoh|mati kau|habisi|bunuh|bangsat|persetan)\b|[!?]{2,}",
+    _re.I
+)
+
+_MONOLOGUE_RE = _re.compile(
+    r"^\s*[\(\[\*].*[\)\]\*]\s*$"
 )
 
 # ---------------------------------------------------------------------------
@@ -1100,6 +1118,17 @@ _PRE_GTX_EN_SLANG_RULES = [
     (r"\bclear rewards?\b", "quest completion reward"),
     (r"\bepic (?:class|job)\b", "epic tier class"),
     (r"\blegendary job\b", "legendary class"),
+    # Proteksi nama game anime agar tidak diterjemahkan mentah
+    (r"\bSatisfy\b", "Satisfy"),
+    (r"\bSword Art Online\b", "Sword Art Online"),
+    (r"\bGun Gale Online\b", "Gun Gale Online"),
+    (r"\bALfheim Online\b", "ALfheim Online"),
+    (r"\bShangri-La Frontier\b", "Shangri-La Frontier"),
+    (r"\bBrain Burst\b", "Brain Burst"),
+    (r"\bElder Tale\b", "Elder Tale"),
+    (r"\bNewWorld Online\b", "NewWorld Online"),
+    (r"\bInfinite Dendrogram\b", "Infinite Dendrogram"),
+    (r"\bCross Reverie\b", "Cross Reverie"),
     # Stage-1: Exclamation Openers & Interjeksi Pembuka (Cegah "Pria, ..." / "Anak laki-laki, ...")
     (r"^\s*oh\s+man,\s*", "oh gosh, "),
     (r"^\s*man,\s+", "gosh, "),
@@ -1263,6 +1292,10 @@ def _pre_normalize_en_slang(text: str) -> str:
     for rx, repl in _COMPILED_PRE_GTX_EN_SLANG:
         result = rx.sub(repl, result)
     return result
+
+def _proper_title(title: str):
+    """Menjaga kapitalisasi nama resmi judul game/anime tanpa terpengaruh lowercase."""
+    return lambda m, t=title: t
 
 # Aturan universal: selalu dikoreksi (karena merupakan blunder/calque harfiah).
 _UNIVERSAL_FANSUB_RULES = [
@@ -1824,6 +1857,71 @@ _UNIVERSAL_FANSUB_RULES = [
     (r"\bselir tingkat tinggi\b", "Selir Utama"),
     (r"\bpencicip makanan\b", "Pencicip Racun"),
     (r"\bapoteker istana\b", "Tabib Istana"),
+
+    # --- 20. Proteksi & Restorasi Nama Game Anime dari Terjemahan Mentah ---
+    (r"\b(?:gim|game|dunia|bermain|pemain|peringkat|sejarah|server|masuk ke|log in ke|login ke)\s+(?:memuaskan|puas|kepuasan)\b", lambda m: _re.sub(r"\s+(?:memuaskan|puas|kepuasan)\b", " Satisfy", m.group(0), flags=_re.I)),
+    (r"\b(?:di|ke)\s+(?:memuaskan|puas|kepuasan)\b", lambda m: _re.sub(r"\s+(?:memuaskan|puas|kepuasan)\b", " Satisfy", m.group(0), flags=_re.I)),
+    (r"\bmemuaskan adalah\b", _proper_title("Satisfy adalah")),
+    (r"\bseni pedang (?:daring|online)\b", _proper_title("Sword Art Online")),
+    (r"\b(?:badai|angin kencang) senjata (?:daring|online)\b", _proper_title("Gun Gale Online")),
+    (r"\balfheim (?:daring|online)\b", _proper_title("ALfheim Online")),
+    (r"\bperbatasan shangri-?la\b", _proper_title("Shangri-La Frontier")),
+    (r"\bdunia baru (?:daring|online)\b", _proper_title("NewWorld Online")),
+    (r"\bledakan otak\b", _proper_title("Brain Burst")),
+    (r"\b(?:kisah|cerita) (?:tua|tetua)\b", _proper_title("Elder Tale")),
+    (r"\bdendrogram tak terbatas\b", _proper_title("Infinite Dendrogram")),
+    (r"\b(?:gim|game|dunia|pemain|pemain pro)\s+(?:kejayaan|kemuliaan)\b", lambda m: _re.sub(r"\s+(?:kejayaan|kemuliaan)\b", " Glory", m.group(0), flags=_re.I)),
+    (r"\blamunan silang\b", _proper_title("Cross Reverie")),
+    (r"\bpenyelaman penuh\b", _proper_title("Full Dive")),
+    (r"\bpenyelam penuh\b", _proper_title("Full Diver")),
+    (r"\bskala ordinal\b", _proper_title("Ordinal Scale")),
+    (r"\bproyek alisisasi\b", _proper_title("Project Alicization")),
+
+    # --- 21. Istilah Khusus Anime Overgeared (Episode 1–4 Lengkap) ---
+    (r"\bpagma'?s successor\b", "Keturunan Pagma"),
+    (r"\bpagma'?s descendant\b", "Keturunan Pagma"),
+    (r"\bpenerus pagma\b", "Keturunan Pagma"),
+    (r"\bpagma'?s (?:rare book|tome)\b", "Kitab Langka Pagma"),
+    (r"\bbuku langka pagma\b", "Kitab Langka Pagma"),
+    (r"\blegendary craftsman'?s tome\b", "Kitab Pengrajin Legendaris"),
+    (r"\blegendary blacksmith\b", "Pandai Besi Legendaris"),
+    (r"\bblacksmith master creation\b", "Kreasi Master Pandai Besi"),
+    (r"\bbreath of the legendary blacksmith\b", "Napas Pandai Besi Legendaris"),
+    (r"\bblue orichalcum\b", "Orichalcum Biru"),
+    (r"\bpavranium\b", "Pavranium"),
+    (r"\btzedakah guild\b", "Guild Tzedakah"),
+    (r"\bblood witch\b", "Penyihir Darah"),
+    (r"\bblood warrior\b", "Blood Warrior"),
+    (r"\bdoran'?s ring\b", "Cincin Doran"),
+    (r"\bdoran'?s sword\b", "Pedang Doran"),
+    (r"\bbehen archipelago\b", "Kepulauan Behen"),
+    (r"\bbairan village\b", "Desa Bairan"),
+    (r"\bwinston village\b", "Desa Winston"),
+    (r"\beternal kingdom\b", "Kerajaan Eternal"),
+    (r"\bearl steim\b", "Earl Steim"),
+    (r"\bearl ashur\b", "Earl Ashur"),
+    (r"\blord winston\b", "Penguasa Winston"),
+    (r"\bchurch of rebecca\b", "Gereja Rebecca"),
+    (r"\bgoddess rebecca\b", "Dewi Rebecca"),
+    (r"\bchurch of yatan\b", "Gereja Yatan"),
+    (r"\bgod yatan\b", "Dewa Yatan"),
+    (r"\bpope drevigo\b", "Paus Drevigo"),
+    (r"\bsupercomputer morpheus\b", "Superkomputer Morpheus"),
+    (r"\bgreat demon\b", "Iblis Agung"),
+    (r"\bhidden quest\b", "Quest Tersembunyi"),
+    (r"\blinked quest\b", "Quest Berantai"),
+    (r"\bss-rank quest\b", "Quest Peringkat SS"),
+    (r"\bs-rank quest\b", "Quest Peringkat S"),
+    (r"\blegendary (?:class|job)\b", "Profesi Legendaris"),
+    (r"\bepic (?:class|job)\b", "Profesi Epic"),
+    (r"\bunique (?:class|job)\b", "Profesi Unique"),
+    (r"\brare (?:class|job)\b", "Profesi Rare"),
+    (r"\bnormal (?:class|job)\b", "Profesi Normal"),
+    (r"\bbaal'?s contractor\b", "Kontraktor Baal"),
+    (r"\bsword saint\b", "Santo Pedang"),
+    (r"\bbow saint\b", "Santo Busur"),
+    (r"\bshadow striker\b", "Shadow Striker"),
+    (r"\bproduction method\b", "Metode Pembuatan"),
 ]
 
 # Aturan khusus adegan kasual/santai (tidak diterapkan jika konteks formal/kerajaan).
@@ -2028,6 +2126,104 @@ _COMPILED_CASUAL = [(_re.compile(pat, _re.IGNORECASE), repl) for pat, repl in _C
 _COMPILED_AIGTX_SMOOTH = [(_re.compile(pat, _re.IGNORECASE), repl) for pat, repl in _AIGTX_SMOOTH_RULES]
 _COMPILED_GTXPLUS_SMOOTH = _COMPILED_AIGTX_SMOOTH
 
+_CASUAL_PRONOUN_RULES = [
+    (_re.compile(r"\bmenurut saya\b", _re.I), lambda m: "menurutku" if m.group(0)[0].islower() else "Menurutku"),
+    (_re.compile(r"\bmilik saya\b", _re.I), "milikku"),
+    (_re.compile(r"\buntuk saya\b", _re.I), "untukku"),
+    (_re.compile(r"\bkepada saya\b", _re.I), "kepadaku"),
+    (_re.compile(r"\bapakah saya\b", _re.I), lambda m: "apa aku" if m.group(0)[0].islower() else "Apa aku"),
+    (_re.compile(r"\bapakah anda\b", _re.I), lambda m: "apa kamu" if m.group(0)[0].islower() else "Apa kamu"),
+    (_re.compile(r"\bbisakah saya\b", _re.I), lambda m: "bisa aku" if m.group(0)[0].islower() else "Bisa aku"),
+    (_re.compile(r"\bbisakah anda\b", _re.I), lambda m: "bisa kamu" if m.group(0)[0].islower() else "Bisa kamu"),
+    (_re.compile(r"\bsaya tidak\b", _re.I), lambda m: "aku nggak" if m.group(0)[0].islower() else "Aku nggak"),
+    (_re.compile(r"\bsaya nggak\b", _re.I), lambda m: "aku nggak" if m.group(0)[0].islower() else "Aku nggak"),
+    (_re.compile(r"\bsaya mau\b", _re.I), lambda m: "aku mau" if m.group(0)[0].islower() else "Aku mau"),
+    (_re.compile(r"\bsaya harus\b", _re.I), lambda m: "aku harus" if m.group(0)[0].islower() else "Aku harus"),
+    (_re.compile(r"\bsaya bisa\b", _re.I), lambda m: "aku bisa" if m.group(0)[0].islower() else "Aku bisa"),
+    (_re.compile(r"\bsaya akan\b", _re.I), lambda m: "aku akan" if m.group(0)[0].islower() else "Aku akan"),
+    (_re.compile(r"\bsaya rasa\b", _re.I), lambda m: "aku rasa" if m.group(0)[0].islower() else "Aku rasa"),
+    (_re.compile(r"\bsaya pikir\b", _re.I), lambda m: "kupikir" if m.group(0)[0].islower() else "Kupikir"),
+    (_re.compile(r"\bberi saya\b", _re.I), lambda m: "beri aku" if m.group(0)[0].islower() else "Beri aku"),
+    (_re.compile(r"\bsaya\b", _re.I), lambda m: "Aku" if m.group(0)[0].isupper() else "aku"),
+]
+
+
+def automate_opensubtitles_pronouns(cues: list, target_lang: str = "id", window: int = 2, max_gap_sec: float = 10.0) -> list:
+    """Otomasi pemilihan kata ganti orang pertama (saya vs aku) dan kedua (Anda vs kamu/kau)
+    pada subtitle OpenSubtitles bahasa Indonesia berbasis Sliding-Window Scene Context.
+
+    Kaidah Otomasi:
+      1. Formal Context (Kerajaan, Nobilitas, Keagamaan, Militer, Wawancara/Siaran Resmi):
+         Pertahankan kesantunan register baku (saya / Anda) tanpa diubah menjadi bahasa gaul.
+      2. Casual Context (Monolog batin, amarah/makian, pertarungan, obrolan gaming):
+         Konversi 'saya' kaku menjadi 'aku' (atau proklitik/enklitik 'ku-' / '-ku'),
+         dan 'Anda' menjadi 'kamu' (atau 'kau' saat amarah/pertarungan).
+    """
+    if not cues or (target_lang or "id").lower() not in ("id", "ind", "indonesian"):
+        return cues
+
+    n = len(cues)
+    direct_formal = []
+    direct_rage = []
+    direct_monologue = []
+
+    for c in cues:
+        txt = (c.get("text") or "").strip()
+        is_f = bool(_FORMAL_INDICATORS_RE.search(txt))
+        is_r = bool(_RAGE_OUTBURST_RE.search(txt))
+        is_m = bool(_MONOLOGUE_RE.match(txt))
+        direct_formal.append(is_f)
+        direct_rage.append(is_r)
+        direct_monologue.append(is_m)
+
+    # Propagasi konteks formal ke tetangga dalam jendela ±window
+    contextual_formal = list(direct_formal)
+    for i in range(n):
+        if direct_formal[i]:
+            continue
+        if direct_rage[i] or direct_monologue[i]:
+            continue
+        c_start = float(cues[i].get("start", 0.0))
+        c_end = float(cues[i].get("end", c_start))
+        for j in range(max(0, i - window), min(n, i + window + 1)):
+            if j == i or not direct_formal[j]:
+                continue
+            n_start = float(cues[j].get("start", 0.0))
+            n_end = float(cues[j].get("end", n_start))
+            gap = max(0.0, c_start - n_end) if j < i else max(0.0, n_start - c_end)
+            if gap <= max_gap_sec:
+                contextual_formal[i] = True
+                break
+
+    out = []
+    for i, c in enumerate(cues):
+        txt = (c.get("text") or "").strip()
+        if not txt:
+            out.append(c)
+            continue
+
+        is_f = contextual_formal[i]
+        is_r = direct_rage[i]
+
+        if is_f and not (direct_rage[i] or direct_monologue[i]):
+            new_txt = txt
+        else:
+            new_txt = txt
+            for rx, repl in _CASUAL_PRONOUN_RULES:
+                new_txt = rx.sub(repl, new_txt)
+            if is_r:
+                new_txt = _re.sub(r"\bAnda\b", lambda m: "Kau" if m.group(0)[0].isupper() else "kau", new_txt, flags=_re.I)
+            else:
+                new_txt = _re.sub(r"\bAnda\b", lambda m: "Kamu" if m.group(0)[0].isupper() else "kamu", new_txt, flags=_re.I)
+
+        out.append({
+            "start": c.get("start", 0.0),
+            "end": c.get("end", 0.0),
+            "text": new_txt
+        })
+
+    return out
+
 
 def apply_universal_lexicon_id(text: str) -> str:
     """Terapkan kamus istilah anime universal (glossary) tanpa mengubah persona/gaya kasual fansub."""
@@ -2035,6 +2231,8 @@ def apply_universal_lexicon_id(text: str) -> str:
         return text
 
     def _replace_match(m, repl):
+        if callable(repl):
+            return repl(m)
         expanded = m.expand(repl) if "\\" in repl else repl
         orig = m.group(0)
         if orig and orig.islower():
@@ -2057,6 +2255,8 @@ def _sanitize_fansub_id(text: str, force_formal: bool = False) -> str:
         return text
 
     def _replace_match(m, repl):
+        if callable(repl):
+            return repl(m)
         expanded = m.expand(repl) if "\\" in repl else repl
         orig = m.group(0)
         if orig and orig.islower():
