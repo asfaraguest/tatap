@@ -120,13 +120,13 @@ def test_smart_merge_optimal_offset_and_gap_filling():
     assert stats["gap_filled"] == 1
 
 
-def test_smart_merge_bilingual_mode():
-    """Pastikan mode bilingual menyusun OpenSubtitles di atas dan teks bawaan di bawah."""
+def test_smart_merge_clean_single_language():
+    """Pastikan merge menghasilkan subtitle tunggal bersih (non-bilingual) sesuai preferensi pengguna."""
     builtin = [{"start": 5.0, "end": 8.0, "text": "Let us go."}]
     os_sub = [{"start": 5.0, "end": 8.0, "text": "Ayo kita pergi."}]
-    merged, stats = merge_opensubtitles_with_builtin(builtin, os_sub, merge_mode="bilingual")
+    merged, stats = merge_opensubtitles_with_builtin(builtin, os_sub, merge_mode="hybrid")
     assert len(merged) == 1
-    assert "Ayo kita pergi.\nLet us go." in merged[0]["text"]
+    assert merged[0]["text"] == "Ayo kita pergi."
 
 
 def test_android_pip_dismiss_protection_in_code():
@@ -197,10 +197,23 @@ def test_opensubtitles_universal_lexicon_and_tag_cleaning():
 
 def test_game_titles_anti_literal_protection():
     """Pastikan judul game anime tidak diterjemahkan mentah dan dipulihkan ke nama resminya."""
-    # Satisfy (Overgeared)
+    # Satisfy (Overgeared) - variasi Puaskan / Memuaskan / Puas
     assert "game Satisfy" in apply_universal_lexicon_id("Aku bermain game memuaskan setiap malam.")
     assert "Di Satisfy" in apply_universal_lexicon_id("Di memuaskan, dia adalah pemain legendaris.")
     assert "Satisfy adalah" in apply_universal_lexicon_id("Memuaskan adalah game realitas virtual terbaik.")
+    assert "Satisfy, game realitas virtual" in apply_universal_lexicon_id("Puaskan, game realitas virtual terhebat di dunia.")
+    assert "Satisfy, game realitas virtual" in apply_universal_lexicon_id("Memuaskan, game realitas virtual terhebat di dunia.")
+    assert "Satisfy, game realitas virtual" in apply_universal_lexicon_id("Puas, game realitas virtual terhebat di dunia.")
+    assert "Berita Satisfy!" in apply_universal_lexicon_id("- Berita Memuaskan! Hari ini, semua orang")
+    assert "Berita Satisfy!" in apply_universal_lexicon_id("Berita yang Memuaskan!")
+    assert "Satisfy Times" in apply_universal_lexicon_id("Memuaskan Times")
+    assert "Satisfy!" in apply_universal_lexicon_id("Puaskan!")
+    assert "Satisfy!" in apply_universal_lexicon_id("Memuaskan!")
+    assert "Satisfy! Siap?" in apply_universal_lexicon_id("Puaskan! Siap?")
+    assert "Bukan Satisfy!" in apply_universal_lexicon_id("Tidak Memuaskan!")
+    assert "Bukan Satisfy!" in apply_universal_lexicon_id("Bukan Memuaskan!")
+    assert "Mengakses Satisfy." in apply_universal_lexicon_id("Mengakses Puas.")
+    assert "Satisfy pengguna pertama" in apply_universal_lexicon_id("Puaskan pengguna pertama dengan dua pekerjaan.")
 
     # SAO, GGO, ShanFro, Full Dive, Glory
     assert "Sword Art Online" in apply_universal_lexicon_id("Dia terjebak di seni pedang daring.")

@@ -300,7 +300,7 @@ def search_opensubtitles(title: str = "", slug: str = "", ep: int = 1, season: i
         if not fid or not dl_url:
             return
         norm_lang = _ISO639_2_TO_LANG.get((raw_lang or "").lower(), (raw_lang or "").lower()[:2])
-        if norm_lang not in (target_lang, "en"):
+        if norm_lang != target_lang:
             return
         fname = (filename or f"OpenSubtitles_{fid}.srt").strip()
         sc = _score_subtitle_candidate(fname, ep, season_num, target_lang, norm_lang, downloads)
@@ -354,7 +354,7 @@ def search_opensubtitles(title: str = "", slug: str = "", ep: int = 1, season: i
     # TIER 2: Official Legacy REST Public API (rest.opensubtitles.org)
     # =========================================================================
     iso_langs = [_LANG_TO_ISO639_2.get(target_lang, "ind")]
-    if "eng" not in iso_langs:
+    if target_lang != "id" and "eng" not in iso_langs:
         iso_langs.append("eng")
 
     num_imdb = imdb_id[2:] if imdb_id.startswith("tt") else ""

@@ -2207,6 +2207,9 @@ async def _get_validated_subtitle_cache(key: str, lang: str = "id", ttl: int = 7
             except Exception:
                 pass
             return None
+        if (lang or "").lower() == "id":
+            from api.translate import apply_universal_lexicon_id
+            hit = apply_universal_lexicon_id(hit)
         return hit
     return None
 
@@ -2256,24 +2259,25 @@ async def proxy_sub(url: str = Query(""),
                    referer: str = Query(""),
                    lang: str = Query("", pattern="^(en|id|ja|es|fr|de|pt|ko|zh)$|^$"),
                    src: str = Query("en", pattern="^(en|ja|es|fr|de|pt|ko|zh)$"),
-                   mode: str = Query("", pattern="^(gtx|gtx\\+|gtx\\+_dual|aigtx|ai|os_merge|os_dual|)$"),
+                   mode: str = Query("", pattern="^(gtx|gtx\\+|gtx\\+_dual|aigtx|ai|os_merge|os_dual|smart_merge|)$"),
                    dual: bool = Query(False),
                    title: str = Query(""),
                    slug: str = Query(""),
                    ep: int = Query(1),
                    os_file_id: str = Query(""),
                    refresh: bool = Query(False)):
-    """Proxy subtitle VTT. Menjalankan translasi multi-tier atau OpenSubtitles Smart Merge
+    """Proxy subtitle VTT. Menjalankan translasi Smart Lexicon atau Smart Fansub & Merge
     dengan deduplikasi inflight dan proteksi cache poisoning."""
     if not url.startswith("http"):
         return Response(status_code=400)
     _validate_external_proxy_url(url)
 
-    is_os_mode = mode in ("os_merge", "os_dual")
-    is_dual = bool(dual) or (mode in ("gtx+_dual", "os_dual"))
-    clean_mode = "gtx+" if mode == "gtx+_dual" else mode
+    is_os_mode = mode in ("os_merge", "os_dual", "smart_merge")
+    # Hapus mode bilingual dan opsi terjemahan mentah sesuai direktif
+    is_dual = False
+    clean_mode = "gtx+" if mode in ("gtx", "gtx+", "gtx+_dual", "aigtx") else (mode or "gtx+")
 
-    # Lang kosong atau sama dengan sumber (dan bukan mode OpenSubtitles) -> return source apa adanya
+    # Lang kosong atau sama dengan sumber (dan bukan mode Smart Merge) -> return source apa adanya
     if (not lang or lang == src) and not is_os_mode:
         try:
             content = await _fetch_sub_text(url, referer)
@@ -2289,30 +2293,28 @@ async def proxy_sub(url: str = Query(""),
         f"{url}|{slug}|{title}|{ep}|{os_file_id}|{lang or 'id'}".encode("utf-8")
     ).hexdigest()
     key_gtxplus = "sub2|gtx+|" + base_hash
-    key_gtxplus_dual = "sub2|gtx+_dual|" + base_hash
     key_aigtx = "sub2|aigtx|" + base_hash
     key_gtx = "sub2|gtx|" + base_hash
     key_llm = "sub2|llm|" + base_hash
     key_os_merge = "sub2|os_merge|" + os_ctx_hash
-    key_os_dual = "sub2|os_dual|" + os_ctx_hash
 
     if refresh:
-        for k in (key_gtx, key_gtxplus, key_gtxplus_dual, key_aigtx, key_llm, key_os_merge, key_os_dual, "sub2|mt|" + base_hash):
+        for k in (key_gtx, key_gtxplus, key_aigtx, key_llm, key_os_merge, "sub2|mt|" + base_hash):
             try:
                 await delete_subtitle_cache(k)
             except Exception:
                 pass
 
     if is_os_mode:
-        target_os_key = key_os_dual if is_dual else key_os_merge
+        target_os_key = key_os_merge
         if not refresh:
             hit_os = await _get_validated_subtitle_cache(target_os_key, lang=lang or "id")
             if hit_os:
                 resp = Response(content=hit_os, media_type="text/vtt")
-                resp.headers["X-Translate-Tier"] = "cached-os_dual" if is_dual else "cached-os_merge"
+                resp.headers["X-Translate-Tier"] = "cached-os_merge"
                 return resp
 
-        os_job_key = f"os|{os_ctx_hash}|dual={int(is_dual)}"
+        os_job_key = f"os|{os_ctx_hash}"
         fut_os = _SUB_INFLIGHT.get(os_job_key)
         if fut_os is None:
             fut_os = asyncio.ensure_future(
@@ -2325,9 +2327,9 @@ async def proxy_sub(url: str = Query(""),
                     slug=slug,
                     ep=ep,
                     os_file_id=os_file_id,
-                    is_dual=is_dual,
+                    is_dual=False,
                     cache_key=target_os_key,
-                    fallback_key_gtxplus=key_gtxplus_dual if is_dual else key_gtxplus,
+                    fallback_key_gtxplus=key_gtxplus,
                 )
             )
             _SUB_INFLIGHT[os_job_key] = fut_os
@@ -2344,23 +2346,11 @@ async def proxy_sub(url: str = Query(""),
             resp.headers["X-OpenSubtitles-Merge"] = f"os={st.get('os_count',0)},snapped={st.get('snapped',0)},gaps={st.get('gap_filled',0)},offset={st.get('offset',0.0)}s"
         return resp
 
-    req_mode = "gtx+" if clean_mode in ("gtx+", "aigtx") else (clean_mode or "gtx")
+    req_mode = "gtx+" if clean_mode in ("gtx+", "aigtx") else (clean_mode or "gtx+")
 
     # Periksa cache lokal jika tidak dalam mode refresh
     if not refresh:
-        if is_dual:
-            hit_dual = await _get_validated_subtitle_cache(key_gtxplus_dual, lang=lang)
-            if hit_dual:
-                resp = Response(content=hit_dual, media_type="text/vtt")
-                resp.headers["X-Translate-Tier"] = "cached-gtx+_dual"
-                return resp
-        elif req_mode == "gtx":
-            hit = await _get_validated_subtitle_cache(key_gtx, lang=lang)
-            if hit:
-                resp = Response(content=hit, media_type="text/vtt")
-                resp.headers["X-Translate-Tier"] = "cached-gtx"
-                return resp
-        elif req_mode in ("gtx+", "aigtx"):
+        if req_mode in ("gtx+", "aigtx"):
             hit = await _get_validated_subtitle_cache(key_gtxplus, lang=lang)
             if not hit:
                 hit = await _get_validated_subtitle_cache(key_aigtx, lang=lang)
@@ -2377,7 +2367,7 @@ async def proxy_sub(url: str = Query(""),
                 resp.headers["X-Translate-Tier"] = "cached-llm"
                 return resp
         else:
-            for k, label in ((key_gtx, "cached-gtx"), (key_gtxplus, "cached-gtx+"), (key_aigtx, "cached-gtx+"), (key_llm, "cached-llm")):
+            for k, label in ((key_gtxplus, "cached-gtx+"), (key_aigtx, "cached-gtx+"), (key_llm, "cached-llm")):
                 hit = await _get_validated_subtitle_cache(k, lang=lang)
                 if hit:
                     resp = Response(content=hit, media_type="text/vtt")
@@ -2385,11 +2375,11 @@ async def proxy_sub(url: str = Query(""),
                     return resp
 
     # Satukan eksekusi translasi agar tidak menduplikasi request bersamaan untuk mode yang sama
-    job_key = f"{base_hash}|{lang}|{req_mode}|dual={int(is_dual)}"
+    job_key = f"{base_hash}|{lang}|{req_mode}|dual=0"
     fut = _SUB_INFLIGHT.get(job_key)
     if fut is None:
         fut = asyncio.ensure_future(
-            _translate_sub_job(url, referer, src, lang, key_llm, key_gtxplus, _fetch_sub_text, key_gtx=key_gtx, requested_mode=req_mode, is_dual=is_dual, key_dual=key_gtxplus_dual)
+            _translate_sub_job(url, referer, src, lang, key_llm, key_gtxplus, _fetch_sub_text, key_gtx=key_gtx, requested_mode=req_mode, is_dual=False, key_dual="")
         )
         _SUB_INFLIGHT[job_key] = fut
         fut.add_done_callback(lambda _f, k=job_key: _SUB_INFLIGHT.pop(k, None))
@@ -2598,18 +2588,24 @@ async def _opensubtitles_merge_sub_job(
     cache_key: str,
     fallback_key_gtxplus: str,
 ):
-    """Unduh subtitle dari OpenSubtitles (Public API + Scraper) lalu lakukan Smart Merge
-    dengan subtitle bawaan anime (url). Jika OpenSubtitles tidak tersedia, fallback otomatis ke GTX+."""
+    """Cari dan unduh subtitle khusus Bahasa Indonesia dari AnimeTosho (prioritas fansub & CR/Netflix resmi)
+    atau OpenSubtitles, lalu lakukan Smart Merge + Smart Lexicon + Scene Detector dengan subtitle bawaan anime.
+    Jika tidak tersedia di AnimeTosho/OpenSubtitles, fallback otomatis ke Smart GTX+."""
     from api.translate import (
         parse_vtt,
         build_vtt,
-        build_bilingual_vtt,
         merge_overlapping_cues,
         estimate_optimal_offset,
         find_unmatched_builtin_cues,
         merge_opensubtitles_with_builtin,
         call_gtx_translate,
         log_translate,
+        automate_opensubtitles_pronouns,
+        apply_universal_lexicon_id,
+    )
+    from api.animetosho import (
+        search_animetosho_indonesian,
+        download_animetosho_sub_text,
     )
     from api.opensubtitles import (
         search_opensubtitles,
@@ -2618,6 +2614,7 @@ async def _opensubtitles_merge_sub_job(
     )
 
     loop = asyncio.get_running_loop()
+    target_lang = (lang or "id").lower()
 
     # 1. Ambil subtitle bawaan anime (builtin_cues)
     builtin_text = ""
@@ -2627,64 +2624,88 @@ async def _opensubtitles_merge_sub_job(
             builtin_text = await _fetch_sub_text(url, referer)
             builtin_cues = merge_overlapping_cues(parse_vtt(builtin_text))
         except Exception as e:
-            log_translate(f"[OpenSubtitles Merge] Gagal mengambil subtitle bawaan: {e}")
+            log_translate(f"[Smart Fansub & Merge] Gagal mengambil subtitle bawaan: {e}")
 
-    # 2. Cari & unduh subtitle dari OpenSubtitles
-    os_cues = []
+    # 2. Cari & unduh subtitle khusus Bahasa Indonesia (AnimeTosho -> OpenSubtitles)
     picked_cand = None
-    try:
-        candidates = await loop.run_in_executor(
-            None,
-            lambda: search_opensubtitles(title=title, slug=slug, ep=ep, lang=lang or "id"),
-        )
-        if os_file_id:
-            for c in candidates:
-                if str(c.get("file_id")) == str(os_file_id) or str(c.get("id")) == str(os_file_id):
-                    picked_cand = c
-                    break
-            if not picked_cand:
-                picked_cand = {
-                    "file_id": str(os_file_id),
-                    "filename": f"OpenSubtitles_{os_file_id}.srt",
-                    "lang": lang or "id",
-                    "url": f"https://dl.opensubtitles.org/en/download/subencoding-utf8/file/{os_file_id}",
-                    "backup_url": f"https://subs5.strem.io/en/download/subencoding-stremio-utf8/src-api/file/{os_file_id}",
-                }
-        elif candidates:
-            picked_cand = candidates[0]
+    ext_cues = []
 
-        if picked_cand:
-            os_raw_txt = await loop.run_in_executor(
+    # Kasus 2a: os_file_id diberikan secara spesifik
+    if os_file_id:
+        try:
+            str_fid = str(os_file_id).strip()
+            if str_fid.startswith("at_") or "animetosho" in str_fid:
+                clean_fid = str_fid.replace("at_", "")
+                raw_txt = await loop.run_in_executor(
+                    None,
+                    lambda: download_animetosho_sub_text("", clean_fid),
+                )
+                picked_cand = {"source": "AnimeTosho", "filename": f"AnimeTosho_{clean_fid}.ass", "file_id": clean_fid}
+            else:
+                raw_txt = await loop.run_in_executor(
+                    None,
+                    lambda: download_opensubtitle_text(file_id=str_fid),
+                )
+                picked_cand = {"source": "OpenSubtitles", "filename": f"OpenSubtitles_{str_fid}.srt", "file_id": str_fid}
+            ext_cues = strip_opensubtitles_ads(parse_vtt(raw_txt))
+        except Exception as e:
+            log_translate(f"[Smart Fansub & Merge] Gagal unduh file_id={os_file_id}: {e}")
+
+    # Kasus 2b: Pencarian otomatis AnimeTosho (prioritas 1) lalu OpenSubtitles (prioritas 2)
+    if not ext_cues and target_lang == "id":
+        try:
+            # 2b.1 Cek AnimeTosho
+            at_cands = await loop.run_in_executor(
                 None,
-                lambda: download_opensubtitle_text(
-                    file_id=picked_cand.get("file_id", ""),
-                    url=picked_cand.get("url", ""),
-                    backup_url=picked_cand.get("backup_url", ""),
-                ),
+                lambda: search_animetosho_indonesian(title=title, slug=slug, ep=ep),
             )
-            os_cues = strip_opensubtitles_ads(parse_vtt(os_raw_txt))
-    except Exception as e:
-        log_translate(f"[OpenSubtitles Merge] Pencarian/unduh OpenSubtitles gagal ({e}), fallback ke GTX+ bawaan.")
+            if at_cands:
+                picked_cand = at_cands[0]
+                raw_txt = await loop.run_in_executor(
+                    None,
+                    lambda: download_animetosho_sub_text(picked_cand.get("url", ""), picked_cand.get("file_id", "")),
+                )
+                ext_cues = strip_opensubtitles_ads(parse_vtt(raw_txt))
+                if ext_cues:
+                    log_translate(f"[Smart Fansub & Merge] Ditemukan di AnimeTosho: {picked_cand.get('filename')}")
+        except Exception as e:
+            log_translate(f"[Smart Fansub & Merge] Gagal pencarian AnimeTosho: {e}")
 
-    # Jika OpenSubtitles berhasil diunduh, lakukan Smart Merge dengan subtitle bawaan anime
-    if os_cues:
-        cand_lang = (picked_cand.get("lang") or "id").lower()
-        target_lang = (lang or "id").lower()
-
-        # Jika kandidat terbaik dari OpenSubtitles berbahasa Inggris sedangkan target Indonesia,
-        # terjemahkan cue OpenSubtitles via GTX+ terlebih dahulu
-        if cand_lang != target_lang and target_lang == "id":
+        # 2b.2 Jika AnimeTosho belum tersedia, cari di OpenSubtitles (khusus ID)
+        if not ext_cues:
             try:
-                os_cues = await call_gtx_translate(os_cues, "en", "id", mode="gtx+")
-            except Exception:
-                pass
+                os_cands = await loop.run_in_executor(
+                    None,
+                    lambda: search_opensubtitles(title=title, slug=slug, ep=ep, lang="id"),
+                )
+                id_os_cands = [c for c in os_cands if (c.get("lang") or "").lower() in ("id", "ind", "indonesian")]
+                if id_os_cands:
+                    picked_cand = id_os_cands[0]
+                    raw_txt = await loop.run_in_executor(
+                        None,
+                        lambda: download_opensubtitle_text(
+                            file_id=picked_cand.get("file_id", ""),
+                            url=picked_cand.get("url", ""),
+                            backup_url=picked_cand.get("backup_url", ""),
+                        ),
+                    )
+                    ext_cues = strip_opensubtitles_ads(parse_vtt(raw_txt))
+                    if ext_cues:
+                        log_translate(f"[Smart Fansub & Merge] Ditemukan di OpenSubtitles: {picked_cand.get('filename')}")
+            except Exception as e:
+                log_translate(f"[Smart Fansub & Merge] Gagal pencarian OpenSubtitles: {e}")
 
-        offset = estimate_optimal_offset(builtin_cues, os_cues) if builtin_cues else 0.0
+    # 3. Jika subtitle eksternal Bahasa Indonesia ditemukan, lakukan Smart Merge
+    if ext_cues and target_lang == "id":
+        # Jalankan Smart Scene Detector untuk kata ganti (saya vs aku)
+        ext_cues = automate_opensubtitles_pronouns(ext_cues, target_lang="id")
+
+        offset = estimate_optimal_offset(builtin_cues, ext_cues) if builtin_cues else 0.0
         translated_gaps = {}
 
-        # Cari cue pada subtitle bawaan (Signs, OP/ED, Preview) yang tidak ada di OpenSubtitles
-        if builtin_cues and target_lang == "id":
-            unmatched_idx, unmatched_cues = find_unmatched_builtin_cues(builtin_cues, os_cues, offset=offset)
+        # Cari cue pada subtitle bawaan (Signs, OP/ED, Preview) yang tidak ada di external sub
+        if builtin_cues:
+            unmatched_idx, unmatched_cues = find_unmatched_builtin_cues(builtin_cues, ext_cues, offset=offset)
             if unmatched_cues and len(unmatched_cues) <= 180:
                 try:
                     tr_gaps = await call_gtx_translate(unmatched_cues, src or "en", "id", mode="gtx+")
@@ -2693,83 +2714,96 @@ async def _opensubtitles_merge_sub_job(
                 except Exception:
                     pass
 
-        merge_mode = "bilingual" if is_dual else "hybrid"
         merged_cues, stats = merge_opensubtitles_with_builtin(
             builtin_cues=builtin_cues,
-            os_cues=os_cues,
-            merge_mode=merge_mode,
+            os_cues=ext_cues,
+            merge_mode="hybrid",
             translated_gaps=translated_gaps,
             offset=offset,
-            target_lang=target_lang,
+            target_lang="id",
         )
         new_text = build_vtt(merged_cues)
-        if cache_key and ((target_lang != "id") or _is_valid_id_subtitle(new_text)):
+        if cache_key and _is_valid_id_subtitle(new_text):
             await set_subtitle_cache(cache_key, new_text)
 
+        src_name = (picked_cand.get("source") or "Fansub") if picked_cand else "Fansub"
+        fn = (picked_cand.get("filename") or "Subtitle") if picked_cand else "Subtitle"
         log_translate(
-            f"[OpenSubtitles Merge] Sukses merge '{picked_cand.get('filename')}' "
-            f"(OS={stats['os_count']}, Snapped={stats['snapped']}, GapsFilled={stats['gap_filled']}, Offset={stats['offset']}s)"
+            f"[Smart Fansub & Merge] Sukses merge [{src_name}] '{fn}' "
+            f"(Count={stats['os_count']}, Snapped={stats['snapped']}, GapsFilled={stats['gap_filled']}, Offset={stats['offset']}s)"
         )
         return new_text, {
-            "level": "os_dual" if is_dual else "os_merge",
-            "os_filename": picked_cand.get("filename", ""),
+            "level": "os_merge",
+            "source": src_name,
+            "os_filename": fn,
             "merge_stats": stats,
         }
 
-    # Fallback: Jika OpenSubtitles belum tersedia untuk episode ini, gunakan GTX+ dari subtitle bawaan anime
+    # 4. Fallback: Jika belum ada subtitle ID di AnimeTosho/OpenSubtitles, gunakan Smart GTX+ bawaan
     if builtin_cues:
-        tier = await _translate_with_fallback(builtin_cues, src or "en", lang or "id", requested_mode="gtx+")
-        if is_dual:
-            new_text = build_bilingual_vtt(tier.get("cues") or builtin_cues, builtin_cues)
-        else:
-            new_text = build_vtt(tier.get("cues") or builtin_cues)
-        if fallback_key_gtxplus and ((lang or "id").lower() != "id" or _is_valid_id_subtitle(new_text)):
+        tier = await _translate_with_fallback(builtin_cues, src or "en", target_lang, requested_mode="gtx+")
+        new_text = build_vtt(tier.get("cues") or builtin_cues)
+        if fallback_key_gtxplus and (target_lang != "id" or _is_valid_id_subtitle(new_text)):
             await set_subtitle_cache(fallback_key_gtxplus, new_text)
-        return new_text, {"level": "os_fallback_gtx+", "error": "Subtitle belum tersedia di OpenSubtitles, menggunakan GTX+ Bawaan"}
+        return new_text, {
+            "level": "os_fallback_gtx+",
+            "error": "Subtitle belum tersedia di AnimeTosho maupun OpenSubtitles, menggunakan Smart GTX+ Bawaan",
+        }
 
-    raise HTTPException(status_code=404, detail="Subtitle tidak ditemukan baik di OpenSubtitles maupun bawaan stream")
+    raise HTTPException(status_code=404, detail="Subtitle tidak ditemukan baik di AnimeTosho, OpenSubtitles, maupun bawaan stream")
 
 
 @app.get("/api/subtitles/opensubtitles")
-async def api_search_opensubtitles(
+@app.get("/api/subtitles/external")
+async def api_search_external_subtitles(
     title: str = Query(""),
     slug: str = Query(""),
     ep: int = Query(1),
     season: int = Query(0),
     lang: str = Query("id"),
 ):
-    """Cari daftar subtitle yang tersedia di OpenSubtitles (Public API + Scraping) untuk episode anime."""
+    """Cari daftar subtitle khusus Bahasa Indonesia yang tersedia di AnimeTosho dan OpenSubtitles."""
     try:
+        from api.animetosho import search_animetosho_indonesian
         from api.opensubtitles import search_opensubtitles
         loop = asyncio.get_running_loop()
-        items = await loop.run_in_executor(
-            None,
-            lambda: search_opensubtitles(title=title, slug=slug, ep=ep, season=season, lang=lang),
-        )
+
+        at_task = loop.run_in_executor(None, lambda: search_animetosho_indonesian(title=title, slug=slug, ep=ep, season=season or 1))
+        os_task = loop.run_in_executor(None, lambda: search_opensubtitles(title=title, slug=slug, ep=ep, season=season, lang="id"))
+        at_items, os_items = await asyncio.gather(at_task, os_task, return_exceptions=True)
+
+        items = []
+        if isinstance(at_items, list):
+            items.extend(at_items)
+        if isinstance(os_items, list):
+            for it in os_items:
+                if (it.get("lang") or "id").lower() in ("id", "ind", "indonesian"):
+                    it["source"] = "OpenSubtitles"
+                    items.append(it)
+
         return ok({"items": items, "count": len(items), "title": title, "slug": slug, "ep": ep})
     except Exception as e:
-        return fail(f"Gagal mencari di OpenSubtitles: {e}")
+        return fail(f"Gagal mencari subtitle eksternal: {e}")
 
 
 @app.post("/api/player/sub_opensubtitles_merge")
-async def api_merge_opensubtitle(body: dict = None):
-    """Unduh subtitle spesifik dari OpenSubtitles dan lakukan Smart Merge dengan subtitle bawaan anime."""
+@app.post("/api/player/sub_external_merge")
+async def api_merge_external_subtitle(body: dict = None):
+    """Unduh subtitle spesifik dari AnimeTosho atau OpenSubtitles dan lakukan Smart Merge."""
     body = body or {}
     file_id = str(body.get("file_id") or body.get("id") or "").strip()
     os_url = str(body.get("os_url") or body.get("url") or "").strip()
     backup_url = str(body.get("backup_url") or "").strip()
-    filename = str(body.get("filename") or f"OpenSubtitles_{file_id}.srt").strip()
-    cand_lang = str(body.get("cand_lang") or "id").strip().lower()
+    source = str(body.get("source") or "").strip().lower()
+    filename = str(body.get("filename") or f"Subtitle_{file_id}.srt").strip()
     target_lang = str(body.get("lang") or "id").strip().lower()
     base_sub_url = str(body.get("base_sub_url") or "").strip()
     referer = str(body.get("referer") or "").strip()
-    merge_mode = str(body.get("merge_mode") or "hybrid").strip().lower()
 
     if not file_id and not os_url:
-        return fail("file_id atau os_url OpenSubtitles wajib diisi")
+        return fail("file_id atau os_url subtitle wajib diisi")
 
     try:
-        from api.opensubtitles import download_opensubtitle_text, strip_opensubtitles_ads
         from api.translate import (
             parse_vtt,
             build_vtt,
@@ -2778,16 +2812,33 @@ async def api_merge_opensubtitle(body: dict = None):
             find_unmatched_builtin_cues,
             merge_opensubtitles_with_builtin,
             call_gtx_translate,
+            automate_opensubtitles_pronouns,
+            apply_universal_lexicon_id,
         )
+        from api.opensubtitles import download_opensubtitle_text, strip_opensubtitles_ads
+        from api.animetosho import download_animetosho_sub_text
 
         loop = asyncio.get_running_loop()
-        os_raw = await loop.run_in_executor(
-            None,
-            lambda: download_opensubtitle_text(file_id=file_id, url=os_url, backup_url=backup_url),
-        )
-        os_cues = strip_opensubtitles_ads(parse_vtt(os_raw))
-        if not os_cues:
-            return fail("File subtitle OpenSubtitles kosong atau tidak valid")
+        is_animetosho = "animetosho" in source or "animetosho" in os_url or file_id.startswith("at_")
+
+        if is_animetosho:
+            clean_fid = file_id.replace("at_", "") if file_id.startswith("at_") else file_id
+            raw_txt = await loop.run_in_executor(
+                None,
+                lambda: download_animetosho_sub_text(url=os_url, file_id=clean_fid),
+            )
+        else:
+            raw_txt = await loop.run_in_executor(
+                None,
+                lambda: download_opensubtitle_text(file_id=file_id, url=os_url, backup_url=backup_url),
+            )
+
+        ext_cues = strip_opensubtitles_ads(parse_vtt(raw_txt))
+        if not ext_cues:
+            return fail("File subtitle kosong atau tidak valid")
+
+        if target_lang == "id":
+            ext_cues = automate_opensubtitles_pronouns(ext_cues, target_lang="id")
 
         builtin_cues = []
         if base_sub_url and base_sub_url.startswith("http"):
@@ -2798,16 +2849,10 @@ async def api_merge_opensubtitle(body: dict = None):
             except Exception:
                 pass
 
-        if cand_lang != target_lang and target_lang == "id":
-            try:
-                os_cues = await call_gtx_translate(os_cues, "en", "id", mode="gtx+")
-            except Exception:
-                pass
-
-        offset = estimate_optimal_offset(builtin_cues, os_cues) if builtin_cues else 0.0
+        offset = estimate_optimal_offset(builtin_cues, ext_cues) if builtin_cues else 0.0
         translated_gaps = {}
         if builtin_cues and target_lang == "id":
-            unmatched_idx, unmatched_cues = find_unmatched_builtin_cues(builtin_cues, os_cues, offset=offset)
+            unmatched_idx, unmatched_cues = find_unmatched_builtin_cues(builtin_cues, ext_cues, offset=offset)
             if unmatched_cues and len(unmatched_cues) <= 180:
                 try:
                     tr_gaps = await call_gtx_translate(unmatched_cues, "en", "id", mode="gtx+")
@@ -2818,8 +2863,8 @@ async def api_merge_opensubtitle(body: dict = None):
 
         merged_cues, stats = merge_opensubtitles_with_builtin(
             builtin_cues=builtin_cues,
-            os_cues=os_cues,
-            merge_mode="bilingual" if merge_mode in ("bilingual", "dual", "os_dual") else "hybrid",
+            os_cues=ext_cues,
+            merge_mode="hybrid",
             translated_gaps=translated_gaps,
             offset=offset,
             target_lang=target_lang,
@@ -2827,19 +2872,20 @@ async def api_merge_opensubtitle(body: dict = None):
         norm_vtt = build_vtt(merged_cues)
 
         import hashlib
-        sub_id = hashlib.sha1(f"os_merged|{file_id}|{base_sub_url}|{merge_mode}".encode("utf-8")).hexdigest()[:16]
+        sub_id = hashlib.sha1(f"ext_merged|{file_id}|{base_sub_url}".encode("utf-8")).hexdigest()[:16]
         await set_subtitle_cache(f"custom|{sub_id}", norm_vtt)
 
+        prov_tag = "AnimeTosho" if is_animetosho else "OpenSubtitles"
         return ok({
             "id": sub_id,
             "url": f"/api/player/sub_custom?id={sub_id}",
             "cues_count": len(merged_cues),
             "lang": target_lang,
-            "label": f"[OS+Merge] {filename}",
+            "label": f"[{prov_tag}] {filename}",
             "stats": stats,
         })
     except Exception as e:
-        return fail(f"Gagal mengunduh/merge OpenSubtitles: {e}")
+        return fail(f"Gagal mengunduh/merge subtitle eksternal: {e}")
 
 
 @app.post("/api/player/sub_custom")
@@ -2916,12 +2962,12 @@ async def get_custom_sub(id: str = Query(""),
 
     # Jika pengguna meminta translasi autosub (misal dari English ke Indonesian)
     if lang and lang.lower() != src.lower():
-        from api.translate import parse_vtt, build_vtt, build_bilingual_vtt
+        from api.translate import parse_vtt, build_vtt
         import hashlib
-        is_dual = (mode == "gtx+_dual")
-        clean_mode = "gtx+" if mode == "gtx+_dual" else mode
+        is_dual = False
+        clean_mode = "gtx+" if mode in ("gtx", "gtx+", "gtx+_dual", "aigtx") else (mode or "gtx+")
         cache_id = id or hashlib.sha1(url.encode("utf-8")).hexdigest()[:16]
-        tr_hash = hashlib.sha1(f"custom_tr|{cache_id}|{lang}|{mode or 'gtx+'}".encode("utf-8")).hexdigest()
+        tr_hash = hashlib.sha1(f"custom_tr|{cache_id}|{lang}|{clean_mode}".encode("utf-8")).hexdigest()
         key_tr = f"sub2|custom|{tr_hash}"
 
         if not refresh:
@@ -2934,14 +2980,11 @@ async def get_custom_sub(id: str = Query(""),
         try:
             cues = parse_vtt(vtt_text)
             tier = await _translate_with_fallback(cues, src, lang, requested_mode=clean_mode or "gtx+")
-            if is_dual:
-                new_text = build_bilingual_vtt(tier.get("cues") or cues, cues)
-            else:
-                new_text = build_vtt(tier.get("cues") or cues)
+            new_text = build_vtt(tier.get("cues") or cues)
             if tier.get("level") not in ("source", "source-fallback"):
                 await set_subtitle_cache(key_tr, new_text)
             resp = Response(content=new_text, media_type="text/vtt; charset=utf-8")
-            resp.headers["X-Translate-Tier"] = str(tier.get("level", "gtx+")) + ("-dual" if is_dual else "")
+            resp.headers["X-Translate-Tier"] = str(tier.get("level", "gtx+"))
             return resp
         except Exception as e:
             pass

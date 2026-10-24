@@ -262,7 +262,7 @@ public class PlayerActivity extends Activity {
     private String idNativeSubUrl = "";
     private String activeSubUrl = "";
     private String activeSubLang = "id"; // Default Indonesian
-    private String activeEngine = "gtx"; // "gtx" | "gtx+" | "aigtx" | "ai" | "raw"
+    private String activeEngine = "os_merge"; // "os_merge" | "ai" | "raw"
     private boolean subEnabled = true;
     private String activeStreamMode = "sub"; // "sub" | "dub"
     private String requestMode = "sub";
@@ -712,8 +712,8 @@ public class PlayerActivity extends Activity {
             currentResizeMode = TvFocusHelper.isTv(this)
                     ? AspectRatioFrameLayout.RESIZE_MODE_FIT
                     : sp.getInt("aspect_mode", AspectRatioFrameLayout.RESIZE_MODE_FIT);
-            activeEngine = sp.getString("pref_sub_engine", "gtx");
-            if ("aigtx".equals(activeEngine)) activeEngine = "gtx+";
+            activeEngine = sp.getString("pref_sub_engine", "os_merge");
+            if ("gtx".equals(activeEngine) || "gtx+".equals(activeEngine) || "aigtx".equals(activeEngine) || "gtx+_dual".equals(activeEngine) || "os_dual".equals(activeEngine)) activeEngine = "os_merge";
             activeSubLang = sp.getString("pref_sub_lang", "id");
             subEnabled = sp.getBoolean("pref_sub_enabled", true);
             if (playerView != null) {
@@ -3100,11 +3100,8 @@ public class PlayerActivity extends Activity {
             }
             return;
         }
-        String engineLabel = "Google GTX (Cepat)";
-        if ("gtx+".equals(activeEngine) || "aigtx".equals(activeEngine)) engineLabel = "GTX+ (Smart Fansub & Scene Detection)";
-        else if ("gtx+_dual".equals(activeEngine)) engineLabel = "GTX+ Bilingual (ID + EN)";
-        else if ("os_merge".equals(activeEngine)) engineLabel = "OpenSubtitles + Merge Bawaan";
-        else if ("os_dual".equals(activeEngine)) engineLabel = "OpenSubtitles Bilingual + Bawaan";
+        String engineLabel = "Smart Fansub & Merge";
+        if ("os_merge".equals(activeEngine) || "gtx+".equals(activeEngine) || "aigtx".equals(activeEngine)) engineLabel = "Smart Fansub & Merge";
         else if ("ai".equals(activeEngine)) engineLabel = "AI Fansub (" + configuredAiModel + ")";
         else if ("raw".equals(activeEngine)) {
             if ("en".equals(activeSubLang)) engineLabel = "Source English";
@@ -3596,40 +3593,10 @@ public class PlayerActivity extends Activity {
                 });
             }
 
-            // 1. Google GTX Murni (Prioritas Pertama / Super Cepat)
+            // 1. Smart Fansub & Merge (AnimeTosho ID -> OpenSubtitles ID -> Builtin + GTX+, dengan Smart Lexicon + Scene Detector)
             if (!enSourceSubUrl.isEmpty()) {
-                boolean isGtxSelected = subEnabled && "id".equals(activeSubLang) && "gtx".equals(activeEngine);
-                options.add("[ID] Bahasa Indonesia (Google GTX Murni - Cepat)" + (isGtxSelected ? " [Aktif]" : ""));
-                actions.add(() -> {
-                    subEnabled = true;
-                    activeSubLang = "id";
-                    activeEngine = "gtx";
-                    activeSubUrl = enSourceSubUrl;
-                });
-
-                // 2. GTX+ (Prioritas Kedua / GTX + Smart Fansub & Scene Detection)
-                boolean isGtxPlusSelected = subEnabled && "id".equals(activeSubLang) && ("gtx+".equals(activeEngine) || "aigtx".equals(activeEngine));
-                options.add("[ID] Bahasa Indonesia (GTX+ - Smart Fansub & Scene Detection)" + (isGtxPlusSelected ? " [Aktif]" : ""));
-                actions.add(() -> {
-                    subEnabled = true;
-                    activeSubLang = "id";
-                    activeEngine = "gtx+";
-                    activeSubUrl = enSourceSubUrl;
-                });
-
-                // 2b. GTX+ Bilingual (ID + EN Dual Subtitle)
-                boolean isGtxDualSelected = subEnabled && "id".equals(activeSubLang) && "gtx+_dual".equals(activeEngine);
-                options.add("[ID+EN] Bahasa Indonesia — GTX+ Bilingual (ID + EN)" + (isGtxDualSelected ? " [Aktif]" : ""));
-                actions.add(() -> {
-                    subEnabled = true;
-                    activeSubLang = "id";
-                    activeEngine = "gtx+_dual";
-                    activeSubUrl = enSourceSubUrl;
-                });
-
-                // 2c. OpenSubtitles + Smart Merge dengan subtitle bawaan anime
-                boolean isOsMergeSelected = subEnabled && "id".equals(activeSubLang) && "os_merge".equals(activeEngine);
-                options.add("[ID] Bahasa Indonesia (OpenSubtitles + Merge Subtitle Bawaan)" + (isOsMergeSelected ? " [Aktif]" : ""));
+                boolean isOsMergeSelected = subEnabled && "id".equals(activeSubLang) && ("os_merge".equals(activeEngine) || "gtx+".equals(activeEngine) || "gtx".equals(activeEngine));
+                options.add("[ID] Bahasa Indonesia (Smart Fansub & Merge)" + (isOsMergeSelected ? " [Aktif]" : ""));
                 actions.add(() -> {
                     subEnabled = true;
                     activeSubLang = "id";
@@ -3637,17 +3604,7 @@ public class PlayerActivity extends Activity {
                     activeSubUrl = enSourceSubUrl;
                 });
 
-                // 2d. OpenSubtitles Bilingual (OpenSubtitles di atas + teks bawaan di bawah)
-                boolean isOsDualSelected = subEnabled && "id".equals(activeSubLang) && "os_dual".equals(activeEngine);
-                options.add("[ID+EN] Bahasa Indonesia (OpenSubtitles Bilingual + Bawaan)" + (isOsDualSelected ? " [Aktif]" : ""));
-                actions.add(() -> {
-                    subEnabled = true;
-                    activeSubLang = "id";
-                    activeEngine = "os_dual";
-                    activeSubUrl = enSourceSubUrl;
-                });
-
-                // 3. AI Fansub (Prioritas Ketiga / LLM Translate)
+                // 2. AI Fansub (LLM Translate BYOK)
                 boolean isAiSelected = subEnabled && "id".equals(activeSubLang) && "ai".equals(activeEngine);
                 String aiOptionText = "[AI] Bahasa Indonesia (AI Fansub / " + configuredAiModel + ")"
                         + (hasAiKey ? " [SIAP]" : " [Butuh Key]")
@@ -3659,7 +3616,7 @@ public class PlayerActivity extends Activity {
                     activeEngine = "ai";
                     activeSubUrl = enSourceSubUrl;
                     if (!hasAiKey) {
-                        Toast.makeText(this, "Perhatian: API Key AI belum disetel (:apikey <key> di home). Menggunakan GTX sebagai fallback otomatis.", Toast.LENGTH_LONG).show();
+                        Toast.makeText(this, "Perhatian: API Key AI belum disetel (:apikey <key> di home). Menggunakan Smart Fansub & Merge sebagai fallback otomatis.", Toast.LENGTH_LONG).show();
                     }
                 });
             }
@@ -3718,8 +3675,8 @@ public class PlayerActivity extends Activity {
             });
         }
 
-        // Opsi pencarian rilis OpenSubtitles (download + merge dengan subtitle bawaan anime)
-        options.add("[+] Cari & Merge dari OpenSubtitles...");
+        // Opsi pencarian subtitle Bahasa Indonesia (AnimeTosho & OpenSubtitles)
+        options.add("[+] Cari Subtitle Bahasa Indonesia (AnimeTosho & OpenSubtitles)...");
         actions.add(this::showOpenSubtitlesSearchDialog);
 
         // Opsi Subtitle Kustom (File Lokal / URL)
@@ -3916,11 +3873,11 @@ public class PlayerActivity extends Activity {
     }
 
     /**
-     * Menampilkan daftar rilis subtitle OpenSubtitles untuk episode aktif (Android Mobile & Android TV).
+     * Menampilkan daftar subtitle Bahasa Indonesia (AnimeTosho & OpenSubtitles) untuk episode aktif (Android Mobile & Android TV).
      * Rilis yang dipilih diunduh lalu di-merge dengan subtitle bawaan anime di backend.
      */
     private void showOpenSubtitlesSearchDialog() {
-        Toast.makeText(this, "Mencari subtitle di OpenSubtitles...", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, "Mencari subtitle di AnimeTosho & OpenSubtitles...", Toast.LENGTH_SHORT).show();
         final String qTitle = title != null ? title : "";
         final String qSlug = slug != null ? slug : "";
         final int qEp = ep;
@@ -3939,7 +3896,7 @@ public class PlayerActivity extends Activity {
                 org.json.JSONArray arr = d != null ? d.optJSONArray("items") : null;
                 final List<JSONObject> items = new ArrayList<>();
                 if (arr != null) {
-                    for (int i = 0; i < arr.length() && i < 20; i++) {
+                    for (int i = 0; i < arr.length() && i < 25; i++) {
                         JSONObject it = arr.optJSONObject(i);
                         if (it != null) items.add(it);
                     }
@@ -3947,19 +3904,19 @@ public class PlayerActivity extends Activity {
                 runOnUiThread(() -> {
                     if (isFinishing() || isDestroyed()) return;
                     if (items.isEmpty()) {
-                        Toast.makeText(this, "Belum ada subtitle untuk episode ini di OpenSubtitles", Toast.LENGTH_LONG).show();
+                        Toast.makeText(this, "Belum ada subtitle Bahasa Indonesia untuk episode ini di AnimeTosho maupun OpenSubtitles", Toast.LENGTH_LONG).show();
                         return;
                     }
                     String[] labels = new String[items.size()];
                     for (int i = 0; i < items.size(); i++) {
                         JSONObject it = items.get(i);
-                        String lang = it.optString("lang", "").toUpperCase();
+                        String prov = it.optString("source", it.optString("id", "").startsWith("at_") ? "AnimeTosho" : "OpenSubtitles");
                         int dl = it.optInt("downloads", 0);
-                        labels[i] = "[" + lang + "] " + it.optString("filename", "OpenSubtitles #" + it.optString("file_id"))
+                        labels[i] = "[" + prov + "] " + it.optString("filename", "Subtitle #" + it.optString("file_id"))
                                 + (dl > 0 ? "  (" + dl + "×)" : "");
                     }
                     AlertDialog.Builder b = new AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert);
-                    b.setTitle("OpenSubtitles · Episode " + qEp);
+                    b.setTitle("Subtitle Bahasa Indonesia · Episode " + qEp);
                     b.setItems(labels, (dialog, which) -> {
                         if (which >= 0 && which < items.size()) {
                             mergeOpenSubtitleRelease(items.get(which));
@@ -3977,7 +3934,7 @@ public class PlayerActivity extends Activity {
                     b.show();
                 });
             } catch (Exception e) {
-                runOnUiThread(() -> Toast.makeText(this, "Gagal mencari di OpenSubtitles: " + e.getMessage(), Toast.LENGTH_LONG).show());
+                runOnUiThread(() -> Toast.makeText(this, "Gagal mencari subtitle: " + e.getMessage(), Toast.LENGTH_LONG).show());
             } finally {
                 if (conn != null) conn.disconnect();
             }
@@ -3985,7 +3942,8 @@ public class PlayerActivity extends Activity {
     }
 
     private void mergeOpenSubtitleRelease(JSONObject item) {
-        Toast.makeText(this, "Mengunduh & merge subtitle OpenSubtitles...", Toast.LENGTH_SHORT).show();
+        String prov = item.optString("source", item.optString("id", "").startsWith("at_") ? "AnimeTosho" : "OpenSubtitles");
+        Toast.makeText(this, "Mengunduh & merge subtitle " + prov + "...", Toast.LENGTH_SHORT).show();
         final String baseSub = enSourceSubUrl != null && !enSourceSubUrl.contains("/api/player/sub_custom") ? enSourceSubUrl : "";
         final String ref = streamReferer != null ? streamReferer : "";
         new Thread(() -> {
@@ -3996,7 +3954,8 @@ public class PlayerActivity extends Activity {
                 body.put("os_url", item.optString("url", ""));
                 body.put("backup_url", item.optString("backup_url", ""));
                 body.put("filename", item.optString("filename", ""));
-                body.put("cand_lang", item.optString("lang", "id"));
+                body.put("source", prov);
+                body.put("cand_lang", "id");
                 body.put("lang", "id");
                 body.put("base_sub_url", baseSub);
                 body.put("referer", ref);
@@ -4021,7 +3980,7 @@ public class PlayerActivity extends Activity {
                 JSONObject d = r.optJSONObject("data");
                 if (d == null) return;
                 final String subFullUrl = "http://127.0.0.1:8767" + d.optString("url", "");
-                final String label = d.optString("label", "OpenSubtitles");
+                final String label = d.optString("label", prov);
                 final int cuesCount = d.optInt("cues_count", 0);
                 JSONObject st = d.optJSONObject("stats");
                 final double offset = st != null ? st.optDouble("offset", 0.0) : 0.0;
@@ -4035,11 +3994,11 @@ public class PlayerActivity extends Activity {
                     activeEngine = "raw";
                     subEnabled = true;
                     applySubtitleSelection();
-                    Toast.makeText(this, "OpenSubtitles dimuat: " + cuesCount + " baris (offset "
+                    Toast.makeText(this, "Subtitle " + prov + " dimuat: " + cuesCount + " baris (offset "
                             + String.format(java.util.Locale.US, "%.1f", offset) + "s, " + gaps + " sign/OP/ED dari bawaan)", Toast.LENGTH_LONG).show();
                 });
             } catch (Exception e) {
-                runOnUiThread(() -> Toast.makeText(this, "Gagal merge OpenSubtitles: " + e.getMessage(), Toast.LENGTH_LONG).show());
+                runOnUiThread(() -> Toast.makeText(this, "Gagal merge subtitle: " + e.getMessage(), Toast.LENGTH_LONG).show());
             } finally {
                 if (conn != null) conn.disconnect();
             }

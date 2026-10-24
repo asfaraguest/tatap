@@ -334,35 +334,30 @@ def merge_opensubtitles_with_builtin(
                 final_s, final_e = bs, be
                 snapped_count += 1
 
-        if merge_mode == "bilingual" and overlapping_b_texts:
-            base_line = " / ".join(overlapping_b_texts[:2])
-            if base_line.lower() != os_txt.replace("\n", " ").strip().lower():
-                final_txt = f"{os_txt}\n{base_line}"
-            else:
-                final_txt = os_txt
-        else:
-            final_txt = os_txt
-
+        final_txt = os_txt
         merged.append({"start": final_s, "end": final_e, "text": final_txt})
 
-    # Isi celah cue dari subtitle bawaan yang tidak ada di OpenSubtitles (Signs, OP/ED, Preview)
-    if merge_mode in ("hybrid", "bilingual"):
-        for b_idx, bc in enumerate(clean_builtin):
-            if b_idx in matched_builtin_indices:
-                continue
-            bs, be = float(bc["start"]), float(bc["end"])
-            orig_b_txt = (bc.get("text") or "").strip()
-            if not orig_b_txt:
-                continue
-            tr_b_txt = (translated_gaps.get(b_idx) or orig_b_txt).strip()
-            if merge_mode == "bilingual" and tr_b_txt.lower() != orig_b_txt.lower():
-                gap_txt = f"{tr_b_txt}\n{orig_b_txt.replace(chr(10), ' ')}"
-            else:
-                gap_txt = tr_b_txt
-            merged.append({"start": bs, "end": be, "text": gap_txt})
-            gap_filled_count += 1
+    # Isi celah cue dari subtitle bawaan yang tidak ada di external sub (Signs, OP/ED, Preview)
+    for b_idx, bc in enumerate(clean_builtin):
+        if b_idx in matched_builtin_indices:
+            continue
+        bs, be = float(bc["start"]), float(bc["end"])
+        orig_b_txt = (bc.get("text") or "").strip()
+        if not orig_b_txt:
+            continue
+        tr_b_txt = (translated_gaps.get(b_idx) or orig_b_txt).strip()
+        if is_id_lang and tr_b_txt:
+            tr_b_txt = apply_universal_lexicon_id(tr_b_txt)
+        gap_txt = tr_b_txt
+        merged.append({"start": bs, "end": be, "text": gap_txt})
+        gap_filled_count += 1
 
     final_cues = merge_overlapping_cues(merged)
+    # Proteksi leksikon final untuk setiap cue hasil merge
+    if is_id_lang:
+        for fc in final_cues:
+            if fc.get("text"):
+                fc["text"] = apply_universal_lexicon_id(fc["text"])
     stats = {
         "offset": offset,
         "os_count": len(clean_os),
@@ -1859,8 +1854,16 @@ _UNIVERSAL_FANSUB_RULES = [
     (r"\bapoteker istana\b", "Tabib Istana"),
 
     # --- 20. Proteksi & Restorasi Nama Game Anime dari Terjemahan Mentah ---
-    (r"\b(?:gim|game|dunia|bermain|pemain|peringkat|sejarah|server|masuk ke|log in ke|login ke)\s+(?:memuaskan|puas|kepuasan)\b", lambda m: _re.sub(r"\s+(?:memuaskan|puas|kepuasan)\b", " Satisfy", m.group(0), flags=_re.I)),
-    (r"\b(?:di|ke)\s+(?:memuaskan|puas|kepuasan)\b", lambda m: _re.sub(r"\s+(?:memuaskan|puas|kepuasan)\b", " Satisfy", m.group(0), flags=_re.I)),
+    # Satisfy (VRMMO Game di Overgeared)
+    (r"\b(?:puaskan|memuaskan|puas|kepuasan),?\s+((?:(?:sebuah\s+)?(?:gim|game|dunia|realitas (?:virtual|maya)|vrmmo))\b)", lambda m: "Satisfy, " + m.group(1)),
+    (r"\b(?:puaskan|memuaskan|puas|kepuasan)\s+((?:pengguna|user|pemain|akun|karakter|server)\b)", lambda m: "Satisfy " + m.group(1)),
+    (r"\b(?:berita|warta|kabar|saluran|siaran|tayangan|acara|koran|harian)\s+(?:yang\s+)?(?:memuaskan|puaskan|puas|kepuasan)\b", lambda m: _re.sub(r"\s+(?:yang\s+)?(?:memuaskan|puaskan|puas|kepuasan)\b", " Satisfy", m.group(0), flags=_re.I)),
+    (r"\b(?:memuaskan|puaskan|puas|kepuasan)\s+(times|news|every|harian|koran|berita)\b", lambda m: "Satisfy " + m.group(1)),
+    (r"\bsatisfy\s+(?:berita|warta)\b", _proper_title("Berita Satisfy")),
+    (r"\b(?:gim|game|dunia|bermain|pemain|pengguna|user|peringkat|sejarah|server|masuk ke|log in ke|login ke|mengakses|akun|karakter|di|ke|dalam|di dalam)\s+(?:memuaskan|puaskan|puas|kepuasan)\b", lambda m: _re.sub(r"\s+(?:memuaskan|puaskan|puas|kepuasan)\b", " Satisfy", m.group(0), flags=_re.I)),
+    (r"\b(?:tidak|bukan)\s+(?:memuaskan|puaskan|puas)(!|\b)", lambda m: "Bukan Satisfy" + (m.group(1) if m.group(1) == "!" else "")),
+    (r"\b(?:puaskan|memuaskan|puas)!\s*(siap|ready)\b", _proper_title("Satisfy! Siap")),
+    (r"^\s*([-–—]?\s*)(?:Puaskan|Memuaskan)\s*([!.]*)\s*$", lambda m: m.group(1) + "Satisfy" + (m.group(2) or "!")),
     (r"\bmemuaskan adalah\b", _proper_title("Satisfy adalah")),
     (r"\bseni pedang (?:daring|online)\b", _proper_title("Sword Art Online")),
     (r"\b(?:badai|angin kencang) senjata (?:daring|online)\b", _proper_title("Gun Gale Online")),
@@ -2121,7 +2124,7 @@ _AIGTX_SMOOTH_RULES = [
 ]
 _GTXPLUS_SMOOTH_RULES = _AIGTX_SMOOTH_RULES
 
-_COMPILED_UNIVERSAL = [(_re.compile(pat, _re.IGNORECASE), repl) for pat, repl in _UNIVERSAL_FANSUB_RULES]
+_COMPILED_UNIVERSAL = [(_re.compile(pat, _re.IGNORECASE | _re.MULTILINE), repl) for pat, repl in _UNIVERSAL_FANSUB_RULES]
 _COMPILED_CASUAL = [(_re.compile(pat, _re.IGNORECASE), repl) for pat, repl in _CASUAL_FANSUB_RULES]
 _COMPILED_AIGTX_SMOOTH = [(_re.compile(pat, _re.IGNORECASE), repl) for pat, repl in _AIGTX_SMOOTH_RULES]
 _COMPILED_GTXPLUS_SMOOTH = _COMPILED_AIGTX_SMOOTH
@@ -2292,6 +2295,8 @@ def _sanitize_gtxplus_id(text: str, force_formal: bool = False) -> str:
         return text
 
     def _replace_match(m, repl):
+        if callable(repl):
+            return repl(m)
         expanded = m.expand(repl) if "\\" in repl else repl
         orig = m.group(0)
         if orig and orig.islower():
