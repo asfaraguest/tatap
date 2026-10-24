@@ -44,6 +44,9 @@ playMPV:function(b){return jpost("/api/play-mpv",b);},
 getSettings:function(){return jget("/api/settings");},
 setSetting:function(b){return jpost("/api/settings",b);},
 checkUpdate:function(force){return jget("/api/update/check"+(force?"?force=true":""));},
-uploadCustomSub:function(b){return jpost("/api/player/sub_custom",b);}
+uploadCustomSub:function(b){return jpost("/api/player/sub_custom",b);},
+// OpenSubtitles: cari daftar rilis subtitle & unduh + merge dengan subtitle bawaan anime.
+searchOpenSubtitles:function(title,slug,ep,lang){return jget("/api/subtitles/opensubtitles?title="+encodeURIComponent(title||"")+"&slug="+encodeURIComponent(slug||"")+"&ep="+encodeURIComponent(ep||1)+"&lang="+encodeURIComponent(lang||"id"));},
+mergeOpenSubtitle:function(b){return jpost("/api/player/sub_opensubtitles_merge",b);}
 };
 

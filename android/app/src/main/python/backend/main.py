@@ -2256,20 +2256,25 @@ async def proxy_sub(url: str = Query(""),
                    referer: str = Query(""),
                    lang: str = Query("", pattern="^(en|id|ja|es|fr|de|pt|ko|zh)$|^$"),
                    src: str = Query("en", pattern="^(en|ja|es|fr|de|pt|ko|zh)$"),
-                   mode: str = Query("", pattern="^(gtx|gtx\\+|gtx\\+_dual|aigtx|ai|)$"),
+                   mode: str = Query("", pattern="^(gtx|gtx\\+|gtx\\+_dual|aigtx|ai|os_merge|os_dual|)$"),
                    dual: bool = Query(False),
+                   title: str = Query(""),
+                   slug: str = Query(""),
+                   ep: int = Query(1),
+                   os_file_id: str = Query(""),
                    refresh: bool = Query(False)):
-    """Proxy subtitle VTT. Menjalankan translasi multi-tier dengan deduplikasi inflight
-    dan proteksi cache poisoning."""
+    """Proxy subtitle VTT. Menjalankan translasi multi-tier atau OpenSubtitles Smart Merge
+    dengan deduplikasi inflight dan proteksi cache poisoning."""
     if not url.startswith("http"):
         return Response(status_code=400)
     _validate_external_proxy_url(url)
 
-    is_dual = bool(dual) or (mode == "gtx+_dual")
+    is_os_mode = mode in ("os_merge", "os_dual")
+    is_dual = bool(dual) or (mode in ("gtx+_dual", "os_dual"))
     clean_mode = "gtx+" if mode == "gtx+_dual" else mode
 
-    # Lang kosong atau sama dengan sumber -> return source apa adanya
-    if not lang or lang == src:
+    # Lang kosong atau sama dengan sumber (dan bukan mode OpenSubtitles) -> return source apa adanya
+    if (not lang or lang == src) and not is_os_mode:
         try:
             content = await _fetch_sub_text(url, referer)
             return Response(content=content, media_type="text/vtt")
@@ -2278,20 +2283,66 @@ async def proxy_sub(url: str = Query(""),
 
     import hashlib
     base_hash = hashlib.sha1(
-        (url + "|" + (referer or "") + "|" + lang).encode("utf-8")
+        (url + "|" + (referer or "") + "|" + (lang or "id")).encode("utf-8")
+    ).hexdigest()
+    os_ctx_hash = hashlib.sha1(
+        f"{url}|{slug}|{title}|{ep}|{os_file_id}|{lang or 'id'}".encode("utf-8")
     ).hexdigest()
     key_gtxplus = "sub2|gtx+|" + base_hash
     key_gtxplus_dual = "sub2|gtx+_dual|" + base_hash
     key_aigtx = "sub2|aigtx|" + base_hash
     key_gtx = "sub2|gtx|" + base_hash
     key_llm = "sub2|llm|" + base_hash
+    key_os_merge = "sub2|os_merge|" + os_ctx_hash
+    key_os_dual = "sub2|os_dual|" + os_ctx_hash
 
     if refresh:
-        for k in (key_gtx, key_gtxplus, key_gtxplus_dual, key_aigtx, key_llm, "sub2|mt|" + base_hash):
+        for k in (key_gtx, key_gtxplus, key_gtxplus_dual, key_aigtx, key_llm, key_os_merge, key_os_dual, "sub2|mt|" + base_hash):
             try:
                 await delete_subtitle_cache(k)
             except Exception:
                 pass
+
+    if is_os_mode:
+        target_os_key = key_os_dual if is_dual else key_os_merge
+        if not refresh:
+            hit_os = await _get_validated_subtitle_cache(target_os_key, lang=lang or "id")
+            if hit_os:
+                resp = Response(content=hit_os, media_type="text/vtt")
+                resp.headers["X-Translate-Tier"] = "cached-os_dual" if is_dual else "cached-os_merge"
+                return resp
+
+        os_job_key = f"os|{os_ctx_hash}|dual={int(is_dual)}"
+        fut_os = _SUB_INFLIGHT.get(os_job_key)
+        if fut_os is None:
+            fut_os = asyncio.ensure_future(
+                _opensubtitles_merge_sub_job(
+                    url=url,
+                    referer=referer,
+                    src=src,
+                    lang=lang or "id",
+                    title=title,
+                    slug=slug,
+                    ep=ep,
+                    os_file_id=os_file_id,
+                    is_dual=is_dual,
+                    cache_key=target_os_key,
+                    fallback_key_gtxplus=key_gtxplus_dual if is_dual else key_gtxplus,
+                )
+            )
+            _SUB_INFLIGHT[os_job_key] = fut_os
+            fut_os.add_done_callback(lambda _f, k=os_job_key: _SUB_INFLIGHT.pop(k, None))
+
+        new_text, tier = await asyncio.shield(fut_os)
+        resp = Response(content=new_text, media_type="text/vtt")
+        resp.headers["X-Translate-Tier"] = tier.get("level", "os_merge")
+        if tier.get("os_filename"):
+            clean_fn = re.sub(r"[^\w.\-\[\]() ]", "", str(tier["os_filename"]))[:80]
+            resp.headers["X-OpenSubtitles-File"] = clean_fn
+        if tier.get("merge_stats"):
+            st = tier["merge_stats"]
+            resp.headers["X-OpenSubtitles-Merge"] = f"os={st.get('os_count',0)},snapped={st.get('snapped',0)},gaps={st.get('gap_filled',0)},offset={st.get('offset',0.0)}s"
+        return resp
 
     req_mode = "gtx+" if clean_mode in ("gtx+", "aigtx") else (clean_mode or "gtx")
 
@@ -2532,6 +2583,261 @@ async def _translate_with_fallback(cues, src, tgt, requested_mode="gtx"):
 
     # Return cues asli jika semua penerjemah gagal
     return {"cues": cues, "level": "source", "error": last_err}
+
+
+async def _opensubtitles_merge_sub_job(
+    url: str,
+    referer: str,
+    src: str,
+    lang: str,
+    title: str,
+    slug: str,
+    ep: int,
+    os_file_id: str,
+    is_dual: bool,
+    cache_key: str,
+    fallback_key_gtxplus: str,
+):
+    """Unduh subtitle dari OpenSubtitles (Public API + Scraper) lalu lakukan Smart Merge
+    dengan subtitle bawaan anime (url). Jika OpenSubtitles tidak tersedia, fallback otomatis ke GTX+."""
+    from api.translate import (
+        parse_vtt,
+        build_vtt,
+        build_bilingual_vtt,
+        merge_overlapping_cues,
+        estimate_optimal_offset,
+        find_unmatched_builtin_cues,
+        merge_opensubtitles_with_builtin,
+        call_gtx_translate,
+        log_translate,
+    )
+    from api.opensubtitles import (
+        search_opensubtitles,
+        download_opensubtitle_text,
+        strip_opensubtitles_ads,
+    )
+
+    loop = asyncio.get_running_loop()
+
+    # 1. Ambil subtitle bawaan anime (builtin_cues)
+    builtin_text = ""
+    builtin_cues = []
+    if url and url.startswith("http"):
+        try:
+            builtin_text = await _fetch_sub_text(url, referer)
+            builtin_cues = merge_overlapping_cues(parse_vtt(builtin_text))
+        except Exception as e:
+            log_translate(f"[OpenSubtitles Merge] Gagal mengambil subtitle bawaan: {e}")
+
+    # 2. Cari & unduh subtitle dari OpenSubtitles
+    os_cues = []
+    picked_cand = None
+    try:
+        candidates = await loop.run_in_executor(
+            None,
+            lambda: search_opensubtitles(title=title, slug=slug, ep=ep, lang=lang or "id"),
+        )
+        if os_file_id:
+            for c in candidates:
+                if str(c.get("file_id")) == str(os_file_id) or str(c.get("id")) == str(os_file_id):
+                    picked_cand = c
+                    break
+            if not picked_cand:
+                picked_cand = {
+                    "file_id": str(os_file_id),
+                    "filename": f"OpenSubtitles_{os_file_id}.srt",
+                    "lang": lang or "id",
+                    "url": f"https://dl.opensubtitles.org/en/download/subencoding-utf8/file/{os_file_id}",
+                    "backup_url": f"https://subs5.strem.io/en/download/subencoding-stremio-utf8/src-api/file/{os_file_id}",
+                }
+        elif candidates:
+            picked_cand = candidates[0]
+
+        if picked_cand:
+            os_raw_txt = await loop.run_in_executor(
+                None,
+                lambda: download_opensubtitle_text(
+                    file_id=picked_cand.get("file_id", ""),
+                    url=picked_cand.get("url", ""),
+                    backup_url=picked_cand.get("backup_url", ""),
+                ),
+            )
+            os_cues = strip_opensubtitles_ads(parse_vtt(os_raw_txt))
+    except Exception as e:
+        log_translate(f"[OpenSubtitles Merge] Pencarian/unduh OpenSubtitles gagal ({e}), fallback ke GTX+ bawaan.")
+
+    # Jika OpenSubtitles berhasil diunduh, lakukan Smart Merge dengan subtitle bawaan anime
+    if os_cues:
+        cand_lang = (picked_cand.get("lang") or "id").lower()
+        target_lang = (lang or "id").lower()
+
+        # Jika kandidat terbaik dari OpenSubtitles berbahasa Inggris sedangkan target Indonesia,
+        # terjemahkan cue OpenSubtitles via GTX+ terlebih dahulu
+        if cand_lang != target_lang and target_lang == "id":
+            try:
+                os_cues = await call_gtx_translate(os_cues, "en", "id", mode="gtx+")
+            except Exception:
+                pass
+
+        offset = estimate_optimal_offset(builtin_cues, os_cues) if builtin_cues else 0.0
+        translated_gaps = {}
+
+        # Cari cue pada subtitle bawaan (Signs, OP/ED, Preview) yang tidak ada di OpenSubtitles
+        if builtin_cues and target_lang == "id":
+            unmatched_idx, unmatched_cues = find_unmatched_builtin_cues(builtin_cues, os_cues, offset=offset)
+            if unmatched_cues and len(unmatched_cues) <= 180:
+                try:
+                    tr_gaps = await call_gtx_translate(unmatched_cues, src or "en", "id", mode="gtx+")
+                    for idx_b, tr_c in zip(unmatched_idx, tr_gaps):
+                        translated_gaps[idx_b] = tr_c.get("text", "")
+                except Exception:
+                    pass
+
+        merge_mode = "bilingual" if is_dual else "hybrid"
+        merged_cues, stats = merge_opensubtitles_with_builtin(
+            builtin_cues=builtin_cues,
+            os_cues=os_cues,
+            merge_mode=merge_mode,
+            translated_gaps=translated_gaps,
+            offset=offset,
+        )
+        new_text = build_vtt(merged_cues)
+        if cache_key and ((target_lang != "id") or _is_valid_id_subtitle(new_text)):
+            await set_subtitle_cache(cache_key, new_text)
+
+        log_translate(
+            f"[OpenSubtitles Merge] Sukses merge '{picked_cand.get('filename')}' "
+            f"(OS={stats['os_count']}, Snapped={stats['snapped']}, GapsFilled={stats['gap_filled']}, Offset={stats['offset']}s)"
+        )
+        return new_text, {
+            "level": "os_dual" if is_dual else "os_merge",
+            "os_filename": picked_cand.get("filename", ""),
+            "merge_stats": stats,
+        }
+
+    # Fallback: Jika OpenSubtitles belum tersedia untuk episode ini, gunakan GTX+ dari subtitle bawaan anime
+    if builtin_cues:
+        tier = await _translate_with_fallback(builtin_cues, src or "en", lang or "id", requested_mode="gtx+")
+        if is_dual:
+            new_text = build_bilingual_vtt(tier.get("cues") or builtin_cues, builtin_cues)
+        else:
+            new_text = build_vtt(tier.get("cues") or builtin_cues)
+        if fallback_key_gtxplus and ((lang or "id").lower() != "id" or _is_valid_id_subtitle(new_text)):
+            await set_subtitle_cache(fallback_key_gtxplus, new_text)
+        return new_text, {"level": "os_fallback_gtx+", "error": "Subtitle belum tersedia di OpenSubtitles, menggunakan GTX+ Bawaan"}
+
+    raise HTTPException(status_code=404, detail="Subtitle tidak ditemukan baik di OpenSubtitles maupun bawaan stream")
+
+
+@app.get("/api/subtitles/opensubtitles")
+async def api_search_opensubtitles(
+    title: str = Query(""),
+    slug: str = Query(""),
+    ep: int = Query(1),
+    season: int = Query(0),
+    lang: str = Query("id"),
+):
+    """Cari daftar subtitle yang tersedia di OpenSubtitles (Public API + Scraping) untuk episode anime."""
+    try:
+        from api.opensubtitles import search_opensubtitles
+        loop = asyncio.get_running_loop()
+        items = await loop.run_in_executor(
+            None,
+            lambda: search_opensubtitles(title=title, slug=slug, ep=ep, season=season, lang=lang),
+        )
+        return ok({"items": items, "count": len(items), "title": title, "slug": slug, "ep": ep})
+    except Exception as e:
+        return fail(f"Gagal mencari di OpenSubtitles: {e}")
+
+
+@app.post("/api/player/sub_opensubtitles_merge")
+async def api_merge_opensubtitle(body: dict = None):
+    """Unduh subtitle spesifik dari OpenSubtitles dan lakukan Smart Merge dengan subtitle bawaan anime."""
+    body = body or {}
+    file_id = str(body.get("file_id") or body.get("id") or "").strip()
+    os_url = str(body.get("os_url") or body.get("url") or "").strip()
+    backup_url = str(body.get("backup_url") or "").strip()
+    filename = str(body.get("filename") or f"OpenSubtitles_{file_id}.srt").strip()
+    cand_lang = str(body.get("cand_lang") or "id").strip().lower()
+    target_lang = str(body.get("lang") or "id").strip().lower()
+    base_sub_url = str(body.get("base_sub_url") or "").strip()
+    referer = str(body.get("referer") or "").strip()
+    merge_mode = str(body.get("merge_mode") or "hybrid").strip().lower()
+
+    if not file_id and not os_url:
+        return fail("file_id atau os_url OpenSubtitles wajib diisi")
+
+    try:
+        from api.opensubtitles import download_opensubtitle_text, strip_opensubtitles_ads
+        from api.translate import (
+            parse_vtt,
+            build_vtt,
+            merge_overlapping_cues,
+            estimate_optimal_offset,
+            find_unmatched_builtin_cues,
+            merge_opensubtitles_with_builtin,
+            call_gtx_translate,
+        )
+
+        loop = asyncio.get_running_loop()
+        os_raw = await loop.run_in_executor(
+            None,
+            lambda: download_opensubtitle_text(file_id=file_id, url=os_url, backup_url=backup_url),
+        )
+        os_cues = strip_opensubtitles_ads(parse_vtt(os_raw))
+        if not os_cues:
+            return fail("File subtitle OpenSubtitles kosong atau tidak valid")
+
+        builtin_cues = []
+        if base_sub_url and base_sub_url.startswith("http"):
+            try:
+                _validate_external_proxy_url(base_sub_url)
+                base_txt = await _fetch_sub_text(base_sub_url, referer)
+                builtin_cues = merge_overlapping_cues(parse_vtt(base_txt))
+            except Exception:
+                pass
+
+        if cand_lang != target_lang and target_lang == "id":
+            try:
+                os_cues = await call_gtx_translate(os_cues, "en", "id", mode="gtx+")
+            except Exception:
+                pass
+
+        offset = estimate_optimal_offset(builtin_cues, os_cues) if builtin_cues else 0.0
+        translated_gaps = {}
+        if builtin_cues and target_lang == "id":
+            unmatched_idx, unmatched_cues = find_unmatched_builtin_cues(builtin_cues, os_cues, offset=offset)
+            if unmatched_cues and len(unmatched_cues) <= 180:
+                try:
+                    tr_gaps = await call_gtx_translate(unmatched_cues, "en", "id", mode="gtx+")
+                    for idx_b, tr_c in zip(unmatched_idx, tr_gaps):
+                        translated_gaps[idx_b] = tr_c.get("text", "")
+                except Exception:
+                    pass
+
+        merged_cues, stats = merge_opensubtitles_with_builtin(
+            builtin_cues=builtin_cues,
+            os_cues=os_cues,
+            merge_mode="bilingual" if merge_mode in ("bilingual", "dual", "os_dual") else "hybrid",
+            translated_gaps=translated_gaps,
+            offset=offset,
+        )
+        norm_vtt = build_vtt(merged_cues)
+
+        import hashlib
+        sub_id = hashlib.sha1(f"os_merged|{file_id}|{base_sub_url}|{merge_mode}".encode("utf-8")).hexdigest()[:16]
+        await set_subtitle_cache(f"custom|{sub_id}", norm_vtt)
+
+        return ok({
+            "id": sub_id,
+            "url": f"/api/player/sub_custom?id={sub_id}",
+            "cues_count": len(merged_cues),
+            "lang": target_lang,
+            "label": f"[OS+Merge] {filename}",
+            "stats": stats,
+        })
+    except Exception as e:
+        return fail(f"Gagal mengunduh/merge OpenSubtitles: {e}")
 
 
 @app.post("/api/player/sub_custom")

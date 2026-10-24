@@ -138,7 +138,59 @@ def tls_desync_connect(host: str, port: int = 443, timeout: float = 8.0):
     return raw_sock, sslobj, in_bio, out_bio
 
 
-def tls_desync_request(url: str, headers: dict = None, timeout: float = 10.0) -> bytes:
+def _decode_http_body(header_bytes: bytes, body_bytes: bytes) -> bytes:
+    """Dekode Transfer-Encoding: chunked dan Content-Encoding: gzip/deflate pada HTTP body mentah."""
+    if not body_bytes:
+        return b""
+    hdr_text = header_bytes.decode("latin-1", errors="replace").lower()
+    out = body_bytes
+
+    if "transfer-encoding: chunked" in hdr_text or "transfer-encoding:chunked" in hdr_text:
+        dechunked = bytearray()
+        pos = 0
+        n = len(out)
+        while pos < n:
+            rn = out.find(b"\r\n", pos)
+            if rn < 0:
+                break
+            line = out[pos:rn].split(b";", 1)[0].strip()
+            if not line:
+                pos = rn + 2
+                continue
+            try:
+                chunk_len = int(line, 16)
+            except ValueError:
+                # Jika bukan hex valid, kemungkinan bukan chunked murni; batalkan dechunk
+                dechunked = bytearray(out)
+                break
+            if chunk_len == 0:
+                break
+            start_data = rn + 2
+            end_data = start_data + chunk_len
+            dechunked.extend(out[start_data:end_data])
+            pos = end_data + 2
+        out = bytes(dechunked)
+
+    if "content-encoding: gzip" in hdr_text or "content-encoding:gzip" in hdr_text:
+        try:
+            import gzip
+            out = gzip.decompress(out)
+        except Exception:
+            pass
+    elif "content-encoding: deflate" in hdr_text or "content-encoding:deflate" in hdr_text:
+        try:
+            import zlib
+            out = zlib.decompress(out)
+        except Exception:
+            try:
+                import zlib
+                out = zlib.decompress(out, -zlib.MAX_WBITS)
+            except Exception:
+                pass
+    return out
+
+
+def tls_desync_request(url: str, headers: dict = None, timeout: float = 10.0, _redirects: int = 0) -> bytes:
     """Kirim HTTP GET request via desync TLS socket dan kembalikan response body bytes."""
     p = urllib.parse.urlsplit(url)
     host = p.netloc.split(":")[0]
@@ -160,6 +212,8 @@ def tls_desync_request(url: str, headers: dict = None, timeout: float = 10.0) ->
             for k, v in headers.items():
                 if k.lower() not in ("host", "connection"):
                     h_lines.append(f"{k}: {v}")
+                elif k.lower() == "user-agent":
+                    h_lines[2] = f"User-Agent: {v}"
         
         req_data = "\r\n".join(h_lines) + "\r\n\r\n"
         sslobj.write(req_data.encode("utf-8"))
@@ -190,7 +244,18 @@ def tls_desync_request(url: str, headers: dict = None, timeout: float = 10.0) ->
         # Pisahkan header dan body HTTP
         idx = resp_raw.find(b"\r\n\r\n")
         if idx >= 0:
-            return resp_raw[idx + 4:]
+            hdr_part = resp_raw[:idx]
+            body_part = resp_raw[idx + 4:]
+            first_line = hdr_part.split(b"\r\n", 1)[0].decode("latin-1", errors="replace")
+            if _redirects < 3 and any(code in first_line for code in (" 301 ", " 302 ", " 303 ", " 307 ", " 308 ")):
+                for h_ln in hdr_part.split(b"\r\n")[1:]:
+                    if h_ln.lower().startswith(b"location:"):
+                        loc = h_ln.split(b":", 1)[1].strip().decode("utf-8", errors="replace")
+                        if loc:
+                            next_url = urllib.parse.urljoin(url, loc)
+                            raw_sock.close()
+                            return tls_desync_request(next_url, headers=headers, timeout=timeout, _redirects=_redirects + 1)
+            return _decode_http_body(hdr_part, body_part)
         return resp_raw
     finally:
         try:

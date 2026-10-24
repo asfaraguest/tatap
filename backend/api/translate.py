@@ -173,6 +173,188 @@ def build_bilingual_vtt(translated_cues, source_cues):
     return build_vtt(combined)
 
 
+def estimate_optimal_offset(builtin_cues: list, os_cues: list, max_shift: float = 15.0) -> float:
+    """Hitung offset waktu optimal (detik) untuk menyelaraskan os_cues terhadap builtin_cues anime.
+    Menggunakan cross-correlation histogram selisih waktu mulai (start onset) dengan presisi 0.2 detik."""
+    if not builtin_cues or not os_cues:
+        return 0.0
+    buckets = _collections.Counter()
+    b_starts = [float(c["start"]) for c in builtin_cues[:400]]
+    o_starts = [float(c["start"]) for c in os_cues[:400]]
+
+    for bs in b_starts:
+        for os_t in o_starts:
+            diff = bs - os_t
+            if -max_shift <= diff <= max_shift:
+                q = round(diff * 5.0) / 5.0
+                buckets[q] += 1
+
+    if not buckets:
+        return 0.0
+
+    best_q, best_cnt = buckets.most_common(1)[0]
+    # Hitung rata-rata tertimbang di sekitar puncak (best_q +- 0.2s)
+    total_w = 0
+    weighted_sum = 0.0
+    for q_val in (round((best_q - 0.2) * 5.0) / 5.0, best_q, round((best_q + 0.2) * 5.0) / 5.0):
+        w = buckets.get(q_val, 0)
+        total_w += w
+        weighted_sum += q_val * w
+
+    n_min = min(len(b_starts), len(o_starts))
+    min_required = max(2, min(n_min, int(n_min * 0.15))) if n_min >= 10 else max(2, int(n_min * 0.5))
+    if total_w < min_required:
+        return 0.0
+
+    refined = round(weighted_sum / max(1, total_w), 2)
+    return refined if abs(refined) >= 0.20 else 0.0
+
+
+def _cues_overlap(a_start: float, a_end: float, b_start: float, b_end: float, tol: float = 0.25) -> bool:
+    """True jika dua rentang waktu cue saling berimpitan atau sangat berdekatan."""
+    overlap = min(a_end, b_end) - max(a_start, b_start)
+    if overlap >= -tol:
+        return True
+    return abs(a_start - b_start) <= 0.65
+
+
+def find_unmatched_builtin_cues(builtin_cues: list, os_cues: list, offset: float = 0.0) -> tuple:
+    """Temukan cue pada subtitle bawaan anime (seperti Sign, OP/ED, Preview) yang belum ada di OpenSubtitles.
+    Mengembalikan (list_index_builtin, list_cue_builtin)."""
+    if not builtin_cues:
+        return ([], [])
+    if not os_cues:
+        return (list(range(len(builtin_cues))), list(builtin_cues))
+
+    shifted_os = [
+        {"start": max(0.0, float(c["start"]) + offset), "end": max(0.1, float(c["end"]) + offset)}
+        for c in os_cues
+    ]
+    unmatched_idx = []
+    unmatched_cues = []
+    for idx, bc in enumerate(builtin_cues):
+        bs, be = float(bc["start"]), float(bc["end"])
+        has_match = False
+        for oc in shifted_os:
+            if _cues_overlap(bs, be, oc["start"], oc["end"], tol=0.20):
+                has_match = True
+                break
+        if not has_match:
+            unmatched_idx.append(idx)
+            unmatched_cues.append(bc)
+    return (unmatched_idx, unmatched_cues)
+
+
+def merge_opensubtitles_with_builtin(
+    builtin_cues: list,
+    os_cues: list,
+    merge_mode: str = "hybrid",
+    translated_gaps: dict = None,
+    offset: float = None,
+) -> tuple:
+    """Gabungkan (merge) subtitle yang diunduh dari OpenSubtitles dengan subtitle bawaan anime.
+
+    Mekanisme:
+      1. Auto-Sync Offset: Menyelaraskan timeline os_cues dengan builtin_cues.
+      2. Timestamp Snapping: Menempelkan waktu cue OpenSubtitles ke timestamp presisi milik subtitle bawaan.
+      3. Gap Filling (Hybrid): Mengisi cue yang hilang di OpenSubtitles (Signs/OP/ED/Preview) dari subtitle bawaan.
+      4. Bilingual Mode (os_dual): Menyusun teks OpenSubtitles di baris atas & teks bawaan anime di baris bawah.
+
+    Mengembalikan (merged_cues, stats_dict).
+    """
+    from api.opensubtitles import strip_opensubtitles_ads
+
+    clean_os = strip_opensubtitles_ads(os_cues or [])
+    clean_builtin = list(builtin_cues or [])
+
+    if not clean_os and not clean_builtin:
+        return ([], {"offset": 0.0, "os_count": 0, "gap_filled": 0, "snapped": 0})
+    if not clean_os:
+        return (clean_builtin, {"offset": 0.0, "os_count": 0, "gap_filled": len(clean_builtin), "snapped": 0})
+    if not clean_builtin:
+        return (clean_os, {"offset": 0.0, "os_count": len(clean_os), "gap_filled": 0, "snapped": 0})
+
+    if offset is None:
+        offset = estimate_optimal_offset(clean_builtin, clean_os)
+
+    translated_gaps = translated_gaps or {}
+    merged = []
+    snapped_count = 0
+    gap_filled_count = 0
+    matched_builtin_indices = set()
+
+    for oc in clean_os:
+        os_s = max(0.0, float(oc["start"]) + offset)
+        os_e = max(os_s + 0.1, float(oc["end"]) + offset)
+        os_txt = (oc.get("text") or "").strip()
+        if not os_txt:
+            continue
+
+        # Cari cue bawaan yang berimpitan paling dekat
+        best_b_idx = -1
+        best_dist = 999.0
+        overlapping_b_texts = []
+
+        for b_idx, bc in enumerate(clean_builtin):
+            bs, be = float(bc["start"]), float(bc["end"])
+            if _cues_overlap(os_s, os_e, bs, be, tol=0.20):
+                matched_builtin_indices.add(b_idx)
+                b_txt = (bc.get("text") or "").replace("\n", " ").strip()
+                if b_txt and b_txt not in overlapping_b_texts:
+                    overlapping_b_texts.append(b_txt)
+                dist = abs(os_s - bs) + abs(os_e - be)
+                if dist < best_dist:
+                    best_dist = dist
+                    best_b_idx = b_idx
+
+        final_s, final_e = os_s, os_e
+        if best_b_idx >= 0:
+            bc_best = clean_builtin[best_b_idx]
+            bs, be = float(bc_best["start"]), float(bc_best["end"])
+            if abs(os_s - bs) <= 0.85 and abs(os_e - be) <= 1.10:
+                final_s, final_e = bs, be
+                snapped_count += 1
+
+        if merge_mode == "bilingual" and overlapping_b_texts:
+            base_line = " / ".join(overlapping_b_texts[:2])
+            if base_line.lower() != os_txt.replace("\n", " ").strip().lower():
+                final_txt = f"{os_txt}\n{base_line}"
+            else:
+                final_txt = os_txt
+        else:
+            final_txt = os_txt
+
+        merged.append({"start": final_s, "end": final_e, "text": final_txt})
+
+    # Isi celah cue dari subtitle bawaan yang tidak ada di OpenSubtitles (Signs, OP/ED, Preview)
+    if merge_mode in ("hybrid", "bilingual"):
+        for b_idx, bc in enumerate(clean_builtin):
+            if b_idx in matched_builtin_indices:
+                continue
+            bs, be = float(bc["start"]), float(bc["end"])
+            orig_b_txt = (bc.get("text") or "").strip()
+            if not orig_b_txt:
+                continue
+            tr_b_txt = (translated_gaps.get(b_idx) or orig_b_txt).strip()
+            if merge_mode == "bilingual" and tr_b_txt.lower() != orig_b_txt.lower():
+                gap_txt = f"{tr_b_txt}\n{orig_b_txt.replace(chr(10), ' ')}"
+            else:
+                gap_txt = tr_b_txt
+            merged.append({"start": bs, "end": be, "text": gap_txt})
+            gap_filled_count += 1
+
+    final_cues = merge_overlapping_cues(merged)
+    stats = {
+        "offset": offset,
+        "os_count": len(clean_os),
+        "builtin_count": len(clean_builtin),
+        "snapped": snapped_count,
+        "gap_filled": gap_filled_count,
+        "total_merged": len(final_cues),
+    }
+    return (final_cues, stats)
+
+
 def _vtt_ts(s):
     """Parse VTT timestamp (HH:MM:SS.mmm or MM:SS.mmm) to seconds."""
     m = _re.match(r"^(?:(\d+):)?([0-5]?\d):([0-5]\d)(?:[.,](\d{1,3}))?$", (s or "").strip())

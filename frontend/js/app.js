@@ -1450,7 +1450,7 @@ function pickSubtitleUrl(subtitles, preferLang){
     }
     // Kalau prefer Indonesian / translate on dan tidak ada track ID asli:
     // auto-pilih track GTX+, Bilingual, AI Fansub, atau Pure GTX translate dari track English.
-    if((low==="indonesian"||low==="id"||low==="indonesian (gtx+)"||low==="indonesian (gtx+ bilingual)"||low==="indonesian (aigtx)"||low==="indonesian (ai)"||low==="indonesian (gtx)"||cur.translate)){
+    if((low==="indonesian"||low==="id"||low==="indonesian (gtx+)"||low==="indonesian (gtx+ bilingual)"||low==="indonesian (aigtx)"||low==="indonesian (ai)"||low==="indonesian (gtx)"||low==="indonesian (opensubtitles)"||low==="indonesian (opensubtitles bilingual)"||cur.translate)){
       var enTrack=null;
       for(var e=0;e<subtitles.length;e++){
         if(isExactEnglishSubTrack(subtitles[e])){
@@ -1465,6 +1465,8 @@ function pickSubtitleUrl(subtitles, preferLang){
         }
       }
       if(enTrack&&enTrack.url){
+        if(low==="indonesian (opensubtitles)") return "os_merge:"+enTrack.url;
+        if(low==="indonesian (opensubtitles bilingual)") return "os_dual:"+enTrack.url;
         if(low==="indonesian (gtx+ bilingual)") return "gtx+_dual:"+enTrack.url;
         if(low==="indonesian (gtx+)"||low==="indonesian (aigtx)") return "gtx+:"+enTrack.url;
         if(low==="indonesian (ai)") return "ai:"+enTrack.url;
@@ -1587,7 +1589,25 @@ function renderSubtitles(subtitles, activeUrl){
       aiOpt.selected=true;
     }
     sel.appendChild(aiOpt);
+
+    // OpenSubtitles: unduh subtitle buatan manusia lalu merge dengan subtitle bawaan anime
+    var osMergeOpt=document.createElement("option");
+    osMergeOpt.value="os_merge:"+englishTrack.url;
+    osMergeOpt.textContent="Indonesian (OpenSubtitles + Merge Bawaan)";
+    if(activeUrl&&activeUrl===osMergeOpt.value)osMergeOpt.selected=true;
+    sel.appendChild(osMergeOpt);
+
+    var osDualOpt=document.createElement("option");
+    osDualOpt.value="os_dual:"+englishTrack.url;
+    osDualOpt.textContent="Indonesian (OpenSubtitles Bilingual + Bawaan)";
+    if(activeUrl&&activeUrl===osDualOpt.value)osDualOpt.selected=true;
+    sel.appendChild(osDualOpt);
   }
+
+  var optOsSearch=document.createElement("option");
+  optOsSearch.value="__opensubtitles_search__";
+  optOsSearch.textContent="🔍 [+] Cari & Merge dari OpenSubtitles...";
+  sel.appendChild(optOsSearch);
 
   // Opsi custom subtitle eksternal
   var optCustomFile=document.createElement("option");
@@ -1666,7 +1686,22 @@ function renderSubtitles(subtitles, activeUrl){
       return;
     }
 
+    if(url==="__opensubtitles_search__"){
+      sel.value=activeUrl||"";
+      openOpenSubtitlesPicker(subtitles, englishTrack ? englishTrack.url : "");
+      return;
+    }
+
     cur.activeSub=url||null;
+    // Track OpenSubtitles Merge: synthetic URL "os_merge:<url>" / "os_dual:<url>".
+    if(url&&(url.indexOf("os_merge:")===0||url.indexOf("os_dual:")===0)){
+      cur.translate=false;
+      var isOsDual=url.indexOf("os_dual:")===0;
+      switchSubtitleTrack(url,"id");
+      cur.subLang=isOsDual?"Indonesian (OpenSubtitles Bilingual)":"Indonesian (OpenSubtitles)";
+      window.Tatap.setSetting({sub_lang:cur.subLang}).then(function(){}).catch(function(){});
+      return;
+    }
     // Track GTX+ Bilingual: synthetic URL "gtx+_dual:<url>".
     if(url&&url.indexOf("gtx+_dual:")===0){
       cur.translate=false;
@@ -1720,6 +1755,82 @@ function renderSubtitles(subtitles, activeUrl){
       toast("Subtitle: Off");
     }
   };
+}
+
+function closeOpenSubtitlesPicker(){
+  var old=document.getElementById("os-picker");
+  if(old&&old.parentNode)old.parentNode.removeChild(old);
+}
+
+function openOpenSubtitlesPicker(subtitles, baseSubUrl){
+  // Daftar rilis subtitle OpenSubtitles untuk episode aktif. Rilis yang dipilih diunduh
+  // lalu di-merge dengan subtitle bawaan anime (baseSubUrl) di backend.
+  closeOpenSubtitlesPicker();
+  var host=document.querySelector(".ambient-stage")||document.body;
+  var box=document.createElement("div");
+  box.id="os-picker";
+  box.className="os-picker";
+  box.setAttribute("role","dialog");
+  box.innerHTML='<div class="os-picker-card"><div class="os-picker-head"><span>OpenSubtitles · Ep '+esc(String(cur.ep||1))+'</span><button type="button" class="os-picker-close" aria-label="Tutup">✕</button></div><div class="os-picker-body"><div class="os-picker-status">Mencari subtitle di OpenSubtitles...</div></div></div>';
+  host.appendChild(box);
+  var body=box.querySelector(".os-picker-body");
+  box.querySelector(".os-picker-close").onclick=closeOpenSubtitlesPicker;
+  box.addEventListener("click",function(e){ if(e.target===box) closeOpenSubtitlesPicker(); });
+  box.addEventListener("keydown",function(e){
+    if(e.key==="Escape"){ e.preventDefault(); e.stopPropagation(); closeOpenSubtitlesPicker(); }
+  });
+  var token=cur.playToken;
+  window.Tatap.searchOpenSubtitles(cur.title, cur.slug, cur.ep, "id").then(function(res){
+    if(cur.playToken!==token||!document.getElementById("os-picker"))return;
+    var items=(res&&res.success&&res.data&&res.data.items)||[];
+    if(!items.length){
+      body.innerHTML='<div class="os-picker-status">Belum ada subtitle untuk episode ini di OpenSubtitles.</div>';
+      return;
+    }
+    body.innerHTML="";
+    var note=document.createElement("div");
+    note.className="os-picker-status";
+    note.textContent=baseSubUrl?"Pilih rilis — akan di-merge otomatis dengan subtitle bawaan (sync waktu + isi sign/OP/ED).":"Pilih rilis (stream ini tidak punya subtitle bawaan untuk di-merge).";
+    body.appendChild(note);
+    items.slice(0,20).forEach(function(it){
+      var btn=document.createElement("button");
+      btn.type="button";
+      btn.className="os-picker-item";
+      var langTag=(it.lang||"").toUpperCase();
+      btn.innerHTML='<span class="os-lang">'+esc(langTag)+'</span><span class="os-name">'+esc(it.filename||("OpenSubtitles #"+it.file_id))+'</span>'+(it.downloads?'<span class="os-dl">'+esc(String(it.downloads))+'×</span>':'');
+      btn.onclick=function(){
+        body.innerHTML='<div class="os-picker-status">Mengunduh & merge subtitle...</div>';
+        window.Tatap.mergeOpenSubtitle({
+          file_id:it.file_id, os_url:it.url, backup_url:it.backup_url,
+          filename:it.filename, cand_lang:it.lang, lang:"id",
+          base_sub_url:baseSubUrl||"", referer:(cur.res&&cur.res.referer)||"", merge_mode:"hybrid"
+        }).then(function(r){
+          closeOpenSubtitlesPicker();
+          if(cur.playToken!==token)return;
+          if(r&&r.success&&r.data){
+            var st=r.data.stats||{};
+            toast("OpenSubtitles dimuat: "+r.data.cues_count+" baris (offset "+(st.offset||0)+"s, "+(st.gap_filled||0)+" sign/OP/ED dari bawaan)",5000);
+            var newTrack={label:r.data.label,url:r.data.url,lang:r.data.lang};
+            subtitles.push(newTrack);
+            cur.activeSub=r.data.url;
+            renderSubtitles(subtitles,r.data.url);
+            switchSubtitleTrack(r.data.url);
+          }else{
+            toast("Gagal merge OpenSubtitles: "+((r&&r.error)||"tidak diketahui"),5000);
+          }
+        }).catch(function(err){
+          closeOpenSubtitlesPicker();
+          toast("Gagal merge OpenSubtitles: "+err,5000);
+        });
+      };
+      body.appendChild(btn);
+    });
+    var first=body.querySelector(".os-picker-item");
+    if(first)try{first.focus();}catch(_){}
+  }).catch(function(err){
+    if(!document.getElementById("os-picker"))return;
+    body.innerHTML='<div class="os-picker-status">Gagal mencari di OpenSubtitles: '+esc(String(err))+'</div>';
+  });
 }
 
 function vttTime(s){
@@ -2059,7 +2170,18 @@ function prefetchSubtitleTrack(url, ref, langCode){
   var targetLang = langCode || "";
   var mode = "";
   var isDual = false;
-  if(targetUrl.indexOf("gtx+_dual:")===0){
+  var isOs = false;
+  if(targetUrl.indexOf("os_merge:")===0){
+    targetUrl = targetUrl.slice(9);
+    if(!targetLang) targetLang = "id";
+    mode = "os_merge";
+    isOs = true;
+  }else if(targetUrl.indexOf("os_dual:")===0){
+    targetUrl = targetUrl.slice(8);
+    if(!targetLang) targetLang = "id";
+    mode = "os_dual";
+    isOs = true;
+  }else if(targetUrl.indexOf("gtx+_dual:")===0){
     targetUrl = targetUrl.slice(10);
     if(!targetLang) targetLang = "id";
     mode = "gtx+_dual";
@@ -2085,6 +2207,10 @@ function prefetchSubtitleTrack(url, ref, langCode){
   if(targetLang) qs += "&lang=" + encodeURIComponent(targetLang);
   if(mode) qs += "&mode=" + encodeURIComponent(mode);
   if(isDual) qs += "&dual=true";
+  if(isOs){
+    // Konteks judul & episode agar backend dapat mencari rilis yang cocok di OpenSubtitles
+    qs += "&title=" + encodeURIComponent(cur.title || "") + "&slug=" + encodeURIComponent(cur.slug || "") + "&ep=" + encodeURIComponent(cur.ep || 1);
+  }
   var prox = "/api/player/sub?" + qs;
 
   // Cek apakah promise untuk URL yang sama sudah berjalan
@@ -2099,8 +2225,10 @@ function prefetchSubtitleTrack(url, ref, langCode){
     var trModel=r.headers.get("X-Translate-Model")||"";
     var trMixed=r.headers.get("X-Translate-Mixed")||"";
     var trBg=r.headers.get("X-Translate-Background")||"";
+    var osFile=r.headers.get("X-OpenSubtitles-File")||"";
+    var osMerge=r.headers.get("X-OpenSubtitles-Merge")||"";
     return r.text().then(function(t){
-      return {text:t, tier:tier, error:trErr, model:trModel, mixed:trMixed, bg:trBg};
+      return {text:t, tier:tier, error:trErr, model:trModel, mixed:trMixed, bg:trBg, osFile:osFile, osMerge:osMerge};
     });
   });
 
@@ -2128,7 +2256,15 @@ function switchSubtitleTrack(url, langCode){
   if(/^\d+$/.test(cleanSubUrl)) return;
   var originalUrl = url;
   var trackMode = "none";
-  if(url.indexOf("gtx+_dual:")===0){
+  if(url.indexOf("os_merge:")===0){
+    url=url.slice(9);
+    if(!langCode) langCode="id";
+    trackMode = "os_merge";
+  }else if(url.indexOf("os_dual:")===0){
+    url=url.slice(8);
+    if(!langCode) langCode="id";
+    trackMode = "os_dual";
+  }else if(url.indexOf("gtx+_dual:")===0){
     url=url.slice(10);
     if(!langCode) langCode="id";
     trackMode = "gtx+_dual";
@@ -2151,7 +2287,9 @@ function switchSubtitleTrack(url, langCode){
   }
   if(langCode==="id"){
     var waitMsg = "Menerjemahkan subtitle AI ke bahasa Indonesia...";
-    if(trackMode==="gtx+_dual") waitMsg = "Menerjemahkan subtitle GTX+ Bilingual (ID + EN)...";
+    if(trackMode==="os_merge") waitMsg = "Mengunduh subtitle OpenSubtitles & merge dengan subtitle bawaan...";
+    else if(trackMode==="os_dual") waitMsg = "Mengunduh OpenSubtitles & menyusun bilingual dengan subtitle bawaan...";
+    else if(trackMode==="gtx+_dual") waitMsg = "Menerjemahkan subtitle GTX+ Bilingual (ID + EN)...";
     else if(trackMode==="gtx+"||trackMode==="aigtx") waitMsg = "Menerjemahkan subtitle GTX+ (Smart Fansub & Scene Detection)...";
     else if(trackMode==="gtx") waitMsg = "Menerjemahkan subtitle Google GTX...";
     toast(waitMsg, 3000);
@@ -2180,7 +2318,13 @@ function switchSubtitleTrack(url, langCode){
         toast(msg, 6000);
       }else{
         var tierLabel = "AI Fansub" + (res.model ? " · "+res.model : "");
-        if(res.tier === "gtx+" || res.tier === "cached-gtx+" || res.tier === "aigtx" || res.tier === "cached-aigtx"){
+        if(res.tier === "os_merge" || res.tier === "os_dual"){
+          tierLabel = "OpenSubtitles + Merge" + (res.osFile ? " · " + res.osFile : "");
+        }else if(res.tier === "cached-os_merge" || res.tier === "cached-os_dual"){
+          tierLabel = "OpenSubtitles + Merge, tersimpan";
+        }else if(res.tier === "os_fallback_gtx+"){
+          tierLabel = "Belum ada di OpenSubtitles → GTX+";
+        }else if(res.tier === "gtx+" || res.tier === "cached-gtx+" || res.tier === "aigtx" || res.tier === "cached-aigtx"){
           tierLabel = (res.tier === "cached-gtx+" || res.tier === "cached-aigtx") ? "GTX+, tersimpan" : "GTX+ Translate";
         }else if(res.tier === "tier2"){
           tierLabel = trackMode === "gtx" ? "Google GTX" : "GTX+ (Instan)";
@@ -2701,6 +2845,7 @@ function closePlayer(){
   // 1. Invalidate all pending async playback tokens immediately
   cur.playToken = ++_playTokenCounter;
   TvNavigationManager.hidePlayerControls();
+  closeOpenSubtitlesPicker();
 
   // 2. Safely stop and destroy video & HLS stream
   var v=$("vid");

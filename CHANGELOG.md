@@ -16,10 +16,22 @@ Format versi menggunakan skema `MAJOR.MINOR.PATCH`:
 ## [2.12.1] - 2026-10-24
 
 ### Justifikasi SemVer 2.0.0 (PATCH: 2.12.0 -> 2.12.1)
-Kenaikan digit PATCH diterapkan sesuai kaidah Semantic Versioning 2.0.0 dan Direktif #3 [`AGENTS.md`](AGENTS.md) karena rilis ini berfokus pada penyempurnaan visual & estetika antarmuka (**UI/UX Visual Polish**) pada pemutar video Web Desktop, Windows Portable, Linux AppImage, serta ExoPlayer di Android Mobile dan Android TV tanpa penambahan modul arsitektur baru, perubahan skema database SQLite, ataupun modifikasi kontrak API eksternal.
+Kenaikan digit PATCH diterapkan sesuai kaidah Semantic Versioning 2.0.0 dan Direktif #3 [`AGENTS.md`](AGENTS.md) karena rilis ini berfokus pada penyempurnaan visual & estetika antarmuka (**UI/UX Visual Polish**) pemutar video, penambahan integrasi sumber subtitle eksternal **OpenSubtitles Smart Merge**, serta perbaikan siklus hidup Picture-in-Picture (PiP) pada Android Mobile tanpa modifikasi skema database SQLite ataupun perubahan mendasar pada kontrak runtime eksternal.
+
+### Added
+1. **Integrasi OpenSubtitles Multi-Tier & Smart Merge Engine (`backend/api/opensubtitles.py`, `backend/api/translate.py`, `backend/main.py`, `frontend/`, `PlayerActivity.java`):**
+   - **Arsitektur Multi-Tier OpenSubtitles:** Mengambil rilis subtitle komunitas dari OpenSubtitles melalui 3 tingkat terintegrasi: Stremio v3 Public API (`opensubtitles-v3.strem.io`), Legacy REST API (`rest.opensubtitles.org` melalui bypass TLS Desync DoH), dan fallback scraper web HTML.
+   - **Bypass Proteksi Jaringan & De-chunking (`backend/api/desync.py`):** Mendukung parsing respons `Transfer-Encoding: chunked` serta dekompresi otomatis `gzip`/`deflate` pada koneksi HTTP raw socket desync.
+   - **Pembersih Iklan & Watermark Komunitas (`strip_opensubtitles_ads`):** Menghapus secara otomatis baris promosi/iklan, URL situs, donasi crypto/VIP, nama ripper/encoder, dan watermark OpenSubtitles tanpa merusak konten dialog anime.
+   - **Penyelarasan Waktu Otomatis & Smart Merge (`estimate_optimal_offset` & `merge_opensubtitles_with_builtin`):** Menghitung selisih waktu ($\Delta t$) antara dialog OpenSubtitles dan subtitle bawaan stream anime secara otomatis via histogram cross-correlation onset. Melakukan sinkronisasi timestamp serta mengisi celah (*gap filling*) teks papan nama (*Signs*), lagu pembuka/penutup (*OP/ED*), dan cuplikan episode berikutnya (*Preview*) dari subtitle bawaan anime (+GTX+ terjemahan Indonesia).
+   - **Mode Gabungan Hibrida & Bilingual:** Menyediakan opsi `os_merge` (Hybrid: dialog OpenSubtitles + Sign/OP/ED bawaan) dan `os_dual` (Bilingual: dialog OpenSubtitles + teks asli bahasa Inggris/Jepang bawaan).
+   - **Antarmuka Pencarian & Pemilihan Subtitle di Seluruh Platform:** Menambahkan modal pencarian OpenSubtitles interaktif yang terisolasi di dalam kontainer panggung video Web/Desktop (`openOpenSubtitlesPicker`) dan dialog native Android (`showOpenSubtitlesSearchDialog` pada `PlayerActivity.java`).
 
 ### Changed
-1. **Penyempurnaan Estetika Sinematik Video Player Web & Desktop (`frontend/css/style.css`):**
+1. **Penyempurnaan Siklus Hidup & Proteksi PiP Android Mobile (`PlayerActivity.java`):**
+   - **Perbaikan Audio/Video Tetap Berjalan Saat Jendela PiP Ditutup:** Menghilangkan early-return `if (isInPictureInPictureMode()) return;` pada `onStop()` yang sebelumnya menyebabkan pemutar ExoPlayer terus bersuara di latar belakang ketika jendela PiP ditutup melalui tombol `✕` atau swipe-to-dismiss.
+   - **Deteksi Restored vs Dismissed:** Memasang verifikasi status siklus hidup `isRestored = !isFinishing() && getLifecycle().getCurrentState().isAtLeast(Lifecycle.State.STARTED)` pada callback `onPictureInPictureModeChanged(false, ...)`. Jika pengguna menutup/membuang jendela PiP, pemutaran langsung dijeda (`player.pause()`), progres tontonan dicatat (`recordWatchProgress(true)`), dan activity diselesaikan secara bersih (`finish()`).
+2. **Penyempurnaan Estetika Sinematik Video Player Web & Desktop (`frontend/css/style.css`):**
    - **Floating Cinema Header & Footer Bar (`.player-head`, `.player-foot`):** Menyempurnakan bilah kontrol atas dan bawah player menjadi *dark cinema bar* berlapis gradien halus (`linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02))`), *specular top highlight* (`inset 0 1px 0 rgba(255,255,255,0.09)`), serta badge kapsul cyan pada indikator meta episode (`.player-title .dim`).
    - **Panggung Video & Bingkai Ambient (`.ambient-stage`):** Menambahkan bingkai sinematik tipis (`1px solid rgba(255,255,255,0.08)`), sudut membulat `10px`, dan bayangan kedalaman saat mode windowed (otomatis direset menjadi `0px` pada mode `:fullscreen`).
    - **Segmented Concentric Subtitle Picker (`.sub-picker`, `.sub-size`, `.sub-delay-ctrl`, `.sub-translate`):** Merapikan pemilih subtitle, ukuran font (`S` / `M` / `L`), pengatur sinkronisasi waktu (`-` / `0.0s` / `+`), dan toggle terjemahan `ID` menjadi segmen kapsul konsentris yang bersih dan ergonomis.
@@ -36,6 +48,7 @@ Kenaikan digit PATCH diterapkan sesuai kaidah Semantic Versioning 2.0.0 dan Dire
 
 ### Tests
 - Menambahkan suite pengujian otomatis `tests/test_player_visual_polish.py` untuk memverifikasi keabsahan XML drawable baru, kustomisasi `DefaultTimeBar`, serta aturan estetika CSS & layout ExoPlayer.
+- Menambahkan suite pengujian otomatis `tests/test_opensubtitles_and_pip.py` untuk memvalidasi de-chunking/gzip DoH TLS desync, pembersihan metadata judul/musim OpenSubtitles, eliminasi watermark/iklan, algoritma scoring kandidat subtitle, estimasi offset optimal cross-correlation histogram, penggabungan smart merge (hybrid & bilingual), serta audit proteksi siklus hidup PiP Android.
 
 ## [2.12.0] - 2026-10-23
 
