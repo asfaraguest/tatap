@@ -1295,7 +1295,14 @@ function openPlayer(ep, resumeTime, forceRefresh){
   closeTitle();
   closeResumeModal();
   $("player-modal").classList.remove("hidden");
-  TvNavigationManager.showPlayerControls($("pm-speed-select") || $("pm-close"));
+  if(TvNavigationManager.isTvMode()){
+    TvNavigationManager.showPlayerControls($("pm-speed-select") || $("pm-close"));
+  } else {
+    TvNavigationManager.showPlayerControls();
+    if(document.activeElement && document.activeElement !== document.body && $("player-modal").contains(document.activeElement)){
+      try { document.activeElement.blur(); } catch(_){}
+    }
+  }
   $("pm-title").textContent=cur.title;
   $("pm-meta").textContent="ep "+ep+" · "+cur.mode.toUpperCase();
   $("pm-spinner").classList.remove("hidden");
@@ -1594,6 +1601,7 @@ function renderSubtitles(subtitles, activeUrl){
   }
   // Event listener: ganti track aktif seketika + simpan preferensi.
   sel.onchange=function(){
+    if(!TvNavigationManager.isTvMode()){ try { sel.blur(); } catch(_){} }
     var url=sel.value;
     if(url==="__custom_file__"){
       sel.value=activeUrl||"";
@@ -3118,9 +3126,11 @@ function handleTitleModalKey(e){
 }
 
 function onKeyPlayer(e){
-  var t=(e.target.tagName||"");
-  var typing=t==="INPUT"||t==="SELECT"||t==="TEXTAREA"||(e.target&&e.target.isContentEditable);
-  if(typing){
+  var t=(e.target&&e.target.tagName||"").toUpperCase();
+  var isTextEditing=(t==="INPUT" && ["button","checkbox","color","file","hidden","image","radio","range","reset","submit"].indexOf(((e.target&&e.target.type)||"text").toLowerCase())===-1) ||
+                    (t==="TEXTAREA") ||
+                    (e.target&&e.target.isContentEditable);
+  if(isTextEditing){
     if(e.key==="Escape"){e.target.blur();}
     return;
   }
@@ -3149,11 +3159,16 @@ function onKeyPlayer(e){
     return;
   }
 
+  var isSpace = e.key===" " || e.key==="Spacebar" || e.code==="Space" || e.keyCode===32;
+
   if(pState === TvNavigationManager.PLAYER_IDLE){
     if(e.key==="ArrowRight"){e.preventDefault();v.currentTime+=5;return;}
     if(e.key==="ArrowLeft"){e.preventDefault();v.currentTime-=5;return;}
-    if(e.key==="Enter"||e.key===" "){
+    if(e.key==="Enter"||isSpace){
       e.preventDefault();
+      if(document.activeElement && document.activeElement !== document.body && document.activeElement !== v){
+        try { document.activeElement.blur(); } catch(_){}
+      }
       var skipBtn = $("pm-skip-btn");
       if(skipBtn && !skipBtn.classList.contains("hidden") && (cur.activeSkipTarget > 0)){
         doSkip();
@@ -3192,54 +3207,78 @@ function onKeyPlayer(e){
   if(pState === TvNavigationManager.PLAYER_HUD_ACTIVE){
     TvNavigationManager.resetHudTimer();
 
-    var pm = $("player-modal");
-    var hudBtns = Array.prototype.slice.call(pm.querySelectorAll(".player-head-btns button, .player-head-btns select, .player-foot button, .player-foot select, .sub-size button, .sub-translate, .pm-skip-btn:not(.hidden)"));
-    var curFoc = document.activeElement;
-    if(e.key==="ArrowDown"){
-      var nextDown = TvNavigationManager.getSpatialTarget(curFoc, hudBtns, "down");
-      if(nextDown){
-        e.preventDefault();
-        TvNavigationManager.setFocus(nextDown, "player-hud");
-        return;
-      }
-    } else if(e.key==="ArrowUp"){
-      var nextUp = TvNavigationManager.getSpatialTarget(curFoc, hudBtns, "up");
-      if(nextUp){
-        e.preventDefault();
-        TvNavigationManager.setFocus(nextUp, "player-hud");
-        return;
-      }
-    } else if(e.key==="ArrowRight"){
-      var nextRight = TvNavigationManager.getSpatialTarget(curFoc, hudBtns, "right");
-      if(nextRight){
-        e.preventDefault();
-        TvNavigationManager.setFocus(nextRight, "player-hud");
-        return;
-      }
-    } else if(e.key==="ArrowLeft"){
-      var nextLeft = TvNavigationManager.getSpatialTarget(curFoc, hudBtns, "left");
-      if(nextLeft){
-        e.preventDefault();
-        TvNavigationManager.setFocus(nextLeft, "player-hud");
-        return;
+    if(TvNavigationManager.isTvMode()){
+      var pm = $("player-modal");
+      var hudBtns = Array.prototype.slice.call(pm.querySelectorAll(".player-head-btns button, .player-head-btns select, .player-foot button, .player-foot select, .sub-size button, .sub-translate, .pm-skip-btn:not(.hidden)"));
+      var curFoc = document.activeElement;
+      if(e.key==="ArrowDown"){
+        var nextDown = TvNavigationManager.getSpatialTarget(curFoc, hudBtns, "down");
+        if(nextDown){
+          e.preventDefault();
+          TvNavigationManager.setFocus(nextDown, "player-hud");
+          return;
+        }
+      } else if(e.key==="ArrowUp"){
+        var nextUp = TvNavigationManager.getSpatialTarget(curFoc, hudBtns, "up");
+        if(nextUp){
+          e.preventDefault();
+          TvNavigationManager.setFocus(nextUp, "player-hud");
+          return;
+        }
+      } else if(e.key==="ArrowRight"){
+        var nextRight = TvNavigationManager.getSpatialTarget(curFoc, hudBtns, "right");
+        if(nextRight){
+          e.preventDefault();
+          TvNavigationManager.setFocus(nextRight, "player-hud");
+          return;
+        }
+      } else if(e.key==="ArrowLeft"){
+        var nextLeft = TvNavigationManager.getSpatialTarget(curFoc, hudBtns, "left");
+        if(nextLeft){
+          e.preventDefault();
+          TvNavigationManager.setFocus(nextLeft, "player-hud");
+          return;
+        }
       }
     }
   }
 
-  if(e.key===" "){e.preventDefault();if(v.paused)v.play();else v.pause();}
-  else if(e.key==="f"||e.key==="F"){e.preventDefault();toggleFullscreen();}
-  else if(e.key==="n")stepEp(1);
-  else if(e.key==="p")stepEp(-1);
+  if(isSpace || (!TvNavigationManager.isTvMode() && e.key==="Enter")){
+    e.preventDefault();
+    if(document.activeElement && document.activeElement !== document.body && document.activeElement !== v){
+      try { document.activeElement.blur(); } catch(_){}
+    }
+    var skipBtn = $("pm-skip-btn");
+    if(skipBtn && !skipBtn.classList.contains("hidden") && (cur.activeSkipTarget > 0)){
+      doSkip();
+    } else {
+      if(v.paused) v.play(); else v.pause();
+    }
+    return;
+  }
+  else if(e.key==="f"||e.key==="F"){
+    e.preventDefault();
+    if(document.activeElement && document.activeElement !== document.body && document.activeElement !== v){
+      try { document.activeElement.blur(); } catch(_){}
+    }
+    toggleFullscreen();
+  }
+  else if(e.key==="n"||e.key==="N"){e.preventDefault();stepEp(1);}
+  else if(e.key==="p"||e.key==="P"){e.preventDefault();stepEp(-1);}
   else if(e.key===","||e.key==="<"){e.preventDefault();adjustSubDelay(-0.25);}
   else if(e.key==="."||e.key===">"){e.preventDefault();adjustSubDelay(0.25);}
   else if(e.key==="["||e.key==="{"){e.preventDefault();adjustPlaySpeed(-1);}
   else if(e.key==="]"||e.key==="}"){e.preventDefault();adjustPlaySpeed(1);}
-  else if(e.key==="m"||e.key==="M"){e.preventDefault();v.muted=!v.muted;}
+  else if(e.key==="m"||e.key==="M"){
+    e.preventDefault();
+    v.muted=!v.muted;
+    toast(v.muted ? "Muted" : "Unmuted ("+Math.round((v.volume||1)*100)+"%)", 1200);
+  }
   else if(e.key==="s"||e.key==="S"){
+    e.preventDefault();
     var skipBtn = $("pm-skip-btn");
     var isSkipActive = skipBtn && !skipBtn.classList.contains("hidden") && cur.activeSkipTarget > 0;
     if(isSkipActive){
-      e.preventDefault();
       doSkip();
       return;
     }
@@ -3655,12 +3694,14 @@ function init(){
   var qSel=$("pm-quality-select");
   if(qSel){
     qSel.addEventListener("change",function(){
+      if(!TvNavigationManager.isTvMode()){ try { this.blur(); } catch(_){} }
       switchQ(this.value);
     });
   }
   var spdSel=$("pm-speed-select");
   if(spdSel){
     spdSel.addEventListener("change",function(){
+      if(!TvNavigationManager.isTvMode()){ try { this.blur(); } catch(_){} }
       setPlaySpeed(parseFloat(this.value), true);
     });
   }

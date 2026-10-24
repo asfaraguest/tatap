@@ -13,6 +13,21 @@ Format versi menggunakan skema `MAJOR.MINOR.PATCH`:
 - **MINOR (x.Y.0):** Penambahan fitur atau kapabilitas baru yang tetap kompatibel ke belakang (*backward-compatible new features*). Digit PATCH direset ke 0.
 - **PATCH (x.y.Z):** Perbaikan bug, peningkatan stabilitas, atau perbaikan internal tanpa penambahan fitur baru (*backward-compatible bug fixes*).
 
+## [2.12.2] - 2026-10-24
+
+### Justifikasi SemVer 2.0.0 (PATCH: 2.12.1 -> 2.12.2)
+Kenaikan digit PATCH diterapkan sesuai kaidah Semantic Versioning 2.0.0 dan Direktif #3 [`AGENTS.md`](AGENTS.md) untuk perbaikan bug hotkey pada pemutar video Web dan Desktop (Space play/pause, Fullscreen, Mute, Seek, dan isolasi fokus elemen kontrol) tanpa perubahan skema database maupun modifikasi antarmuka API eksternal.
+
+### Fixed
+1. **Perbaikan Hotkey Pemutar Video Web & Desktop (`frontend/js/app.js`):**
+   - **Koreksi Deteksi Pengetikan Teks (`isTextEditing`):** Menghapus elemen `<select>` dan `<button>` dari pengecekan pengetikan teks sehingga fokus pada dropdown kontrol (kecepatan, resolusi, subtitle) tidak lagi memblokir pintasan keyboard (Space, `f`, `m`, panah, dll.).
+   - **Dukungan Varian Tombol Spasi (`isSpace`):** Mendukung penuh seluruh varian event tombol spasi (`e.key === " "`, `"Spacebar"`, `e.code === "Space"`, `e.keyCode === 32`) untuk toggle play/pause secara konsisten di seluruh browser dan sistem operasi.
+   - **Pencegahan Focus Stealing pada Peluncuran Pemutar:** Membatasi pemusatan fokus awal ke `pm-speed-select` hanya saat berada dalam mode Android TV (`TvNavigationManager.isTvMode()`). Pada Web dan Desktop, kontrol dibuka tanpa memaksakan fokus ke elemen select.
+   - **Auto-Blur Elemen Kontrol:** Secara otomatis melepaskan fokus (`document.activeElement.blur()`) dari tombol atau dropdown yang sedang aktif saat tombol pintasan ditekan atau opsi diubah pada mode desktop, mencegah aktivasi sekunder yang tidak diinginkan.
+
+### Tests
+- Menambahkan pengujian otomatis di `tests/test_desktop_keyboard_navigation.py` (`test_app_js_player_space_and_hotkey_handling`) untuk memverifikasi hotkey Space, Fullscreen, Mute, Seek, dan isolasi fokus pengetikan teks.
+
 ## [2.12.1] - 2026-10-24
 
 ### Justifikasi SemVer 2.0.0 (PATCH: 2.12.0 -> 2.12.1)

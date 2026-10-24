@@ -81,6 +81,39 @@ def test_app_js_player_volume_keyboard_controls():
     assert 'else if(e.key==="ArrowDown"){\n    e.preventDefault();\n    v.volume=Math.max(0,' in content
 
 
+def test_app_js_player_space_and_hotkey_handling():
+    """Memastikan onKeyPlayer di app.js menangani tombol Space, Fullscreen, Mute, dan hotkey lainnya secara tangguh."""
+    content = APP_JS.read_text(encoding="utf-8")
+    
+    # 1. Pastikan SELECT dan BUTTON tidak dihitung sebagai text editing yang memblokir shortcut
+    assert 'isTextEditing' in content
+    assert '["button","checkbox","color","file","hidden","image","radio","range","reset","submit"]' in content
+    assert 't==="SELECT"' not in content[content.find("function onKeyPlayer"):content.find("function onKeyPlayer") + 800]
+    
+    # 2. Pastikan varian tombol spasi didukung penuh (Spacebar, code Space, keyCode 32)
+    assert 'var isSpace = e.key===" " || e.key==="Spacebar" || e.code==="Space" || e.keyCode===32;' in content
+    
+    # 3. Pastikan penekanan Space atau Enter melakukan toggle play/pause dan un-focus elemen aktif
+    assert 'if(v.paused) v.play(); else v.pause();' in content
+    assert 'document.activeElement.blur()' in content
+    
+    # 4. Pastikan fullscreen dan hotkey player lainnya didukung
+    assert 'else if(e.key==="f"||e.key==="F")' in content
+    assert 'toggleFullscreen();' in content
+    assert 'else if(e.key==="m"||e.key==="M")' in content
+    assert 'else if(e.key==="s"||e.key==="S")' in content
+    assert 'else if(e.key==="n"||e.key==="N")' in content
+    assert 'else if(e.key==="p"||e.key==="P")' in content
+    assert 'else if(e.key===","||e.key==="<")' in content
+    assert 'else if(e.key==="."||e.key===">")' in content
+    assert 'else if(e.key==="["||e.key==="{")' in content
+    assert 'else if(e.key==="]"||e.key==="}")' in content
+    
+    # 5. Pastikan openPlayer pada Desktop tidak memaksakan fokus ke pm-speed-select
+    assert 'if(TvNavigationManager.isTvMode())' in content
+    assert 'TvNavigationManager.showPlayerControls($("pm-speed-select") || $("pm-close"));' in content
+
+
 def test_style_css_focus_visible_styling():
     """Memastikan style.css menyediakan outline focus-visible untuk kartu anime dan tombol episode."""
     content = STYLE_CSS.read_text(encoding="utf-8")
