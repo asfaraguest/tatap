@@ -71,8 +71,9 @@ def test_player_tv_seek_and_timebar_navigation():
     # Verifikasi dual ID fallback untuk rewind dan fast forward
     assert "androidx.media3.ui.R.id.exo_rew_with_amount" in content
     assert "androidx.media3.ui.R.id.exo_ffwd_with_amount" in content
-    # Verifikasi increment D-Pad TimeBar 10 detik
+    # Verifikasi increment D-Pad TimeBar murni 10 detik tanpa override proporsional (keyCountIncrement)
     assert "dtb.setKeyTimeIncrement(10000)" in content
+    assert "dtb.setKeyCountIncrement" not in content
     # Verifikasi pengecualian DPAD_LEFT/RIGHT agar DefaultTimeBar.onKeyDown bisa mengeksekusi scrub
     assert "isTimeBarFocusedLeft" in content
     assert "isTimeBarFocusedRight" in content

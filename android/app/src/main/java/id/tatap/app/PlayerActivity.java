@@ -5034,7 +5034,6 @@ public class PlayerActivity extends Activity {
             dtb.setBufferedColor(0x6638BDF8);
             dtb.setUnplayedColor(0x33FFFFFF);
             dtb.setKeyTimeIncrement(10000);
-            dtb.setKeyCountIncrement(30);
             dtb.setFocusable(true);
             dtb.setFocusableInTouchMode(false);
             dtb.setOnFocusChangeListener((v, hasFocus) -> {

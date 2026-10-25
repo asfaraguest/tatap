@@ -52,6 +52,9 @@ Kenaikan digit PATCH diterapkan sesuai kaidah Semantic Versioning 2.0.0 dan Dire
    - **Tabel Baru `mal_map`:** Menambahkan tabel SQLite `mal_map` dengan masa simpan TTL 30 hari untuk menyimpan pemetaan `slug/title -> mal_id`.
    - **Eliminasi Penguerian Berulang:** Saat resolusi pertama berhasil, hasil disimpan secara persisten ke database SQLite sehingga aplikasi tidak lagi mengueri ulang server AniList saat dibuka kembali, mencegah terkena limit ketat 30 req/menit (HTTP 429).
 
+9. **Kalibrasi Presisi Increment SeekBar Android TV (`PlayerActivity.java`):**
+   - **Lompatan Konstan 10 Detik:** Menghapus konfigurasi `setKeyCountIncrement(30)` yang sebelumnya menimpa `setKeyTimeIncrement(10000)` dan memicu perhitungan proporsional durasi ($\sim$48 detik pada anime 24 menit). Kini navigasi D-Pad Kanan dan Kiri pada SeekBar TimeBar Android TV melompat tepat **10 detik konstan**.
+
 ### Tests
 - Menambahkan test suite `test_aniskip_query_episode_length_v2_spec`, `test_aniskip_mal_id_in_memory_cache`, `test_resolve_mal_id_and_stream_skip_injection`, `test_multi_season_normalization_no_collision`, `test_apostrophe_nouns_and_curly_quote_matching`, dan `test_persistent_sqlite_mal_map` pada `tests/test_skip_times.py` untuk menguji kepatuhan schema AniSkip v2, isolasi season tanpa tabrakan cache, normalisasi apostrof, dan persistensi SQLite.
 
