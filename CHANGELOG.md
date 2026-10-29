@@ -13,6 +13,15 @@ Format versi menggunakan skema `MAJOR.MINOR.PATCH`:
 - **MINOR (x.Y.0):** Penambahan fitur atau kapabilitas baru yang tetap kompatibel ke belakang (*backward-compatible new features*). Digit PATCH direset ke 0.
 - **PATCH (x.y.Z):** Perbaikan bug, peningkatan stabilitas, atau perbaikan internal tanpa penambahan fitur baru (*backward-compatible bug fixes*).
 
+## [Unreleased]
+
+### Changed
+1. **Master Prompt Fansub & TLC Anime Indonesia (`backend/api/translate.py`, Paritas Chaquopy `android/app/src/main/python/backend/api/translate.py`):**
+   - **Persona TLC/Translation Checker:** Mengintegrasikan instruksi komprehensif penerjemah sekaligus editor (TLC/Translation Checker) fansub anime berpengalaman dengan fokus pada makna & emosi lisan alami, bukan terjemahan harfiah kaku ala mesin penerjemah.
+   - **Aturan Nada Adegan Multi-Domain:** Pengaturan ketat konteks adegan (Formal/Kerajaan/Militer vs Santai/Sekolah/Komedi vs Kasar/Preman/Musuh) dengan konsistensi persona kata ganti dan larangan partikel campur aduk.
+   - **Kamus Kosakata Spesifik Genre & Idiom:** Integrasi kamus terminologi Game/Isekai/Job System, Mecha & Tactical Sci-Fi, Ninja/Shinobi Shonen, Kutukan & Roh Supernatural Modern (Jujutsu), Fantasi Abadi & Atelier Sihir (Frieren, Witch Hat), Misteri Sekolah & Rom-Com OSIS (Hyouka, Kaguya-sama), Kuliner, Olahraga, serta kamus lengkap idiom fansub anime anti-harfiah.
+   - **Dinamika Token Sumber & Multi-Scene Examples:** Menjaga format token ganti baris `<br>`, format baris tunggal `N|terjemahan`, dan contoh 5 baris multi-scene cue teruji.
+
 ## [2.12.4] - 2026-10-25
 
 ### Justifikasi SemVer 2.0.0 (PATCH: 2.12.3 -> 2.12.4)

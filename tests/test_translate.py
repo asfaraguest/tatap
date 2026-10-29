@@ -382,5 +382,52 @@ def test_new_casual_slang_smoothing():
     assert T._sanitize_gtxplus_id("Tenanglah sedikit, jangan terburu-buru.") == "Santai dikit dong, jangan terburu-buru."
 
 
+def test_fansub_prompt_id_tlc_master():
+    """Memverifikasi Master Prompt Fansub & TLC Anime Indonesia."""
+    prompt_id = T._fansub_system_prompt("English", "id", "Indonesian")
+    
+    # 1. Identitas & Persona TLC
+    assert "penerjemah sekaligus editor (TLC/Translation Checker) fansub anime Indonesia" in prompt_id
+    assert "Terjemahkan subtitle bahasa Inggris menjadi bahasa Indonesia" in prompt_id
+    assert "PRINSIP UTAMA KELUWESAN FANSUB:" in prompt_id
+    
+    # 2. Aturan Nada Bahasa Sesuai Konteks Adegan
+    assert "Adegan Formal / Berwibawa / Kerajaan / Militer:" in prompt_id
+    assert "Adegan Santai / Sehari-hari / Komedi / Sekolah:" in prompt_id
+    assert "KONSISTENSI PERSONA SEKOLAH:" in prompt_id
+    assert "Adegan Kasar / Preman / Musuh:" in prompt_id
+    
+    # 3. Kosakata Tematik & Kamus
+    assert "KOSAKATA GAME, ISEKAI & JOB SYSTEM:" in prompt_id
+    assert "KOSAKATA MECHA & TAKTIS MILITER (Mecha & Tactical Sci-Fi):" in prompt_id
+    assert "KOSAKATA DUNIA NINJA & SHONEN (Ninja / Shinobi - misal: Naruto):" in prompt_id
+    assert "KOSAKATA DUNIA KUTUKAN, ROH & PENYIHIR MODERN (Jujutsu & Supernatural):" in prompt_id
+    assert "KOSAKATA FANTASI ABADI, ELF & ATELIER SIHIR (Frieren, Witch Hat Atelier, dll.):" in prompt_id
+    assert "KOSAKATA MISTERI SEKOLAH, KLUB SASTRA & ROM-COM OSIS (Hyouka, Kaguya-sama):" in prompt_id
+    assert "KOSAKATA KULINER, OLAHRAGA, HISTORIS, CYBERPUNK & THRILLER:" in prompt_id
+    assert "KAMUS IDIOM & UNGKAPAN KHAS FANSUB (DILARANG TERJEMAHKAN HARFIAH):" in prompt_id
+    
+    # 4. Contoh Multi-Scene & Format Keluaran
+    assert "CONTOH MULTI-SCENE:" in prompt_id
+    assert "1|Yang Mulia, pasukan ksatria garis depan telah bersiap." in prompt_id
+    assert "5|What a drag... It can't be helped, I'll take care of this myself.<br>Just stand back!" in prompt_id
+    assert "5|Merepotkan sekali... Mau gimana lagi, biar aku yang urus ini sendiri.<br>Kalian mundur saja!" in prompt_id
+
+    # 5. Parsing & Round-trip output baris contoh
+    sample_llm_out = (
+        "1|Yang Mulia, pasukan ksatria garis depan telah bersiap. Kami tidak akan mengecewakan kepercayaan Anda.\n"
+        "2|Cewek-cewek cakepnya mantap, kan? Incaranmu tinggi juga ya? Nibutani, kan?\n"
+        "3|Kalau menurutku sih cakep banget. Nggak usah ditanya lagi, itu memalukan banget!\n"
+        "4|Semua unit, segera meluncur! Lakukan manuver menghindar dan jangan lengah!\n"
+        "5|Merepotkan sekali... Mau gimana lagi, biar aku yang urus ini sendiri.<br>Kalian mundur saja!"
+    )
+    parsed = T._parse_id_lines(sample_llm_out, {1, 2, 3, 4, 5})
+    assert len(parsed) == 5
+    assert "<br>" in parsed[5]
+    restored_5 = T._restore_line(parsed[5])
+    assert restored_5 == "Merepotkan sekali... Mau gimana lagi, biar aku yang urus ini sendiri.\nKalian mundur saja!"
+
+
+
 
 
