@@ -13,7 +13,10 @@ Format versi menggunakan skema `MAJOR.MINOR.PATCH`:
 - **MINOR (x.Y.0):** Penambahan fitur atau kapabilitas baru yang tetap kompatibel ke belakang (*backward-compatible new features*). Digit PATCH direset ke 0.
 - **PATCH (x.y.Z):** Perbaikan bug, peningkatan stabilitas, atau perbaikan internal tanpa penambahan fitur baru (*backward-compatible bug fixes*).
 
-## [Unreleased]
+## [2.12.5] - 2026-10-29
+
+### Justifikasi SemVer 2.0.0 (PATCH: 2.12.4 -> 2.12.5)
+Kenaikan digit PATCH diterapkan sesuai kaidah Semantic Versioning 2.0.0 dan Direktif #3 [`AGENTS.md`](AGENTS.md) untuk pembaruan dan optimasi engine penerjemah AI Fansub (Master Prompt Fansub & TLC Anime Indonesia komprehensif, penyempurnaan mapping otomatis bahasa sumber `{src}` ke bahasa Indonesia, serta penambahan test suite verifikasi multi-scene).
 
 ### Changed
 1. **Master Prompt Fansub & TLC Anime Indonesia (`backend/api/translate.py`, Paritas Chaquopy `android/app/src/main/python/backend/api/translate.py`):**
