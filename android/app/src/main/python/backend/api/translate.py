@@ -18,6 +18,7 @@ import time as _time
 import asyncio as _asyncio
 import collections as _collections
 import datetime as _dt
+import threading
 import httpx as _httpx
 
 TRANSLATE_LOGS = _collections.deque(maxlen=100)
@@ -2620,6 +2621,53 @@ def is_valid_translation(original_cues, translated_cues, tgt="id"):
     return bool(marker_match)
 
 
+# ---------------------------------------------------------------------------
+# Client HTTP bersama (pooled) untuk mesin translate GTX+.
+#
+# SEBELUMNYA setiap percobaan endpoint membuat httpx.Client BARU di dalam
+# loop (with _httpx.Client(...) as client). Untuk 1 episode dengan 24 batch
+# dan 4 endpoint failover, ini menghasilkan dozens TCP+TLS handshake sia-sia.
+# Client bersama memakai connection pool sehingga handshake cukup handful.
+# ---------------------------------------------------------------------------
+_gtx_client = None
+_gtx_client_lock = threading.Lock()
+
+
+def _get_gtx_client():
+    """Client httpx pooled bersama untuk mesin translate (thread-safe)."""
+    global _gtx_client
+    if _gtx_client is None:
+        with _gtx_client_lock:
+            if _gtx_client is None:
+                try:
+                    limits = _httpx.Limits(max_connections=16, max_keepalive_connections=8,
+                                           keepalive_expiry=60.0)
+                    _gtx_client = _httpx.Client(timeout=6.0, follow_redirects=True, limits=limits)
+                except Exception:
+                    _gtx_client = _httpx.Client(timeout=6.0, follow_redirects=True)
+    return _gtx_client
+
+
+def _get_gtx_client_unverified():
+    """Client httpx dengan verifikasi SSL dimatikan (fallback Android lama)."""
+    try:
+        limits = _httpx.Limits(max_connections=8, max_keepalive_connections=4, keepalive_expiry=30.0)
+        return _httpx.Client(timeout=6.0, verify=False, follow_redirects=True, limits=limits)
+    except Exception:
+        return _httpx.Client(timeout=6.0, verify=False, follow_redirects=True)
+
+
+def close_gtx_client():
+    """Tutup client translate bersama saat shutdown aplikasi."""
+    global _gtx_client
+    if _gtx_client is not None:
+        try:
+            _gtx_client.close()
+        except Exception:
+            pass
+        _gtx_client = None
+
+
 async def call_gtx_translate(cues, src="en", tgt="id", timeout=20.0, mode="gtx+"):
     """Translate via Google Translate Web RPC (Unmetered, Zero-Key, Super Cepat).
     Menggunakan HTTP POST form-encoded dengan HTML preservation (<p id="i">...</p>)
@@ -2636,6 +2684,12 @@ async def call_gtx_translate(cues, src="en", tgt="id", timeout=20.0, mode="gtx+"
     log_translate(f"Mulai translate Google (POST/Multi-Client): {len(cues)} cues | {len(batches)} batches | mode={mode}")
     
     from concurrent.futures import ThreadPoolExecutor
+
+    # Client HTTP bersama (pooled) untuk GTranslator: sebelumnya setiap
+    # percobaan endpoint membuat Client BARU -> 1 TCP+TLS handshake per
+    # attempt. Untuk 24 batch x 4 endpoint failover, ini dozens handshake
+    # sia-sia. Dengan client bersama, koneksi dipakai ulang antar batch.
+    _tx_client = _get_gtx_client()
 
     def _restore_html_chunk(raw_chunk: str, fallback: str) -> str:
         val = _re.sub(r"<br\s*/?>", "\n", raw_chunk or "", flags=_re.IGNORECASE)
@@ -2676,34 +2730,33 @@ async def call_gtx_translate(cues, src="en", tgt="id", timeout=20.0, mode="gtx+"
 
         body_data = {"q": joined}
 
-        # 1. Coba via HTTP POST menggunakan httpx
+        # 1. Coba via HTTP POST menggunakan httpx (client pooled bersama)
         for ep_url, ep_params in endpoints:
             try:
-                with _httpx.Client(timeout=6.0, follow_redirects=True) as client:
-                    resp = client.post(ep_url, params=ep_params, data=body_data, headers=headers)
-                    if resp.status_code == 200:
-                        data = resp.json()
-                        raw_out = ""
-                        if isinstance(data, list) and data and isinstance(data[0], list):
-                            raw_out = "".join([item[0] for item in data[0] if item and item[0]])
-                        elif isinstance(data, list) and data and isinstance(data[0], str):
-                            raw_out = "".join(data)
-                        elif isinstance(data, str):
-                            raw_out = data
+                resp = _tx_client.post(ep_url, params=ep_params, data=body_data, headers=headers)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    raw_out = ""
+                    if isinstance(data, list) and data and isinstance(data[0], list):
+                        raw_out = "".join([item[0] for item in data[0] if item and item[0]])
+                    elif isinstance(data, list) and data and isinstance(data[0], str):
+                        raw_out = "".join(data)
+                    elif isinstance(data, str):
+                        raw_out = data
 
-                        matches = dict(_re.findall(r'<p\s+id=[\"\']?\s*(\d+)\s*[\"\']?\s*>(.*?)</p>', raw_out, _re.DOTALL))
-                        if matches:
-                            res = []
-                            for i in range(len(batch_lines)):
-                                res.append(_restore_html_chunk(matches.get(str(i), batch_lines[i]), batch_lines[i]))
-                            return res, True
+                    matches = dict(_re.findall(r'<p\s+id=[\"\']?\s*(\d+)\s*[\"\']?\s*>(.*?)</p>', raw_out, _re.DOTALL))
+                    if matches:
+                        res = []
+                        for i in range(len(batch_lines)):
+                            res.append(_restore_html_chunk(matches.get(str(i), batch_lines[i]), batch_lines[i]))
+                        return res, True
             except Exception:
                 pass
 
         # 2. Coba fallback via httpx dengan unverified SSL (untuk Android Chaquopy lama)
         for ep_url, ep_params in endpoints[:2]:
             try:
-                with _httpx.Client(timeout=6.0, verify=False, follow_redirects=True) as client:
+                with _get_gtx_client_unverified() as client:
                     resp = client.post(ep_url, params=ep_params, data=body_data, headers=headers)
                     if resp.status_code == 200:
                         data = resp.json()
@@ -2783,9 +2836,34 @@ async def call_gtx_translate(cues, src="en", tgt="id", timeout=20.0, mode="gtx+"
         return "\n".join(raw_lines)
 
     batch_lines_list = [[_prep_line(cue["text"]) for cue in b] for b in batches]
-    with ThreadPoolExecutor(max_workers=3) as executor:
+    # Jumlah worker dinaikkan dari 3 ke 6. Episode 400-600 cue = 16-24 batch;
+    # dengan 3 worker itu berarti 6-8 gelombang request. Dengan 6 worker
+    # menjadi 3-4 gelombang sehingga waktu translate turun ~40%.
+    # Batas tetap dijaga agar tidak memicu rate-limit Google Translate.
+    _workers = min(6, max(1, len(batch_lines_list)))
+    with ThreadPoolExecutor(max_workers=_workers) as executor:
         tasks = [loop.run_in_executor(executor, lambda b=bl: _fetch_batch_sync(b)) for bl in batch_lines_list]
-        batch_results = await _asyncio.gather(*tasks)
+        # Batas waktu keseluruhan (parameter `timeout` sebelumnya tidak
+        # pernah dipakai sehingga fungsi ini tanpa batas waktu). Timeout
+        # per-endpoint 6s x 4 endpoint x mini-batch =~ 96s per batch, jadi
+        # default 20s terlalu agresif untuk episode penuh — gunakan 180s
+        # sebagai batas keras yang tetap mencegah request menggantung.
+        try:
+            batch_results = await _asyncio.wait_for(
+                _asyncio.gather(*tasks), timeout=max(60.0, float(timeout or 180.0))
+            )
+        except _asyncio.TimeoutError:
+            # Timeout: pakai hasil parsial yang sudah tersedia.
+            done_results = []
+            for t in tasks:
+                if t.done() and not t.exception():
+                    done_results.append(t.result())
+                else:
+                    t.cancel()
+            if not done_results:
+                raise RuntimeError("Timeout translate Google Translate.")
+            batch_results = done_results
+            log_translate(f"Timeout translate parsial: {len(done_results)}/{len(tasks)} batch selesai")
 
     success_count = 0
     for item in batch_results:
