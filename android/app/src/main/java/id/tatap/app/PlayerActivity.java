@@ -55,6 +55,11 @@ import androidx.media3.common.PlaybackException;
 import androidx.media3.common.PlaybackParameters;
 import androidx.media3.common.Player;
 import androidx.media3.datasource.DefaultHttpDataSource;
+import androidx.media3.datasource.DataSource;
+import androidx.media3.datasource.cache.CacheDataSource;
+import androidx.media3.datasource.cache.LeastRecentlyUsedCacheEvictor;
+import androidx.media3.datasource.cache.SimpleCache;
+import androidx.media3.database.StandaloneDatabaseProvider;
 import androidx.media3.exoplayer.ExoPlayer;
 import androidx.media3.exoplayer.analytics.AnalyticsListener;
 import androidx.media3.exoplayer.DefaultLoadControl;
@@ -73,6 +78,7 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.InputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -112,6 +118,23 @@ public class PlayerActivity extends Activity {
     private static final int PIP_ACTION_REWIND = 1;
     private static final int PIP_ACTION_PLAY_PAUSE = 2;
     private static final int PIP_ACTION_FORWARD = 3;
+
+    // ---------------------------------------------------------------------------
+    // Disk cache untuk segmen stream (Media3 SimpleCache).
+    //
+    // SEBELUMNYA tidak ada cache disk sama sekali: setiap segmen .ts/.m4s
+    // diunduh ulang dari proxy Python (127.0.0.1:8767) setiap kali user
+    // play / seek / pindah episode. Pada TV low-end (1-1.5GB RAM) ini berarti
+    // banyak unduhan network bolak-balik untuk data yang sama.
+    //
+    // SEKARANG segmen disimpan di cache disk 96MB (TV) / 256MB (HP) dengan
+    // eviksi LRU, sehingga seek mundur & replay episode kedua tidak perlu
+    // unduh ulang dari CDN.
+    // ---------------------------------------------------------------------------
+    private static final long STREAM_CACHE_BYTES_TV = 96L * 1024L * 1024L;
+    private static final long STREAM_CACHE_BYTES_PHONE = 256L * 1024L * 1024L;
+    private static SimpleCache streamCache;
+    private static final Object STREAM_CACHE_LOCK = new Object();
     private GestureDetector gestureDetector;
     private ScaleGestureDetector scaleGestureDetector;
     private AudioManager audioManager;
@@ -1018,6 +1041,59 @@ public class PlayerActivity extends Activity {
         }).start();
     }
 
+    /**
+     * Buat (atau ambil) instance SimpleCache disk untuk segmen stream.
+     * Disimpan static agar tidak dibuat ulang tiap activity — SimpleCache
+     * hanya boleh ada SATU instance per direktori (SimpleCache mengunci folder).
+     */
+    private static SimpleCache getStreamCache(Context ctx) {
+        synchronized (STREAM_CACHE_LOCK) {
+            if (streamCache != null) {
+                return streamCache;
+            }
+            try {
+                File cacheDir = new File(ctx.getCacheDir(), "tatap-stream");
+                if (!cacheDir.exists() && !cacheDir.mkdirs()) {
+                    return null;
+                }
+                long maxBytes = TvFocusHelper.isTv(ctx)
+                        ? STREAM_CACHE_BYTES_TV
+                        : STREAM_CACHE_BYTES_PHONE;
+                LeastRecentlyUsedCacheEvictor evictor =
+                        new LeastRecentlyUsedCacheEvictor(maxBytes);
+                StandaloneDatabaseProvider dbProvider = new StandaloneDatabaseProvider(ctx);
+                streamCache = new SimpleCache(cacheDir, evictor, dbProvider);
+                return streamCache;
+            } catch (Throwable t) {
+                // Cache bersifat opsional — playback tetap jalan tanpanya.
+                return null;
+            }
+        }
+    }
+
+    /**
+     * Data source factory yang memakai cache disk bila tersedia, dengan
+     * fallback ke HTTP langsung bila inisialisasi cache gagal.
+     */
+    private DataSource.Factory buildCachedDataSourceFactory(
+            DefaultHttpDataSource.Factory httpFactory) {
+        SimpleCache cache = getStreamCache(this);
+        if (cache == null) {
+            return httpFactory;
+        }
+        try {
+            return new CacheDataSource.Factory()
+                    .setCache(cache)
+                    .setUpstreamDataSourceFactory(httpFactory)
+                    // Flag IGNORE_CACHE_ON_ERROR: jika upstream gagal, pakai
+                    // salinan cache lama alih-alih gagal total.
+                    .setFlags(CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR)
+                    .setCacheWriteDataSinkFactory(null);
+        } catch (Throwable t) {
+            return httpFactory;
+        }
+    }
+
     private void initExoPlayer() {
         DefaultLoadControl loadControl = new DefaultLoadControl.Builder()
                 .setBufferDurationsMs(
@@ -1026,7 +1102,12 @@ public class PlayerActivity extends Activity {
                         2_000,  // bufferForPlaybackMs (2s cepat mulai)
                         4_000   // bufferForPlaybackAfterRebufferMs (4s)
                 )
-                .setPrioritizeTimeOverSizeThresholds(false)
+                // Prioritaskan batas UKURAN buffer di atas batas waktu. Nilai false
+                // membuat ExoPlayer buffer hingga 50 detik tanpa memandang ukuran
+                // byte — pada 1080p ini menahan belasan MB di RAM TV (1-1.5GB) dan
+                // memicu OOM/low-memory kill. Dengan true, byte cap berlaku dan
+                // ExoPlayer berhenti tepat di target waktu tanpa over-buffer.
+                .setPrioritizeTimeOverSizeThresholds(true)
                 .build();
 
         // Bandwidth meter dengan estimasi awal tinggi (25 Mbps) agar ExoPlayer langsung
@@ -2973,6 +3054,12 @@ public class PlayerActivity extends Activity {
                     .setReadTimeoutMs(30000)
                     .setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/124.0.0.0");
 
+            // Wrap dengan CacheDataSource supaya segmen .ts/.m4s disimpan ke
+            // disk dan tidak diunduh ulang saat seek/pindah episode. Cache
+            // bersifat opsional: jika inisialisasi gagal, fallback ke HTTP
+            // langsung.
+            DataSource.Factory cachedFactory = buildCachedDataSourceFactory(httpDataSourceFactory);
+
             String epTitle = (title != null && !title.isEmpty()) ? (title + " - Ep " + ep) : ("Episode " + ep);
             androidx.media3.common.MediaMetadata mediaMetadata = new androidx.media3.common.MediaMetadata.Builder()
                     .setTitle(epTitle)
@@ -2987,13 +3074,13 @@ public class PlayerActivity extends Activity {
 
             if (isHls) {
                 mib.setMimeType(MimeTypes.APPLICATION_M3U8);
-                HlsMediaSource videoSource = new HlsMediaSource.Factory(httpDataSourceFactory)
+                HlsMediaSource videoSource = new HlsMediaSource.Factory(cachedFactory)
                         .setAllowChunklessPreparation(true)
                         .createMediaSource(mib.build());
                 player.setMediaSource(videoSource);
             } else {
                 androidx.media3.exoplayer.source.ProgressiveMediaSource videoSource =
-                        new androidx.media3.exoplayer.source.ProgressiveMediaSource.Factory(httpDataSourceFactory)
+                        new androidx.media3.exoplayer.source.ProgressiveMediaSource.Factory(cachedFactory)
                                 .createMediaSource(mib.build());
                 player.setMediaSource(videoSource);
             }

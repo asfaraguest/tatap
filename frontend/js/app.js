@@ -2560,6 +2560,17 @@ function playUrl(url,referrer,sub,subRef,resumeTime,token){
       highBufferWatchdogPeriod:2,
       testBandwidth:false,
       progressive:true,
+      // Estimasi bandwidth awal dinaikkan dari default HLS.js (500 kbps) ke
+      // 3 Mbit/s. Dengan startLevel:-1 + testBandwidth:false, HLS.js memulai
+      // dari estimasi ini; pada 500 kbps player butuh 10-30 detik untuk
+      // meramping ke resolusi layak sehingga terasa lambat saat start.
+      // 3 Mbit/s adalah titik tengah yang realistis untuk koneksi lokal
+      // (proxy di 127.0.0.1) tanpa langsung melompat ke 1080p di jaringan
+      // lambat. Sejalan dengan Android yang memakai initial estimate 25 Mbps.
+      abrEwmaDefaultEstimate:3*1000*1000,
+      // Buffer awal lebih agresif supaya playback tidak sering rebuffer
+      // saat kualitas naik (ABR switch = renegosiasi + unduhan baru).
+      startBufferDuration:3,
       lowLatencyMode:false,
       defaultAudioCodec:"mp4a.40.2",
       enableWorker:true
@@ -2657,12 +2668,10 @@ function playUrl(url,referrer,sub,subRef,resumeTime,token){
     h.on(Hls.Events.ERROR,function(ev,d){
       if(!d)return;
       if(d.details === Hls.ErrorDetails.BUFFER_STALLED_ERROR || d.details === "bufferStalledError"){
-        try{
-          if(!v.paused && v.readyState >= 2){
-            v.currentTime += 0.08;
-          }
-          h.startLoad();
-        }catch(_){}
+        // Recovery stall TANPA seek. Seek 80ms sebelumnya membatalkan fragment
+        // load yang sedang berjalan di HLS.js sehingga memaksa unduhan ulang
+        // segmen dari keyframe lewat proxy Python — mahal dan memperparah stall.
+        try{ h.startLoad(); }catch(_){}
         return;
       }
       if(d.fatal){
