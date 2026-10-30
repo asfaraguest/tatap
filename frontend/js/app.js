@@ -2523,17 +2523,6 @@ function playUrl(url,referrer,sub,subRef,resumeTime,token){
   }
   var b = (typeof apiBase === "function") ? apiBase() : "";
   var prox=b+"/api/player/video?url="+encodeURIComponent(url)+"&referer="+encodeURIComponent(referrer||"");
-  try{
-    var m=/^(.*\/)index-(f\d+-v\d+-a\d+)\.m3u8/.exec(url);
-    if(m){
-      for(var wi=1;wi<=2;wi++){
-        (function(n){
-          var seg=m[1]+"seg-"+n+"-"+m[2]+".jpg";
-          fetch("/api/player/video?url="+encodeURIComponent(seg)+"&referer="+encodeURIComponent(referrer||""),{mode:"no-cors"}).catch(function(){});
-        })(wi);
-      }
-    }
-  }catch(e){}
   // Bersihkan <track> lama lalu pasang track subtitle aktif (live switch).
   // Fungsi switchSubtitleTrack() menhandle Off (hapus semua) dan replace.
   var validSub = (typeof sub === "string" && !/^\d+$/.test(sub.trim())) ? sub : null;
@@ -2613,22 +2602,6 @@ function playUrl(url,referrer,sub,subRef,resumeTime,token){
           h.audioTrack = 0;
         }
       }
-    });
-    h.on(Hls.Events.FRAG_BUFFERED,function(){
-      try{
-        var nxt=null;
-        if(h.levels&&h.levelDetails&&h.levelDetails.fragments){
-          var fr=h.levelDetails.fragments;
-          for(var fi=0;fi<fr.length;fi++){if(!fr[fi].loaded){nxt=fr[fi];break;}}
-        }
-        if(nxt&&nxt.url){
-          var fetchTarget = nxt.url;
-          if(!fetchTarget.startsWith("/api/player/video") && !fetchTarget.startsWith("/api/")){
-            fetchTarget = "/api/player/video?url="+encodeURIComponent(nxt.url)+"&referer="+encodeURIComponent(referrer||"");
-          }
-          fetch(fetchTarget,{mode:"no-cors",priority:"low"}).catch(function(){});
-        }
-      }catch(e){}
     });
     h.on(Hls.Events.MANIFEST_PARSED,function(ev,data){
       if(data&&data.levels&&data.levels.length>1){

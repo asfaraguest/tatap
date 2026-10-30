@@ -24,6 +24,107 @@ _neg_lock = threading.Lock()
 _neg_cache = {}        # host -> expires_at_epoch
 _neg_pair_cache = {}   # "host|slug|ep" -> expires_at_epoch
 
+# ---------------------------------------------------------------------------
+# Positive in-process caches (positive cache = data valid, bukan error).
+#
+#-paying- Actually these reduce duplicate upstream round-trips:
+#   _servers_mem_cache : episodeId -> (expires_at, servers_html)
+#       Dipakai oleh hianime_m3u8() dan hianime_subtitles_for_episode() yang
+#       memanggil endpoint /episode/servers dengan URL IDENTIK. Tanpa cache ini
+#       setiap resolve mode-subiktekan 1 round-trip penuh (12s timeout).
+#   _embed_mem_cache   : embed_url -> (expires_at, payload)
+#       Halaman embed (data-id / window.__P) relatif statis dalam beberapa
+#       menit sehingga tidak perlu di-fetch ulang tiap resolve.
+#   _episodes_mem_cache: slug -> (expires_at, episode_maps)
+#
+# Semua cache punya TTL + batas jumlah entri (LRU sederhana) agar tidak
+# tumbuh tanpa batas pada sesi panjang.
+# ---------------------------------------------------------------------------
+_MEM_LOCK = threading.Lock()
+_MEM_MAX_ENTRIES = 256
+
+
+def _mem_get(cache, key):
+    """Ambil nilai dari TTL-cache. Mengembalikan None bila miss/expired."""
+    with _MEM_LOCK:
+        item = cache.get(key)
+        if not item:
+            return None
+        exp, val = item
+        if exp < _time.time():
+            cache.pop(key, None)
+            return None
+        # Refresh posisi LRU (dict preserves insertion order).
+        try:
+            cache.pop(key)
+            cache[key] = (exp, val)
+        except Exception:
+            pass
+        return val
+
+
+def _mem_set(cache, key, val, ttl):
+    """Simpan nilai ke TTL-cache dengan batas jumlah entri."""
+    exp = _time.time() + ttl
+    with _MEM_LOCK:
+        cache[key] = (exp, val)
+        if len(cache) > _MEM_MAX_ENTRIES:
+            # Buang entri tertua (insertion order) sampai di bawah batas.
+            for k in list(cache.keys())[:len(cache) - _MEM_MAX_ENTRIES]:
+                cache.pop(k, None)
+    return val
+
+
+def _mem_pop(cache, key):
+    with _MEM_LOCK:
+        return cache.pop(key, None)
+
+
+_servers_mem_cache = {}   # episode_id -> (expires_at, servers_html)
+_embed_mem_cache = {}     # embed_url -> (expires_at, payload)
+
+# TTL untuk positive cache (detik).
+_SERVERS_CACHE_TTL = 600          # 10 menit — daftar server jarang berubah
+_EMBED_CACHE_TTL = 1800           # 30 menit — halaman embed relatif statis
+_EPISODES_CACHE_TTL = 6 * 3600    # 6 jam (cocok dengan _EPISODES_MEM_CACHE lama)
+
+
+def _fetch_servers(ep_id) -> str:
+    """Fetch (atau kembalikan dari cache) server HTML untuk suatu episode_id.
+    Endpoint /api/theme/episode/servers?episodeId={} sama persis dipanggil
+    oleh hianime_m3u8() dan hianime_subtitles_for_episode() — cache mencegah
+    round-trip TCP/TLS yang duplikat (bisa 12s timeout per panggilan)."""
+    if not ep_id:
+        return _fetch(SERVERS_API.format(ep_id))
+    cached = _mem_get(_servers_mem_cache, ep_id)
+    if cached:
+        return cached
+    html = _fetch(SERVERS_API.format(ep_id))
+    if html:
+        _mem_set(_servers_mem_cache, ep_id, html, _SERVERS_CACHE_TTL)
+    return html
+
+
+def _fetch_embed_cached(url: str, ttl: int = _EMBED_CACHE_TTL) -> str:
+    """Fetch halaman embed dengan TTL cache. Halaman embed (data-id / window.__P)
+    relatif statis — tidak berubah signifikan dalam 30 menit."""
+    if not url:
+        return ""
+    cached = _mem_get(_embed_mem_cache, url)
+    if cached:
+        return cached
+    html = _fetch(url, referer="https://hianime.at/")
+    if html:
+        _mem_set(_embed_mem_cache, url, html, ttl)
+    return html
+
+
+# Lock terpisah untuk _EPISODES_MEM_CACHE agar check-then-act aman dari race
+# condition pada thread pool executor. Race sebelumnya: dua thread bisa keduanya
+# miss cache lalu keduanya fetch halaman episode yang sama secara bersamaan
+# (menggandakan beban scraping hianime.at).
+_EPISODES_MEM_LOCK = threading.Lock()
+
 
 def _is_dead_host(host):
     base = (host or "").lower()
@@ -66,6 +167,26 @@ def _host_from(url):
 
 
 _BLOCKED_DPI_HOSTS = {"hls.dramahot.top", "drama1.cfd", "hls1.drama1.cfd", "puterin.biz", "putarin.xyz", "stream121.space"}
+# Lock untuk _BLOCKED_DPI_HOSTS: set ini di-mutate dari event loop (main.py)
+# DAN dari worker thread executor (hianime._probe_master). set.add atomic di
+# CPython, tetapi iterasi bersamaan saat resize bisa memicu RuntimeError.
+_DPI_HOSTS_LOCK = threading.Lock()
+
+
+def _add_blocked_dpi_host(host: str) -> None:
+    """Tambahkan host ke daftar DPI-blocked secara thread-safe."""
+    if not host:
+        return
+    with _DPI_HOSTS_LOCK:
+        _BLOCKED_DPI_HOSTS.add(host)
+
+
+def _is_blocked_dpi_host(host: str) -> bool:
+    """Cek daftar DPI-blocked secara thread-safe (snapshot atomik)."""
+    if not host:
+        return False
+    with _DPI_HOSTS_LOCK:
+        return host.lower() in _BLOCKED_DPI_HOSTS
 _BLOCKED_DPI_KEYWORDS = ("dramahot", "drama1", "zokoanime", "puterin", "putarin", "stream121")
 
 
@@ -73,7 +194,7 @@ def _is_dpi_blocked_host(host: str) -> bool:
     if not host:
         return False
     h = host.lower()
-    if h in _BLOCKED_DPI_HOSTS:
+    if _is_blocked_dpi_host(h):
         return True
     return any(k in h for k in _BLOCKED_DPI_KEYWORDS)
 
@@ -107,8 +228,10 @@ def _probe_master(master_url, referer):
             kw = dict(headers=headers, impersonate="chrome124", timeout=10)
             r = creq.get(master_url, **kw)
         except Exception:
-            import httpx
-            r = httpx.get(master_url, headers=headers, timeout=10, follow_redirects=True)
+            # Gunakan shared pooled client (bukan httpx.get module-level) agar
+            # koneksi TCP/TLS dipakai ulang antar request.
+            client = _get_shared_client()
+            r = client.get(master_url, headers=headers, timeout=10, follow_redirects=True)
         if r.status_code == 200 and r.content:
             return r.content
         if r.status_code >= 400:
@@ -118,7 +241,7 @@ def _probe_master(master_url, referer):
         is_known_dpi = any(k in host for k in ("dramahot", "zokoanime"))
         is_rst = any(w in err_str for w in ("reset", "ssl", "recv failure"))
         if is_known_dpi or is_rst:
-            _BLOCKED_DPI_HOSTS.add(host)
+            _add_blocked_dpi_host(host)
             try:
                 from api.desync import tls_desync_request
                 content = tls_desync_request(master_url, headers=headers, timeout=8.0)
@@ -560,44 +683,53 @@ def hianime_episodes(slug: str):
     if "hentai" in (slug or "").lower():
         raise RuntimeError("Anime ini diblokir (genre hentai)")
     now = _time.time()
+    # Double-checked locking: baca cache tanpa lock (fast path), lalu ambil
+    # lock hanya saat miss (perlahan) untuk mencegah dua worker melakukan
+    # fetch ganda untuk slug yang sama.
     cached = _EPISODES_MEM_CACHE.get(slug)
     if cached and (now - cached[0] < _EPISODES_MEM_TTL):
         return cached[1]
 
-    numeric = slug.rsplit("-", 1)[-1]
-    raw_page = _fetch(EPISODES_API.format(numeric))
-    page = raw_page
-    if not page.startswith("{") and "{" in page:
-        page = page[page.find("{"):]
-    if page.endswith("0\r\n\r\n"):
-        page = page[:page.rfind("}") + 1]
+    with _EPISODES_MEM_LOCK:
+        # Re-check setelah lock: mungkin sudah terisi oleh thread lain.
+        cached = _EPISODES_MEM_CACHE.get(slug)
+        if cached and (_time.time() - cached[0] < _EPISODES_MEM_TTL):
+            return cached[1]
 
-    html = ""
-    try:
-        data = json.loads(page)
-        html = data.get("html", "")
-    except Exception:
-        html = raw_page.replace("\\", "")
+        numeric = slug.rsplit("-", 1)[-1]
+        raw_page = _fetch(EPISODES_API.format(numeric))
+        page = raw_page
+        if not page.startswith("{") and "{" in page:
+            page = page[page.find("{"):]
+        if page.endswith("0\r\n\r\n"):
+            page = page[:page.rfind("}") + 1]
 
-    eps = []
-    for m in re.finditer(r'data-number="([0-9]+)"[^>]*?data-id="([0-9]+)"', html):
-        eps.append({"ep": int(m.group(1)), "ep_id": m.group(2)})
-    if not eps:
-        # Fallback pola urutan alternatif jika struktur berubah
-        for m in re.finditer(r'data-number="([^"]*)"[^>]*data-id="([0-9]+)"', html):
-            try:
-                ep_no = int(m.group(1))
-            except ValueError:
-                continue
-            eps.append({"ep": ep_no, "ep_id": m.group(2)})
+        html = ""
+        try:
+            data = json.loads(page)
+            html = data.get("html", "")
+        except Exception:
+            html = raw_page.replace("\\", "")
 
-    seen = {}
-    for e in eps:
-        seen[e["ep"]] = e["ep_id"]
-    result = [{"ep": k, "ep_id": v} for k, v in sorted(seen.items())]
-    if result:
-        _EPISODES_MEM_CACHE[slug] = (now, result)
-    return result
+        eps = []
+        for m in re.finditer(r'data-number="([0-9]+)"[^>]*?data-id="([0-9]+)"', html):
+            eps.append({"ep": int(m.group(1)), "ep_id": m.group(2)})
+        if not eps:
+            # Fallback pola urutan alternatif jika struktur berubah
+            for m in re.finditer(r'data-number="([^"]*)"[^>]*data-id="([0-9]+)"', html):
+                try:
+                    ep_no = int(m.group(1))
+                except ValueError:
+                    continue
+                eps.append({"ep": ep_no, "ep_id": m.group(2)})
+
+        seen = {}
+        for e in eps:
+            seen[e["ep"]] = e["ep_id"]
+        result = [{"ep": k, "ep_id": v} for k, v in sorted(seen.items())]
+        if result:
+            _EPISODES_MEM_CACHE[slug] = (_time.time(), result)
+        return result
 
 def _parse_servers(html: str, mode: str):
     items = html.replace('\\"', '"').split("server-item")
@@ -916,7 +1048,7 @@ def _try_megaplay(embed: str):
     Flow (from newclient.min.js): GET embed page -> data-id -> GET
     /stream/getSourcesNew?id={data-id} (Referer=embed) -> {enc} ->
     AES-CBC decrypt -> {file: master.m3u8} + tracks[]."""
-    page = _fetch(embed, referer="https://hianime.at/")
+    page = _fetch_embed_cached(embed)
     m = re.search(r'data-id="(\d+)"', page)
     if not m:
         raise RuntimeError("megaplay data-id not found")
@@ -1121,15 +1253,15 @@ def _validate_sub_url(sub_url: str, referer: str):
                 return sub_url
             return None
         except Exception:
-            import httpx
-            with httpx.Client(timeout=5, follow_redirects=True, headers=headers) as c:
-                r = c.get(sub_url)
-                if r.status_code == 200 and r.content and len(r.content) >= 10:
-                    return sub_url
-                if any(k in host for k in ("broforgotsave", "stellarfrontier", "megaplay")):
-                    headers["Referer"] = "https://megaplay.buzz/"
-                    r2 = c.get(sub_url, headers=headers)
-                    if r2.status_code == 200 and r2.content and len(r2.content) >= 10:
+            # Gunakan shared pooled client agar koneksi TCP/TLS dipakai ulang.
+            client = _get_shared_client()
+            r = client.get(sub_url, headers=headers, timeout=5, follow_redirects=True)
+            if r.status_code == 200 and r.content and len(r.content) >= 10:
+                return sub_url
+            if any(k in host for k in ("broforgotsave", "stellarfrontier", "megaplay")):
+                headers["Referer"] = "https://megaplay.buzz/"
+                r2 = client.get(sub_url, headers=headers, timeout=5, follow_redirects=True)
+                if r2.status_code == 200 and r2.content and len(r2.content) >= 10:
                         return sub_url
                 return None
     except Exception:
@@ -1138,10 +1270,10 @@ def _validate_sub_url(sub_url: str, referer: str):
 
 def _try_embed_legacy(embed: str):
     referer = re.sub(r"^(https?://[^/]*).*", r"\1/", embed)
-    page = _fetch(embed)
+    page = _fetch_embed_cached(embed)
     # Deteksi halaman 404 ZokoAnime (server return HTML page, bukan markdown())
     # Page signature: ada "<title>Player</title>" + "Not" + "found." pada body.
-    # Skip regex window.__P kalau 404 — raise sebagai "anime not on server"
+    # Skip regex window.__P kalau 404 \u2013 raise sebagai "anime not on server"
     # sehingga caller skip server ini (jangan fallback dalam loop yang sama).
     if "<title>Player</title>" in page and "Not " in page and "found." in page:
         raise RuntimeError("404 page (anime not on server)")
@@ -1193,14 +1325,41 @@ def _try_embed_legacy(embed: str):
             "outro": outro}
 
 
-def _harvest_subtitles(servers, current_srv_name: str = ""):
-    """Ambil track subtitle dari server alternatif jika server video utama tidak memiliki subtitle."""
+def _harvest_subtitles(servers, current_srv_name: str = "", slug: str = "", ep: int = 0,
+                       resolved: dict = None):
+    """Ambil track subtitle dari server alternatif jika server video utama tidak memiliki subtitle.
+
+    Optimasi:
+      - `resolved`: peta {server_name: got_dict} hasil resolusi paralel di atas.
+        Server yang SUDAH berhasil di-resolve (dengan subtitle kosong) TIDAK
+        di-probe ulang — sebelumnya ini menyebabkan embed+sources+master
+        di-fetch 2x untuk server yang sama.
+      - Memakai negative cache per-(host, slug, ep) sehingga server yang sudah
+        diketahui "tidak punya subtitle / 404" tidak di-probe ulang.
+    """
     for srv in servers:
         if srv.get("name") == current_srv_name:
             continue
         host = _host_from(srv.get("embed", ""))
         if _is_dead_host(host):
             continue
+        # Negative cache per-episode: hindari probe ulang server yang sudah
+        # diketahui tidak punya subtitle untuk episode ini.
+        if slug and ep and _is_dead_pair(host, slug, ep):
+            continue
+        # Reuse hasil resolusi yang sudah ada (menghindari probe ganda).
+        if resolved:
+            prev = resolved.get(srv.get("name"))
+            if prev is not None:
+                if prev.get("subtitles"):
+                    return {
+                        "subtitles": prev["subtitles"],
+                        "sub": prev.get("sub"),
+                        "sub_lang": prev.get("sub_lang"),
+                        "referer": prev.get("referer"),
+                    }
+                # Sudah dicek dan tidak punya subtitle -> lewati.
+                continue
         try:
             embed_low = (srv.get("embed") or "").lower()
             if "zokoanime.video" in embed_low or "vidtube.site" in embed_low or "vidplay" in srv.get("name", "").lower():
@@ -1215,6 +1374,9 @@ def _harvest_subtitles(servers, current_srv_name: str = ""):
                     "referer": alt_got.get("referer"),
                 }
         except Exception:
+            # Tandai (host, slug, ep) supaya tidak di-probe ulang pada request berikutnya.
+            if slug and ep:
+                _mark_dead_pair(host, slug, ep, ttl=300)
             continue
     return None
 
@@ -1232,12 +1394,12 @@ def hianime_subtitles_for_episode(slug: str, ep_no: int) -> dict:
                 break
         if not ep_id:
             return {"subtitles": [], "sub": None, "sub_lang": None}
-        servers_html = _fetch(SERVERS_API.format(ep_id))
+        servers_html = _fetch_servers(ep_id)
         sub_servers = _order_servers(_parse_servers(servers_html, "sub"))
-        harvested = _harvest_subtitles(sub_servers)
+        harvested = _harvest_subtitles(sub_servers, slug=slug, ep=ep_no)
         if not harvested:
             dub_servers = _order_servers(_parse_servers(servers_html, "dub"))
-            harvested = _harvest_subtitles(dub_servers)
+            harvested = _harvest_subtitles(dub_servers, slug=slug, ep=ep_no)
         return harvested or {"subtitles": [], "sub": None, "sub_lang": None}
     except Exception:
         return {"subtitles": [], "sub": None, "sub_lang": None}
@@ -1252,7 +1414,7 @@ def hianime_m3u8(episode_maps, ep_no: int, mode: str = "sub", slug: str = ""):
             break
     if not ep_id:
         raise RuntimeError(f"Episode {ep_no} not released!")
-    servers_html = _fetch(SERVERS_API.format(ep_id))
+    servers_html = _fetch_servers(ep_id)
     servers = _order_servers(_parse_servers(servers_html, req_mode))
     actual_mode = req_mode
     if not servers:
@@ -1280,17 +1442,28 @@ def hianime_m3u8(episode_maps, ep_no: int, mode: str = "sub", slug: str = ""):
 
     servers_sorted = sorted(servers, key=lambda sr: (tier_of(sr), sr["name"]))
     last_err = ""
-    for srv in servers_sorted:
+
+    # ------------------------------------------------------------------
+    # Resolusi server PARALEL dengan prioritas tier.
+    #
+    #acja- Sebelumnya loop ini murni sequential: setiap server dicoba satu per
+    # satu sehingga worst-case bisa ~94 detik (servers API + embed + sources
+    # API + master m3u8, diulang untuk tiap server alternatif saat harvest
+    # subtitle). Sekarang semua server kandidat dieksekusi bersamaan pada
+    # ThreadPoolExecutor dan hasilnya dipilih berdasarkan tier TERCEPAT yang
+    # sukses (bukan urutan selesai), sehingga:"
+    #   - Tier 0 (megaplay) tetap menang bila berhasil, sama seperti sebelumnya.
+    #   - If tier 0 gagal, tier 1/2 yang SUDAH selesai tidak perlu menunggu
+    #     giliran -> waktu resolve turun drastis.
+    #   - Batas 3 worker mencegah lonjakan koneksi ke CDN.
+    # ------------------------------------------------------------------
+    def _probe_server(srv):
+        """Coba resolve satu server. Return (index, srv, got_or_None, err)."""
         host = _host_from(srv["embed"])
-        # Skip host mati (global negative cache) tanpa re-fetch.
         if _is_dead_host(host):
-            last_err = f"skip {srv['name']} (dead host)"
-            continue
-        # Skip per-(host, slug, ep): anime ini memang tidak ada di server ini
-        # (misal ZokoAnime 404 untuk judul baru). Negative cache TTL 1 jam.
+            return (srv["name"], None, f"skip {srv['name']} (dead host)")
         if slug and _is_dead_pair(host, slug, ep_no):
-            last_err = f"skip {srv['name']} (404 cached for ep {ep_no})"
-            continue
+            return (srv["name"], None, f"skip {srv['name']} (404 cached for ep {ep_no})")
         try:
             embed_low = srv["embed"].lower()
             if "zokoanime.video" in embed_low:
@@ -1303,31 +1476,10 @@ def hianime_m3u8(episode_maps, ep_no: int, mode: str = "sub", slug: str = ""):
             if got:
                 got["server"] = srv["name"]
                 got["mode"] = actual_mode
-
-                # Fallback Subtitle Tier 1 & 2:
-                # Jika server video yang berhasil memutar video tidak memiliki subtitle (atau kosong):
-                if not got.get("subtitles"):
-                    # 1. Coba server alternatif di mode yang sama (Cross-Server)
-                    alt_subs = _harvest_subtitles(servers_sorted, current_srv_name=srv["name"])
-                    # 2. Jika masih kosong dan sedang mode DUB, pinjam dari mode SUB (Cross-Mode)
-                    if not alt_subs and actual_mode == "dub":
-                        sub_servers = _order_servers(_parse_servers(servers_html, "sub"))
-                        alt_subs = _harvest_subtitles(sub_servers)
-                    # 3. Jika masih kosong dan sedang mode SUB, pinjam dari mode DUB sebagai cadangan
-                    if not alt_subs and actual_mode == "sub":
-                        dub_servers = _order_servers(_parse_servers(servers_html, "dub"))
-                        alt_subs = _harvest_subtitles(dub_servers)
-
-                    if alt_subs:
-                        got["subtitles"] = alt_subs["subtitles"]
-                        got["sub"] = alt_subs.get("sub")
-                        got["sub_lang"] = alt_subs.get("sub_lang")
-
-                return got
-            last_err = f"{srv['name']} gave no m3u8"
+                return (srv["name"], got, "")
+            return (srv["name"], None, f"{srv['name']} gave no m3u8")
         except Exception as e:
             err_msg = str(e)
-            last_err = f"{srv['name']}: {err_msg}"
             msg = err_msg.lower()
             # Tandai host mati kalau error-nya network (RST, ConnectError, probe fail).
             if any(t in msg for t in ("rst", "reset", "connect", "timeout", "dead", "upstream", "probe fail", "sslerror")):
@@ -1337,7 +1489,97 @@ def hianime_m3u8(episode_maps, ep_no: int, mode: str = "sub", slug: str = ""):
             if any(t in msg for t in ("404 page", "not on server", "window.__p not found", "data-id not found")):
                 if slug:
                     _mark_dead_pair(host, slug, ep_no)
-            continue
+            return (srv["name"], None, f"{srv['name']}: {err_msg}")
+
+    got = None
+    winners = []  # (tier_index, srv, got) — dipilih berdasarkan tier, bukan urutan selesai
+    errors = []
+    _failed_servers = set()  # nama server yang gagal (untuk hindari probe ulang saat harvest)
+    try:
+        import concurrent.futures as _cf
+        max_workers = min(3, max(1, len(servers_sorted)))
+        _pool = _cf.ThreadPoolExecutor(max_workers=max_workers)
+        try:
+            _futures = {}
+            for _idx, _srv in enumerate(servers_sorted):
+                _futures[_pool.submit(_probe_server, _srv)] = _idx
+
+            # Kumpulkan hasil. Karena tier-0 (megaplay) harus menang bila
+            # berhasil, kita TETAP menunggu server tier-0 即使 kalau server
+            # tier-lower sudah selesai lebih dulu.
+            _pending = set(_futures.keys())
+            while _pending:
+                _done, _pending = _cf.wait(_pending, return_when=_cf.FIRST_COMPLETED)
+                for _f in _done:
+                    _idx = _futures.get(_f)
+                    try:
+                        name, res, err = _f.result()
+                    except Exception as _ex:
+                        errors.append(str(_ex))
+                        continue
+                    if res is not None:
+                        winners.append((_idx if _idx is not None else 99, res))
+                    elif err:
+                        errors.append(err)
+                        if name:
+                            _failed_servers.add(name)
+
+                # Early-exit: bila tier-0 (index 0) sudah sukses, tidak perlu
+                # menunggu server lain yang lebih lambat.
+                if any(ti == 0 for ti, _ in winners):
+                    break
+                # Early-exit: bila semua server kandidat sudah selesai.
+                if not _pending:
+                    break
+        finally:
+            # wait=False: jangan blocking pada server lambat yang masih jalan.
+            # Thread leftover akan selesai sendiri di background (daemon-ish:
+            # executor di-shutdown tanpa wait tidak menahan proses keluar).
+            _pool.shutdown(wait=False)
+    except Exception as _pool_err:
+        errors.append(str(_pool_err))
+
+    if winners:
+        # Pilih tier terkecil (server paling baik), lalu nama agar deterministik.
+        winners.sort(key=lambda x: x[0])
+        got = winners[0][1]
+        if len(winners) > 1:
+            last_err = "; ".join(errors[-2:]) if errors else ""
+    else:
+        last_err = "; ".join(errors) if errors else "no server produced m3u8"
+
+    if got:
+        # Peta hasil resolusi per-server (termasuk yang gagal) supaya harvest
+        # subtitle tidak melakukan probe ulang terhadap server yang sama.
+        _resolved_map = {}
+        for _ti, _res in winners:
+            _nm = _res.get("server")
+            if _nm:
+                _resolved_map[_nm] = _res
+        for _nm in _failed_servers:
+            _resolved_map.setdefault(_nm, None)
+
+        # Fallback Subtitle Tier 1 & 2:
+        # Jika server video yang berhasil memutar video tidak memiliki subtitle (atau kosong):
+        if not got.get("subtitles"):
+            # 1. Coba server alternatif di mode yang sama (Cross-Server)
+            alt_subs = _harvest_subtitles(servers_sorted, current_srv_name=got.get("server") or "",
+                                          slug=slug, ep=ep_no, resolved=_resolved_map)
+            # 2. Jika masih kosong dan sedang mode DUB, pinjam dari mode SUB (Cross-Mode)
+            if not alt_subs and actual_mode == "dub":
+                sub_servers = _order_servers(_parse_servers(servers_html, "sub"))
+                alt_subs = _harvest_subtitles(sub_servers, slug=slug, ep=ep_no, resolved=_resolved_map)
+            # 3. Jika masih kosong dan sedang mode SUB, pinjam dari mode DUB sebagai cadangan
+            if not alt_subs and actual_mode == "sub":
+                dub_servers = _order_servers(_parse_servers(servers_html, "dub"))
+                alt_subs = _harvest_subtitles(dub_servers, slug=slug, ep=ep_no, resolved=_resolved_map)
+
+            if alt_subs:
+                got["subtitles"] = alt_subs["subtitles"]
+                got["sub"] = alt_subs.get("sub")
+                got["sub_lang"] = alt_subs.get("sub_lang")
+
+        return got
     if "dramahot.top" in last_err.lower() or "zokoanime" in last_err.lower():
         raise RuntimeError(
             "Server video anime baru ini (ZokoAnime) diblokir DPI/ISP (hls.dramahot.top). "

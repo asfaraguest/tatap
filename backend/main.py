@@ -2005,13 +2005,22 @@ def _is_m3u8_url(url: str, ctype: str = "") -> bool:
 
 
 @app.get("/api/player/video")
-async def proxy_video(url: str = Query(""), referer: str = Query("")):
+async def proxy_video(url: str = Query(""), referer: str = Query(""), range: str = Query("")):
     # Proxy cepat: koneksi dipakai ulang, segmen di-stream (tanpa buffer penuh),
-    # Range diteruskan supaya seek tidak unduh ulang dari awal.
+    # Range diteruskan ke upstream supaya seek tidak mengunduh ulang segmen dari awal.
     from fastapi import Request
     from fastapi.responses import StreamingResponse as _SR
     if not url.startswith("http"):
         return Response(status_code=400)
+    # Sanitasi header Range: hanya izinkan bentuk "bytes=<start>-<end>" agar tidak
+    # menjadi vektor request smuggling / header injection ke upstream CDN.
+    range_header = ""
+    if range:
+        _rg = range.strip()
+        if _rg.lower().startswith("bytes="):
+            _rg = _rg[6:].strip()
+            if _rg and all(c.isdigit() or c == "-" for c in _rg) and _rg.count("-") <= 1:
+                range_header = f"bytes={_rg}"
     from api.hianime import SEG_RE, SEG_KEY, SEG_IV, STRIP_BYTES, STRIP_RE
     import re as _re
     m = SEG_RE.search(url)
@@ -2052,10 +2061,10 @@ async def proxy_video(url: str = Query(""), referer: str = Query("")):
     from api.hianime import _host_from, _is_dpi_blocked_host
     host = _host_from(url)
     if _is_dpi_blocked_host(host):
-        return _SR(_pipe_desync_video(url, referer), media_type=media_type,
+        return _SR(_pipe_desync_video(url, referer, range_header=range_header), media_type=media_type,
                    headers={"Access-Control-Allow-Origin": "*"})
 
-    return _SR(_pipe_video(url, referer), media_type=media_type,
+    return _SR(_pipe_video(url, referer, range_header=range_header), media_type=media_type,
                headers={"Access-Control-Allow-Origin": "*"})
 
 
@@ -2094,7 +2103,7 @@ def _rewrite_m3u8_content(txt: str, base_url: str, referer: str) -> str:
     return "\n".join(out)
 
 
-async def _pipe_desync_video(url: str, referer: str):
+async def _pipe_desync_video(url: str, referer: str, range_header: str = ""):
     """Streaming video via TLS Client Hello Desynchronization (Direct TCP 443 tanpa VPN)."""
     from api.desync import tls_desync_request, tls_desync_stream
     import asyncio
@@ -2105,6 +2114,8 @@ async def _pipe_desync_video(url: str, referer: str):
         "Accept": "*/*",
         "Accept-Language": "en-US,en;q=0.9,id;q=0.8",
     }
+    if range_header:
+        headers["Range"] = range_header
     if referer:
         headers["Referer"] = referer
         orig = _re.sub(r"^(https?://[^/]+).*", r"\1", referer)
@@ -2150,7 +2161,7 @@ def _get_video_client(url: str):
     return _direct_client
 
 
-async def _pipe_video(url: str, referer: str):
+async def _pipe_video(url: str, referer: str, range_header: str = ""):
     import urllib.parse as _up
     import asyncio as _asyncio
     import re as _re
@@ -2162,6 +2173,9 @@ async def _pipe_video(url: str, referer: str):
         "Accept": "*/*",
         "Accept-Language": "en-US,en;q=0.9,id;q=0.8",
     }
+    if range_header:
+        # Teruskan Range ke upstream agar seek hanya mengunduh byte yang dibutuhkan.
+        headers["Range"] = range_header
     if referer:
         headers["Referer"] = referer
         orig = _re.sub(r"^(https?://[^/]+).*", r"\1", referer)
@@ -2211,7 +2225,7 @@ async def _pipe_video(url: str, referer: str):
                 from api.hianime import _host_from, _BLOCKED_DPI_HOSTS
                 host = _host_from(url)
                 _BLOCKED_DPI_HOSTS.add(host)
-                async for chunk in _pipe_desync_video(url, referer):
+                async for chunk in _pipe_desync_video(url, referer, range_header=range_header):
                     yield chunk
                 return
             except Exception:
@@ -2228,7 +2242,7 @@ async def _pipe_video(url: str, referer: str):
                 is_rst = any(w in err_text for w in ("connection reset", "connectionreseterror", "rst", "closed connection"))
                 if is_known_dpi or is_rst:
                     _BLOCKED_DPI_HOSTS.add(host)
-                async for chunk in _pipe_desync_video(url, referer):
+                async for chunk in _pipe_desync_video(url, referer, range_header=range_header):
                     yield chunk
                 return
             except Exception:
@@ -2340,7 +2354,7 @@ async def _get_validated_subtitle_cache(key: str, lang: str = "id", ttl: int = 7
     return None
 
 
-async def _prewarm_sub_translation(url: str, referer: str, src: str = "en", lang: str = "id"):
+async def _prewarm_sub_translation(url: str, referer: str, src: str = "en", lang: str = "id", req_mode: str = "gtx+", dual: int = 0):
     """Prefetch subtitle translate di latar belakang jika belum ada di cache."""
     if not url or not url.startswith("http") or not lang or lang == src:
         return
@@ -2351,24 +2365,34 @@ async def _prewarm_sub_translation(url: str, referer: str, src: str = "en", lang
     import hashlib
     base_hash = hashlib.sha1((url + "|" + (referer or "") + "|" + lang).encode("utf-8")).hexdigest()
     key_gtx = "sub2|gtx|" + base_hash
+    key_gtxplus = "sub2|gtx+|" + base_hash
+    key_llm = "sub2|llm|" + base_hash
     hit = await _get_validated_subtitle_cache(key_gtx, lang=lang)
     if hit is not None:
         return
+    hit = await _get_validated_subtitle_cache(key_gtxplus, lang=lang)
+    if hit is not None:
+        return
 
-    job_key = f"{base_hash}|{lang}"
+    job_key = f"{base_hash}|{lang}|{req_mode}|dual={dual}"
     fut = _SUB_INFLIGHT.get(job_key)
     if fut is None:
-        key_gtxplus = "sub2|gtx+|" + base_hash
-        key_aigtx = "sub2|aigtx|" + base_hash
-        key_llm = "sub2|llm|" + base_hash
         try:
             from api.translate import log_translate
             log_translate(f"Prefetch subtitle [{lang}] dimulai di background...")
         except Exception:
             pass
-        fut = asyncio.ensure_future(_translate_sub_job(url, referer, src, lang, key_llm, key_gtxplus, _fetch_sub_text, key_gtx=key_gtx, requested_mode="gtx"))
+        fut = asyncio.ensure_future(_translate_sub_job(url, referer, src, lang, key_llm, key_gtxplus, _fetch_sub_text, key_gtx=key_gtx, requested_mode=req_mode))
         _SUB_INFLIGHT[job_key] = fut
-        fut.add_done_callback(lambda _f, k=job_key: _SUB_INFLIGHT.pop(k, None))
+
+        def _pop_and_retrieve(f, k=job_key):
+            _SUB_INFLIGHT.pop(k, None)
+            try:
+                f.exception()
+            except Exception:
+                pass
+
+        fut.add_done_callback(_pop_and_retrieve)
 
 
 @app.get("/favicon.ico")
@@ -2508,7 +2532,15 @@ async def proxy_sub(url: str = Query(""),
             _translate_sub_job(url, referer, src, lang, key_llm, key_gtxplus, _fetch_sub_text, key_gtx=key_gtx, requested_mode=req_mode, is_dual=False, key_dual="")
         )
         _SUB_INFLIGHT[job_key] = fut
-        fut.add_done_callback(lambda _f, k=job_key: _SUB_INFLIGHT.pop(k, None))
+
+        def _pop_and_retrieve(f, k=job_key):
+            _SUB_INFLIGHT.pop(k, None)
+            try:
+                f.exception()
+            except Exception:
+                pass
+
+        fut.add_done_callback(_pop_and_retrieve)
 
     try:
         new_text, tier = await asyncio.shield(fut)
@@ -2577,14 +2609,17 @@ async def _translate_sub_job(url, referer, src, lang, key_llm, key_gtxplus, fetc
                 await set_subtitle_cache(key_dual, new_text)
             elif lvl in ("tier1", "gtx"):
                 await set_subtitle_cache(key_gtx, new_text)
+                await set_subtitle_cache(key_gtxplus, new_text)
             elif lvl in ("tier2", "gtx+", "aigtx"):
                 await set_subtitle_cache(key_gtxplus, new_text)
+                await set_subtitle_cache(key_gtx, new_text)
             elif lvl in ("tier3", "ai"):
                 total = max(1, tier.get("total") or len(cues))
                 if tier.get("llm_lines", 0) / total >= 0.8:
                     await set_subtitle_cache(key_llm, new_text)
                 else:
                     await set_subtitle_cache(key_gtxplus, new_text)
+                    await set_subtitle_cache(key_gtx, new_text)
     return new_text, tier
 
 
