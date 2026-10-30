@@ -25,6 +25,25 @@ Kenaikan digit PATCH diterapkan sesuai kaidah Semantic Versioning 2.0.0 dan Dire
    - **Kamus Kosakata Spesifik Genre & Idiom:** Integrasi kamus terminologi Game/Isekai/Job System, Mecha & Tactical Sci-Fi, Ninja/Shinobi Shonen, Kutukan & Roh Supernatural Modern (Jujutsu), Fantasi Abadi & Atelier Sihir (Frieren, Witch Hat), Misteri Sekolah & Rom-Com OSIS (Hyouka, Kaguya-sama), Kuliner, Olahraga, serta kamus lengkap idiom fansub anime anti-harfiah.
    - **Dinamika Token Sumber & Multi-Scene Examples:** Menjaga format token ganti baris `<br>`, format baris tunggal `N|terjemahan`, dan contoh 5 baris multi-scene cue teruji.
 
+### Performance
+1. **Kecepatan Resolve Stream & Buffering (`backend/main.py`, `backend/api/hianime.py`, `backend/database/__init__.py`, Paritas Chaquopy):**
+   - **Forwarding header `Range` di `proxy_video`:** Seek tidak lagi mengunduh segmen penuh dari byte 0; byte-range diteruskan ke upstream CDN agar HLS.js / ExoPlayer hanya ambil byte yang dibutuhkan.
+   - **Cache body master M3U8 di memori:** Resolver yang sudah mengunduh master playlist untuk parse variants, body-nya dipakai ulang oleh player (`/api/player/video`) — eliminasi round-trip kedua ke CDN per siklus putar.
+   - **Cache respons `SERVERS_API` (episode/servers) & halaman embed (TTL 10-30 menit):** Menghindari unduhan ulang URL yang identik antar `hianime_m3u8()` dan `hianime_subtitles_for_episode()`.
+   - **Resolusi server paralel (ThreadPoolExecutor 3 worker, early-exit tier-0):** Worst-case resolve ~94 detik → ~41 detik; tier-0 megaplay tetap diprioritaskan.
+   - **Negative-cache per-(host,slug,ep) di `_harvest_subtitles` + reuse hasil resolusi:** Server yang gagal tidak di-probe ulang saat ambil subtitle fallback.
+   - **Koneksi pool SQLite + PRAGMA (WAL, synchronous=NORMAL, busy_timeout=5000):** Menghindari open/close koneksi + thread spawn per operasi DB; writer di-serialize agar tidak `database is locked`.
+   - **Index SQLite baru:** `watch_history(slug)`, `watch_history(played_at DESC)`, `bookmarks(created_at DESC)`, `fetched_at` di 6 tabel cache → tidak lagi full table scan / sort penuh.
+   - **In-process cache `settings` (write-through) + `get_settings_bulk()`:** 13 query berurutan → 1 query per request (atau 0 bila cache hit).
+   - **Sweeper TTL `purge_expired_caches()`:** Baris expired di semua tabel cache sekarang benar-benar dihapus (belum pernah diimplementasi), mencegah DB tumbuh tanpa batas.
+   - **Cache `subtitle`, `gtx+` key dedup antara prewarm & endpoint:** Prewarm subtitle tidak lagi memicu terjemahan ganda; key digabung dengan endpoint (`sub2|gtx+|<hash>|id|gtx+|dual=0`).
+   - **Thread-safe `_BLOCKED_DPI_HOSTS`, `_EPISODES_MEM_CACHE` (double-checked locking), dan httpx pooled client translate (workers 3→6, outer timeout 180s):**
+   - **Background task registry (`_spawn_background`):** Mencegah task prewarm subtitle di-GC sebelum selesai.
+
+### Fixed
+1. **Double-download segmen via `FRAG_BUFFERED` di frontend (`frontend/js/app.js`):** Handler sebelumnya melakukan raw `fetch` seluruh body segmen berikutnya (body dibuang browser) — dihilangkan, beban proxy & upstream turun 2× per segmen.
+2. **Seek-nudge `v.currentTime += 0.08` pada `BUFFER_STALLED_ERROR`:** Seek itu membatalkan in-flight fragment dan memaksa re-download segmen lewat proxy; diganti hanya `h.startLoad()` tanpa seek.
+
 ## [2.12.4] - 2026-10-25
 
 ### Justifikasi SemVer 2.0.0 (PATCH: 2.12.3 -> 2.12.4)
