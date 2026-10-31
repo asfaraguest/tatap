@@ -34,9 +34,18 @@ def local_server():
 
 def test_e2e_player_subtitles_episodes_and_recovery(local_server):
     """Pengujian E2E headless Chromium: player modal, subtitle overlay, next/prev episode, dan event recovery."""
-    chrome_path = "/home/b-ict/.cache/ms-playwright/chromium-1243/chrome-linux64/chrome"
+    import glob
+    chrome_matches = glob.glob(os.path.expanduser("~/.cache/ms-playwright/chromium-*/chrome-linux64/chrome"))
+    chrome_path = chrome_matches[0] if chrome_matches else None
+    if chrome_path is None and not os.path.exists("/usr/bin/chromium-browser"):
+        pytest.skip("Chromium binary tidak ditemukan untuk E2E test")
+
+    launch_kwargs = {"headless": True}
+    if chrome_path:
+        launch_kwargs["executable_path"] = chrome_path
+
     with sync_playwright() as p:
-        browser = p.chromium.launch(executable_path=chrome_path, headless=True)
+        browser = p.chromium.launch(**launch_kwargs)
         context = browser.new_context(viewport={"width": 1280, "height": 720})
         page = context.new_page()
 

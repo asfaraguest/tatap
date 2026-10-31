@@ -66,6 +66,7 @@ public class DetailActivity extends Activity {
     private TextView tvSynopsis, btnToggleSynopsis;
     private boolean isSynopsisExpanded = false;
     private ImageView ivPoster;
+    private ImageButton btnBack;
     private Button btnQuickPlay, btnBookmark, btnSortOrder;
     private boolean isBookmarked = false;
     private ProgressBar pbLoading;
@@ -139,7 +140,7 @@ public class DetailActivity extends Activity {
         btnQuickPlay = findViewById(R.id.btn_quick_play);
         btnSortOrder = findViewById(R.id.btn_sort_order);
         pbLoading = findViewById(R.id.pb_detail_loading);
-        ImageButton btnBack = findViewById(R.id.btn_back);
+        btnBack = findViewById(R.id.btn_back);
         rvEpisodes = findViewById(R.id.rv_episodes);
         layoutSeasons = findViewById(R.id.layout_detail_seasons);
         rvSeasons = findViewById(R.id.rv_detail_seasons);
@@ -218,11 +219,47 @@ public class DetailActivity extends Activity {
         });
 
         updateQuickPlayButton();
+        updateTvFocusChains();
         if (TvFocusHelper.isTv(this)) {
             btnQuickPlay.post(() -> btnQuickPlay.requestFocus());
         }
         loadEpisodes();
         loadRelations();
+    }
+
+    private void updateTvFocusChains() {
+        if (!TvFocusHelper.isTv(this)) return;
+
+        boolean hasSeasons = (layoutSeasons != null && layoutSeasons.getVisibility() == View.VISIBLE);
+        boolean hasRanges = (rvEpisodeRanges != null && rvEpisodeRanges.getVisibility() == View.VISIBLE);
+
+        if (btnBack != null) {
+            btnBack.setNextFocusRightId(hasSeasons ? R.id.rv_detail_seasons : R.id.btn_sort_order);
+            btnBack.setNextFocusDownId(R.id.btn_quick_play);
+        }
+
+        if (btnSortOrder != null) {
+            btnSortOrder.setNextFocusUpId(hasSeasons ? R.id.rv_detail_seasons : R.id.btn_back);
+            btnSortOrder.setNextFocusDownId(hasRanges ? R.id.rv_episode_ranges : R.id.rv_episodes);
+            btnSortOrder.setNextFocusLeftId(R.id.btn_quick_play);
+        }
+
+        if (rvEpisodeRanges != null) {
+            rvEpisodeRanges.setNextFocusUpId(R.id.btn_sort_order);
+            rvEpisodeRanges.setNextFocusDownId(R.id.rv_episodes);
+            rvEpisodeRanges.setNextFocusLeftId(R.id.btn_quick_play);
+        }
+
+        if (rvEpisodes != null) {
+            rvEpisodes.setNextFocusUpId(hasRanges ? R.id.rv_episode_ranges : R.id.btn_sort_order);
+            rvEpisodes.setNextFocusLeftId(R.id.btn_quick_play);
+        }
+
+        if (rvSeasons != null) {
+            rvSeasons.setNextFocusUpId(R.id.btn_back);
+            rvSeasons.setNextFocusDownId(R.id.btn_sort_order);
+            rvSeasons.setNextFocusLeftId(R.id.btn_back);
+        }
     }
 
     private long lastResumeTimeMs = 0;
@@ -235,6 +272,7 @@ public class DetailActivity extends Activity {
         if (adapter != null) {
             adapter.notifyDataSetChanged();
         }
+        updateTvFocusChains();
         if (TvFocusHelper.isTv(this)) {
             // Alihkan fokus remote TV ke tombol lanjutkan atau daftar episode (jangan tertinggal di btnBack)
             getWindow().getDecorView().postDelayed(() -> {
@@ -678,6 +716,7 @@ public class DetailActivity extends Activity {
             rvEpisodeRanges.setVisibility(View.GONE);
             activeRange = null;
         }
+        updateTvFocusChains();
     }
 
     private void updateEpisodeDisplay() {
@@ -870,11 +909,13 @@ public class DetailActivity extends Activity {
                         } else if (layoutSeasons != null) {
                             layoutSeasons.setVisibility(View.GONE);
                         }
+                        updateTvFocusChains();
                     });
                 }
             } catch (Exception ignored) {
                 runOnUiThread(() -> {
                     if (layoutSeasons != null) layoutSeasons.setVisibility(View.GONE);
+                    updateTvFocusChains();
                 });
             }
         }).start();

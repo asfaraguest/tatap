@@ -3859,8 +3859,10 @@ public class PlayerActivity extends Activity {
         actions.add(this::showOpenSubtitlesSearchDialog);
 
         // Opsi Subtitle Kustom (File Lokal / URL)
-        options.add("[+] Pilih File Subtitle Lokal (.srt / .vtt / .ass)...");
-        actions.add(this::openSubtitleFilePicker);
+        if (!TvFocusHelper.isTv(this)) {
+            options.add("[+] Pilih File Subtitle Lokal (.srt / .vtt / .ass)...");
+            actions.add(this::openSubtitleFilePicker);
+        }
 
         options.add("[+] Masukkan URL Subtitle Kustom...");
         actions.add(this::showCustomSubtitleUrlDialog);
@@ -3931,6 +3933,7 @@ public class PlayerActivity extends Activity {
                 intent.setType("*/*");
                 startActivityForResult(intent, REQUEST_CODE_PICK_SUBTITLE);
             } catch (Exception ex) {
+                restoreSubPickerTvFocus();
                 Toast.makeText(this, "Gagal membuka pengelola berkas: " + ex.getMessage(), Toast.LENGTH_SHORT).show();
             }
         }
@@ -4212,6 +4215,7 @@ public class PlayerActivity extends Activity {
         });
         b.setNegativeButton("Batal", (dialog, which) -> dialog.dismiss());
         AlertDialog dialog = b.create();
+        dialog.setOnDismissListener(d -> restoreSubPickerTvFocus());
         TvFocusHelper.applyDialogTvFocus(dialog);
         dialog.show();
     }
@@ -4467,6 +4471,20 @@ public class PlayerActivity extends Activity {
         TvFocusHelper.applyDialogTvFocus(builder.show());
     }
 
+    private void restoreSubPickerTvFocus() {
+        isNavigatingToSubDialog = false;
+        if (playerView != null) {
+            playerView.showController();
+            if (btnSubStyle != null && btnSubStyle.isShown()) {
+                btnSubStyle.requestFocus();
+            } else if (btnExoSub != null && btnExoSub.getVisibility() == View.VISIBLE) {
+                btnExoSub.requestFocus();
+            } else if (btnExoSettings != null && btnExoSettings.getVisibility() == View.VISIBLE) {
+                btnExoSettings.requestFocus();
+            }
+        }
+    }
+
     private void showPositionPicker(SharedPreferences sp) {
         String[] options = new String[]{
                 "Bawah / Rendah (22dp) [Direkomendasikan]",
@@ -4486,6 +4504,7 @@ public class PlayerActivity extends Activity {
                     Toast.makeText(this, "Posisi subtitle disimpan", Toast.LENGTH_SHORT).show();
                 })
                 .setNegativeButton("Batal", null)
+                .setOnDismissListener(d -> restoreSubPickerTvFocus())
                 .show());
     }
 
@@ -4524,6 +4543,7 @@ public class PlayerActivity extends Activity {
                     dialog.dismiss();
                 })
                 .setNegativeButton("Batal", null)
+                .setOnDismissListener(d -> restoreSubPickerTvFocus())
                 .show());
     }
 
@@ -4547,6 +4567,7 @@ public class PlayerActivity extends Activity {
                     Toast.makeText(this, "Gaya latar subtitle disimpan", Toast.LENGTH_SHORT).show();
                 })
                 .setNegativeButton("Batal", null)
+                .setOnDismissListener(d -> restoreSubPickerTvFocus())
                 .show());
     }
 
@@ -4602,6 +4623,7 @@ public class PlayerActivity extends Activity {
                     Toast.makeText(this, "Ukuran subtitle disimpan", Toast.LENGTH_SHORT).show();
                 })
                 .setNegativeButton("Batal", null)
+                .setOnDismissListener(d -> restoreSubPickerTvFocus())
                 .show());
     }
 
@@ -4624,6 +4646,7 @@ public class PlayerActivity extends Activity {
                     Toast.makeText(this, "Format tumpukan subtitle disimpan", Toast.LENGTH_SHORT).show();
                 })
                 .setNegativeButton("Batal", null)
+                .setOnDismissListener(d -> restoreSubPickerTvFocus())
                 .show());
     }
 

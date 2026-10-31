@@ -15,7 +15,9 @@ import android.graphics.Paint;
 import android.graphics.drawable.Drawable;
 import android.text.style.ImageSpan;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.ListView;
 
@@ -119,18 +121,29 @@ public class TvFocusHelper {
                 lv.setFocusableInTouchMode(false);
                 lv.requestFocus();
                 if (lv.getAdapter() != null && lv.getAdapter().getCount() > 0) {
-                    lv.setSelection(0);
+                    int checkedPos = lv.getCheckedItemPosition();
+                    if (checkedPos >= 0 && checkedPos < lv.getAdapter().getCount()) {
+                        lv.setSelection(checkedPos);
+                    } else {
+                        lv.setSelection(0);
+                    }
                 }
             } else {
-                Button btn = dialog.getButton(DialogInterface.BUTTON_POSITIVE);
-                if (btn != null && btn.getVisibility() == View.VISIBLE) {
-                    btn.setFocusable(true);
-                    btn.requestFocus();
+                EditText et = findEditText(dialog.getWindow() != null ? dialog.getWindow().getDecorView() : null);
+                if (et != null && et.getVisibility() == View.VISIBLE) {
+                    et.setFocusable(true);
+                    et.requestFocus();
                 } else {
-                    Button btnNeg = dialog.getButton(DialogInterface.BUTTON_NEGATIVE);
-                    if (btnNeg != null && btnNeg.getVisibility() == View.VISIBLE) {
-                        btnNeg.setFocusable(true);
-                        btnNeg.requestFocus();
+                    Button btn = dialog.getButton(DialogInterface.BUTTON_POSITIVE);
+                    if (btn != null && btn.getVisibility() == View.VISIBLE) {
+                        btn.setFocusable(true);
+                        btn.requestFocus();
+                    } else {
+                        Button btnNeg = dialog.getButton(DialogInterface.BUTTON_NEGATIVE);
+                        if (btnNeg != null && btnNeg.getVisibility() == View.VISIBLE) {
+                            btnNeg.setFocusable(true);
+                            btnNeg.requestFocus();
+                        }
                     }
                 }
             }
@@ -147,6 +160,21 @@ public class TvFocusHelper {
             dialog.setOnShowListener(di -> focusAction.run());
         }
         return dialog;
+    }
+
+    private static EditText findEditText(View root) {
+        if (root == null) return null;
+        if (root instanceof EditText) {
+            return (EditText) root;
+        }
+        if (root instanceof ViewGroup) {
+            ViewGroup vg = (ViewGroup) root;
+            for (int i = 0; i < vg.getChildCount(); i++) {
+                EditText found = findEditText(vg.getChildAt(i));
+                if (found != null) return found;
+            }
+        }
+        return null;
     }
 
     /**

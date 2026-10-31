@@ -13,6 +13,31 @@ Format versi menggunakan skema `MAJOR.MINOR.PATCH`:
 - **MINOR (x.Y.0):** Penambahan fitur atau kapabilitas baru yang tetap kompatibel ke belakang (*backward-compatible new features*). Digit PATCH direset ke 0.
 - **PATCH (x.y.Z):** Perbaikan bug, peningkatan stabilitas, atau perbaikan internal tanpa penambahan fitur baru (*backward-compatible bug fixes*).
 
+## [2.12.6] - 2026-11-01
+
+### Justifikasi SemVer 2.0.0 (PATCH: 2.12.5 -> 2.12.6)
+Kenaikan digit PATCH diterapkan sesuai kaidah Semantic Versioning 2.0.0 dan Direktif #3 [`AGENTS.md`](AGENTS.md) untuk perbaikan komprehensif penanganan navigasi remote D-Pad, eliminasi focus trapping, dan pemulihan fokus dialog pada platform Android TV (10-Foot UI) tanpa modifikasi antarmuka API publik maupun skema database.
+
+### Fixed
+1. **Pemulihan Fokus Sub-Dialog Player Android TV (`PlayerActivity.java`):**
+   - **Eliminasi Lost Focus State:** Menambahkan `OnDismissListener` pada dialog pemilih posisi subtitle (`showPositionPicker`), gaya latar belakang (`showBackgroundPicker`), ukuran huruf (`showSizePicker`), format tumpukan (`showWrapPicker`), sinkronisasi offset (`showSubtitleOffsetPicker`), dan input URL kustom (`showCustomSubtitleUrlDialog`).
+   - **Auto-Restorasi Kontrol:** Saat dialog ditutup (pilih opsi/batal/back), sistem secara otomatis memanggil `playerView.showController()` dan mengembalikan fokus remote D-Pad ke tombol pemanggil (`btnExoSub`, `btnSubStyle`, atau `btnExoSettings`), mencegah layar mati tanpa kursor interaktif.
+
+2. **Preservasi Posisi Seleksi Aktif pada Dialog TV (`TvFocusHelper.java`):**
+   - **Koreksi Seleksi D-Pad:** Mengoreksi `applyDialogTvFocus` untuk mendeteksi `lv.getCheckedItemPosition()`. Kursor remote D-Pad kini langsung menyorot opsi yang saat ini aktif (seperti kecepatan putar, resolusi, atau offset waktu) dan tidak lagi dipaksa melompat kembali ke indeks paling atas (0).
+   - **Auto-Focus Input Teks TV:** Menambahkan deteksi `EditText` pada custom view dialog agar kursor remote langsung memfokuskan field teks dan mengaktifkan keyboard virtual (Leanback IME) secara instan.
+
+3. **Pemberantasan D-Pad Focus Trapping di Detail Anime (`DetailActivity.java`):**
+   - **Dinamisasi Rantai Fokus Spasial:** Mengimplementasikan `updateTvFocusChains()` yang secara dinamis memperbarui penunjuk fokus remote (`setNextFocusRightId`, `setNextFocusUpId`, `setNextFocusDownId`).
+   - **Proteksi Terhadap Elemen GONE:** Jika anime tidak memiliki relasi season (`layout_detail_seasons` berstatus `GONE`), tombol `btn_back` mengarahkan navigasi D-Pad kanan langsung ke `btn_sort_order` alih-alih tersangkut di view `GONE`. Begitu pula pada anime $\le 100$ episode (`rv_episode_ranges` berstatus `GONE`), navigasi D-Pad atas dari daftar episode langsung berpindah mulus ke `btn_sort_order`.
+
+4. **Isolasi Subtitle File Picker Khusus Android Mobile (`PlayerActivity.java`):**
+   - **Pencegahan Error SAF di TV:** Menyembunyikan opsi *"Pilih File Subtitle Lokal"* pada perangkat Android TV (`!TvFocusHelper.isTv(this)`), karena Android TV umumnya tidak memiliki antarmuka Storage Access Framework (`ACTION_OPEN_DOCUMENT`).
+   - **Graceful Fallback:** Menambahkan pemulihan fokus otomatis via `restoreSubPickerTvFocus()` jika terjadi exception saat pemanggilan file picker.
+
+### Tests
+- Menambahkan test suite `tests/test_android_tv_dialog_and_focus.py` untuk menguji auto-restorasi fokus sub-picker dialog player, preservasi `checkedItemPosition` di `TvFocusHelper`, dinamisasi rantai fokus anti-trap di `DetailActivity`, dan isolasi file picker lokal di Android TV.
+
 ## [2.12.5] - 2026-10-29
 
 ### Justifikasi SemVer 2.0.0 (PATCH: 2.12.4 -> 2.12.5)
