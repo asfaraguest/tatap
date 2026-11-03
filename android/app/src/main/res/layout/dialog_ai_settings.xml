@@ -215,7 +215,92 @@
                 android:textSize="12sp"
                 android:paddingHorizontal="10dp"
                 android:singleLine="true"
-                android:layout_marginBottom="14dp" />
+                android:layout_marginBottom="12dp" />
+
+            <!-- Custom Prompt AI Fansub Field -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Custom Prompt AI Fansub (Gaya &amp; Persona):"
+                android:textColor="#8892B0"
+                android:textSize="11.5sp"
+                android:layout_marginBottom="2dp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Arahkan persona penerjemah, gaya bahasa (santai/baku), atau istilah anime khusus:"
+                android:textColor="#5A6578"
+                android:textSize="10sp"
+                android:layout_marginBottom="4dp" />
+
+            <EditText
+                android:id="@+id/et_ai_custom_prompt"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minHeight="50dp"
+                android:maxHeight="96dp"
+                android:gravity="top|start"
+                android:background="@drawable/bg_input_field"
+                android:hint="Contoh: Terjemahkan dengan gaya santai &amp; gaul. Gunakan 'aku-kamu'. Jangan terjemahkan istilah jurus..."
+                android:textColorHint="#5A6578"
+                android:textColor="#F1F5F9"
+                android:textSize="11.5sp"
+                android:padding="8dp"
+                android:inputType="textMultiLine"
+                android:scrollbars="vertical"
+                android:layout_marginBottom="6dp" />
+
+            <!-- Prompt Template Buttons -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginBottom="14dp">
+
+                <Button
+                    android:id="@+id/btn_prompt_preset_casual"
+                    android:layout_width="0dp"
+                    android:layout_height="30dp"
+                    android:layout_weight="1"
+                    android:layout_marginEnd="3dp"
+                    android:text="Santai"
+                    android:textColor="#FFFFFF"
+                    android:backgroundTint="#161922"
+                    android:textSize="10sp" />
+
+                <Button
+                    android:id="@+id/btn_prompt_preset_formal"
+                    android:layout_width="0dp"
+                    android:layout_height="30dp"
+                    android:layout_weight="1"
+                    android:layout_marginEnd="3dp"
+                    android:text="Baku"
+                    android:textColor="#FFFFFF"
+                    android:backgroundTint="#161922"
+                    android:textSize="10sp" />
+
+                <Button
+                    android:id="@+id/btn_prompt_preset_wibu"
+                    android:layout_width="0dp"
+                    android:layout_height="30dp"
+                    android:layout_weight="1"
+                    android:layout_marginEnd="3dp"
+                    android:text="Jurus"
+                    android:textColor="#FFFFFF"
+                    android:backgroundTint="#161922"
+                    android:textSize="10sp" />
+
+                <Button
+                    android:id="@+id/btn_prompt_preset_reset"
+                    android:layout_width="0dp"
+                    android:layout_height="30dp"
+                    android:layout_weight="1"
+                    android:text="Reset"
+                    android:textColor="#EF4444"
+                    android:backgroundTint="#161922"
+                    android:textSize="10sp" />
+            </LinearLayout>
 
             <!-- Action Buttons -->
             <LinearLayout

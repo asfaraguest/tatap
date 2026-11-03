@@ -26,6 +26,10 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import android.app.AlertDialog;
+import android.app.Dialog;
+import android.widget.EditText;
+import android.text.TextWatcher;
+import android.text.Editable;
 import android.content.DialogInterface;
 import android.content.SharedPreferences;
 import android.content.pm.ActivityInfo;
@@ -3876,7 +3880,11 @@ public class PlayerActivity extends Activity {
         options.add("Pengaturan Tampilan (Posisi, Latar Belakang & Ukuran)...");
         actions.add(this::showSubtitleStyleDialog);
 
-        // 8. Matikan Subtitle
+        // 8. Pengaturan AI Fansub & Custom Prompt
+        options.add("[⚙️] Pengaturan AI Fansub & Custom Prompt...");
+        actions.add(this::showPlayerAiSettingsDialog);
+
+        // 9. Matikan Subtitle
         options.add("Matikan Subtitle" + (!subEnabled ? " [Aktif]" : ""));
         actions.add(() -> {
             subEnabled = false;
@@ -3885,11 +3893,11 @@ public class PlayerActivity extends Activity {
         builder.setItems(options.toArray(new String[0]), (dialog, which) -> {
             if (which >= 0 && which < actions.size()) {
                 String chosen = options.get(which);
-                if (chosen.contains("[+]") || chosen.contains("[Sync]") || chosen.contains("Pengaturan Tampilan")) {
+                if (chosen.contains("[+]") || chosen.contains("[Sync]") || chosen.contains("Pengaturan Tampilan") || chosen.contains("[⚙️]")) {
                     isNavigatingToSubDialog = true;
                 }
                 actions.get(which).run();
-                if (!chosen.contains("[Refresh]") && !chosen.contains("[+]") && !chosen.contains("[Sync]") && !chosen.contains("Pengaturan Tampilan")) {
+                if (!chosen.contains("[Refresh]") && !chosen.contains("[+]") && !chosen.contains("[Sync]") && !chosen.contains("Pengaturan Tampilan") && !chosen.contains("[⚙️]")) {
                     getSharedPreferences("tatap_player_prefs", MODE_PRIVATE).edit()
                             .putString("pref_sub_engine", activeEngine)
                             .putString("pref_sub_lang", activeSubLang)
@@ -4469,6 +4477,225 @@ public class PlayerActivity extends Activity {
             }
         });
         TvFocusHelper.applyDialogTvFocus(builder.show());
+    }
+
+    private void showPlayerAiSettingsDialog() {
+        Dialog dialog = new Dialog(this);
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+        dialog.setContentView(R.layout.dialog_ai_settings);
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(Color.TRANSPARENT));
+            int width = TvFocusHelper.isTv(this)
+                    ? Math.min((int) (getResources().getDisplayMetrics().density * 700), (int) (getResources().getDisplayMetrics().widthPixels * 0.85f))
+                    : ViewGroup.LayoutParams.MATCH_PARENT;
+            dialog.getWindow().setLayout(width, ViewGroup.LayoutParams.WRAP_CONTENT);
+        }
+
+        TextView tvKey = dialog.findViewById(R.id.tv_ai_status_key);
+        TextView tvModel = dialog.findViewById(R.id.tv_ai_status_model);
+        TextView tvUrl = dialog.findViewById(R.id.tv_ai_status_url);
+        EditText etKey = dialog.findViewById(R.id.et_ai_apikey);
+        EditText etModel = dialog.findViewById(R.id.et_ai_model);
+        EditText etUrl = dialog.findViewById(R.id.et_ai_apiurl);
+        EditText etPrompt = dialog.findViewById(R.id.et_ai_custom_prompt);
+
+        Button btnClose = dialog.findViewById(R.id.btn_close_ai_dialog);
+        Button btnSave = dialog.findViewById(R.id.btn_ai_save);
+        Button btnReset = dialog.findViewById(R.id.btn_ai_reset_key);
+        Button btnLogs = dialog.findViewById(R.id.btn_ai_view_logs);
+
+        Button btnPresetGemini = dialog.findViewById(R.id.btn_preset_gemini);
+        Button btnPresetGroq = dialog.findViewById(R.id.btn_preset_groq);
+        Button btnPresetOllama = dialog.findViewById(R.id.btn_preset_ollama);
+        Button btnPresetOpenAI = dialog.findViewById(R.id.btn_preset_openai);
+
+        Button btnPromptCasual = dialog.findViewById(R.id.btn_prompt_preset_casual);
+        Button btnPromptFormal = dialog.findViewById(R.id.btn_prompt_preset_formal);
+        Button btnPromptWibu = dialog.findViewById(R.id.btn_prompt_preset_wibu);
+        Button btnPromptReset = dialog.findViewById(R.id.btn_prompt_preset_reset);
+
+        btnClose.setOnClickListener(v -> dialog.dismiss());
+        dialog.setOnDismissListener(d -> restoreSubPickerTvFocus());
+
+        etKey.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+                String k = s.toString().trim();
+                if (k.startsWith("gsk_")) {
+                    etModel.setText("llama-3.3-70b-versatile");
+                    etUrl.setText("https://api.groq.com/openai/v1");
+                } else if (k.startsWith("AQ.") || k.startsWith("AIza") || k.startsWith("AQ")) {
+                    etModel.setText("gemini-2.0-flash");
+                    etUrl.setText("https://generativelanguage.googleapis.com/v1beta/openai");
+                } else if (k.startsWith("sk-or-")) {
+                    etModel.setText("google/gemini-2.0-flash-exp:free");
+                    etUrl.setText("https://openrouter.ai/api/v1");
+                } else if (k.startsWith("ollama_") || k.startsWith("ol_") || (k.length() > 35 && k.contains("."))) {
+                    etModel.setText("gpt-oss:20b");
+                    etUrl.setText("https://ollama.com/v1");
+                } else if (k.startsWith("sk-") || k.startsWith("sk_")) {
+                    etModel.setText("gpt-4o-mini");
+                    etUrl.setText("https://api.openai.com/v1");
+                }
+            }
+            @Override
+            public void afterTextChanged(Editable s) {}
+        });
+
+        if (btnLogs != null) {
+            btnLogs.setVisibility(View.GONE);
+        }
+
+        btnPresetGemini.setOnClickListener(v -> {
+            etModel.setText("gemini-2.0-flash");
+            etUrl.setText("https://generativelanguage.googleapis.com/v1beta/openai");
+            Toast.makeText(this, "Preset Google Gemini dipilih", Toast.LENGTH_SHORT).show();
+        });
+
+        btnPresetGroq.setOnClickListener(v -> {
+            etModel.setText("llama-3.3-70b-versatile");
+            etUrl.setText("https://api.groq.com/openai/v1");
+            Toast.makeText(this, "Preset Groq Cloud dipilih", Toast.LENGTH_SHORT).show();
+        });
+
+        btnPresetOllama.setOnClickListener(v -> {
+            etModel.setText("gpt-oss:20b");
+            etUrl.setText("https://ollama.com/v1");
+            Toast.makeText(this, "Preset Ollama Cloud dipilih", Toast.LENGTH_SHORT).show();
+        });
+
+        btnPresetOpenAI.setOnClickListener(v -> {
+            etModel.setText("gpt-4o-mini");
+            etUrl.setText("https://api.openai.com/v1");
+            Toast.makeText(this, "Preset OpenAI dipilih", Toast.LENGTH_SHORT).show();
+        });
+
+        if (btnPromptCasual != null) {
+            btnPromptCasual.setOnClickListener(v -> {
+                if (etPrompt != null) etPrompt.setText("Gaya bahasa santai & casual anak muda (gunakan aku-kamu / gue-lu secara luwes sesuai karakter). Pertahankan istilah anime populer.");
+            });
+        }
+        if (btnPromptFormal != null) {
+            btnPromptFormal.setOnClickListener(v -> {
+                if (etPrompt != null) etPrompt.setText("Gunakan bahasa Indonesia baku, sopan, dan terstruktur baik. Hindari bahasa gaul/slang.");
+            });
+        }
+        if (btnPromptWibu != null) {
+            btnPromptWibu.setOnClickListener(v -> {
+                if (etPrompt != null) etPrompt.setText("Pertahankan honorifik bahasa Jepang (-san, -kun, -chan, Senpai, Sensei, Sama), nama jurus/sihir, dan istilah anime tanpa diterjemahkan.");
+            });
+        }
+        if (btnPromptReset != null) {
+            btnPromptReset.setOnClickListener(v -> {
+                if (etPrompt != null) etPrompt.setText("");
+            });
+        }
+
+        btnReset.setOnClickListener(v -> {
+            new Thread(() -> {
+                try {
+                    JSONObject body = new JSONObject();
+                    body.put("translate_apikey", "");
+                    postAiSettings(body);
+                    hasAiKey = false;
+                    runOnUiThread(() -> {
+                        etKey.setText("");
+                        tvKey.setText("API Key : (Belum disetel)");
+                        Toast.makeText(this, "API Key AI dihapus", Toast.LENGTH_SHORT).show();
+                    });
+                } catch (Exception ignored) {}
+            }).start();
+        });
+
+        btnSave.setOnClickListener(v -> {
+            String newKey = etKey.getText().toString().trim();
+            String newModel = etModel.getText().toString().trim();
+            String newUrl = etUrl.getText().toString().trim();
+            String newPrompt = etPrompt != null ? etPrompt.getText().toString().trim() : "";
+
+            JSONObject payload = new JSONObject();
+            try {
+                if (!newKey.isEmpty()) payload.put("translate_apikey", newKey);
+                if (!newModel.isEmpty()) payload.put("translate_model", newModel);
+                if (!newUrl.isEmpty()) payload.put("translate_apiurl", newUrl);
+                payload.put("translate_custom_prompt", newPrompt);
+            } catch (Exception ignored) {}
+
+            new Thread(() -> {
+                try {
+                    postAiSettings(payload);
+                    hasAiKey = !newKey.isEmpty();
+                    if (!newModel.isEmpty()) configuredAiModel = newModel;
+                    runOnUiThread(() -> {
+                        Toast.makeText(this, "Pengaturan AI Fansub disimpan!", Toast.LENGTH_SHORT).show();
+                        dialog.dismiss();
+                    });
+                } catch (Exception e) {
+                    runOnUiThread(() -> Toast.makeText(this, "Gagal menyimpan: " + e.getMessage(), Toast.LENGTH_SHORT).show());
+                }
+            }).start();
+        });
+
+        // Fetch current settings
+        new Thread(() -> {
+            try {
+                HttpURLConnection conn = (HttpURLConnection) new URL("http://127.0.0.1:8767/api/settings").openConnection();
+                conn.setConnectTimeout(3000);
+                java.io.BufferedReader r = new java.io.BufferedReader(new java.io.InputStreamReader(conn.getInputStream()));
+                StringBuilder sb = new StringBuilder();
+                String line;
+                while ((line = r.readLine()) != null) sb.append(line);
+                r.close();
+
+                JSONObject res = new JSONObject(sb.toString());
+                JSONObject d = res.optJSONObject("data");
+                if (d == null) d = res;
+                String k = d.optString("translate_apikey", "");
+                String m = d.optString("translate_model", "gemini-2.0-flash");
+                String u = d.optString("translate_apiurl", "https://generativelanguage.googleapis.com/v1beta/openai");
+                String p = d.optString("translate_custom_prompt", "");
+
+                runOnUiThread(() -> {
+                    String masked = k.isEmpty() ? "(Belum disetel)" : (k.length() <= 10 ? "****" : k.substring(0, Math.min(8, k.length())) + "..." + k.substring(Math.max(0, k.length() - 4)));
+                    tvKey.setText("API Key : " + masked);
+                    tvModel.setText("Model   : " + m);
+                    tvUrl.setText("API URL : " + u);
+                    etModel.setText(m);
+                    etUrl.setText(u);
+                    if (etPrompt != null) etPrompt.setText(p);
+                });
+            } catch (Exception ignored) {}
+        }).start();
+
+        TvFocusHelper.attachFocusScale(btnClose, 1.1f, 4f);
+        TvFocusHelper.attachFocusScale(btnSave, 1.05f, 4f);
+        TvFocusHelper.attachFocusScale(btnReset, 1.05f, 4f);
+        TvFocusHelper.attachFocusScale(btnPresetGemini, 1.05f, 4f);
+        TvFocusHelper.attachFocusScale(btnPresetGroq, 1.05f, 4f);
+        TvFocusHelper.attachFocusScale(btnPresetOllama, 1.05f, 4f);
+        TvFocusHelper.attachFocusScale(btnPresetOpenAI, 1.05f, 4f);
+        if (btnPromptCasual != null) TvFocusHelper.attachFocusScale(btnPromptCasual, 1.05f, 4f);
+        if (btnPromptFormal != null) TvFocusHelper.attachFocusScale(btnPromptFormal, 1.05f, 4f);
+        if (btnPromptWibu != null) TvFocusHelper.attachFocusScale(btnPromptWibu, 1.05f, 4f);
+        if (btnPromptReset != null) TvFocusHelper.attachFocusScale(btnPromptReset, 1.05f, 4f);
+
+        dialog.show();
+    }
+
+    private void postAiSettings(JSONObject payload) throws Exception {
+        HttpURLConnection conn = (HttpURLConnection) new URL("http://127.0.0.1:8767/api/settings").openConnection();
+        conn.setRequestMethod("POST");
+        conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
+        conn.setDoOutput(true);
+        conn.setConnectTimeout(3000);
+        byte[] bytes = payload.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        try (java.io.OutputStream os = conn.getOutputStream()) {
+            os.write(bytes);
+        }
+        int code = conn.getResponseCode();
+        if (code < 200 || code >= 300) throw new Exception("HTTP " + code);
     }
 
     private void restoreSubPickerTvFocus() {

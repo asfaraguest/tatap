@@ -946,14 +946,28 @@ _FANSUB_PROMPT_GENERIC = """You are an experienced anime fansub translator. Tran
 Output format (MANDATORY): one line per input as "N|translation" with the same N, same count and numbering, no merging/splitting, no explanations or markdown."""
 
 
-def _fansub_system_prompt(src_name: str, tgt: str, tgt_name: str) -> str:
+def _fansub_system_prompt(src_name: str, tgt: str, tgt_name: str, custom_prompt: str = "") -> str:
+    base = ""
     if (tgt or "").lower() == "id":
         src_label = "bahasa Inggris" if (src_name or "").lower() in ("en", "english") else (src_name or "bahasa Inggris")
         try:
-            return _FANSUB_PROMPT_ID.format(src=src_label)
+            base = _FANSUB_PROMPT_ID.format(src=src_label)
         except (KeyError, IndexError):
-            return _FANSUB_PROMPT_ID
-    return _FANSUB_PROMPT_GENERIC.format(src=src_name, tgt=tgt_name)
+            base = _FANSUB_PROMPT_ID
+    else:
+        base = _FANSUB_PROMPT_GENERIC.format(src=src_name, tgt=tgt_name)
+
+    if custom_prompt and custom_prompt.strip():
+        cp = custom_prompt.strip()
+        user_block = (
+            "\n\n==============================\n"
+            "INSTRUKSI KHUSUS & GAYA DARI PENGGUNA (PRIORITAS TINGGI):\n"
+            f"{cp}\n"
+            "Patuhi instruksi gaya bahasa, dialek, dan istilah di atas dalam menerjemahkan dialog.\n"
+            "==============================\n"
+        )
+        base = base + user_block
+    return base
 
 
 def _prep_line(text: str) -> str:
@@ -2440,13 +2454,14 @@ async def _chat_completion(client, apiurl, headers, payload) -> str:
     return (msg.get("content") or "").strip()
 
 
-async def call_openai_translate(cues, src, tgt, apikey, model, apiurl, timeout=120.0, fill_with_gtx=True):
+async def call_openai_translate(cues, src, tgt, apikey, model, apiurl, timeout=120.0, fill_with_gtx=True, custom_prompt=None):
     """Terjemahan gaya fansub via OpenAI-compatible /chat/completions.
 
     - Format ber-ID "N|teks" -> tidak ada pergeseran baris; ID yang hilang di-retry.
     - Batch paralel (per-provider), konteks 4 baris sebelumnya dikirim sebagai referensi.
     - Rotasi model saat 429/402/404 (mis. Ollama Cloud free: gpt-oss:20b -> gpt-oss:120b).
     - Cue yang tetap gagal diisi Google GTX (hybrid), bukan membuang seluruh episode.
+    - Mendukung custom_prompt khusus pengguna untuk mengarahkan persona penerjemah.
 
     Return (translated_cues, stats). Raise RuntimeError kalau tidak ada satu baris pun
     yang berhasil diterjemahkan LLM.
@@ -2474,7 +2489,13 @@ async def call_openai_translate(cues, src, tgt, apikey, model, apiurl, timeout=1
 
     src_name = LANG_NAMES.get((src or "").lower(), src or "English")
     tgt_name = LANG_NAMES.get((tgt or "").lower(), tgt or "Indonesian")
-    system_prompt = _fansub_system_prompt(src_name, tgt, tgt_name)
+    if custom_prompt is None:
+        try:
+            from database import get_setting
+            custom_prompt = await get_setting("translate_custom_prompt", "")
+        except Exception:
+            custom_prompt = ""
+    system_prompt = _fansub_system_prompt(src_name, tgt, tgt_name, custom_prompt=custom_prompt or "")
 
     headers = {"Content-Type": "application/json"}
     if apikey:

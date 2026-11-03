@@ -118,6 +118,12 @@
     <symbol id="icon-skip" viewBox="0 0 24 24">
       <path d="M5 4l8 8-8 8V4zm8 0l8 8-8 8V4zm8 0h2v16h-2V4z" fill="currentColor"/>
     </symbol>
+    <!-- CPU / AI Brain -->
+    <symbol id="icon-cpu" viewBox="0 0 24 24">
+      <rect x="4" y="4" width="16" height="16" rx="2" stroke="currentColor" stroke-width="2" fill="none"/>
+      <rect x="9" y="9" width="6" height="6" stroke="currentColor" stroke-width="1.8" fill="none"/>
+      <path d="M9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 15h3M1 9h3M1 15h3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+    </symbol>
     <!-- Fullscreen -->
     <symbol id="icon-fullscreen" viewBox="0 0 24 24">
       <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
@@ -434,6 +440,11 @@
           <span class="drawer-item-label">Sumber Video Stream</span>
           <span class="drawer-item-badge" id="drawer-src-badge">HiAnime</span>
         </button>
+        <button class="drawer-item" id="drawer-ai-settings">
+          <span class="drawer-item-icon"><svg class="ui-icon"><use href="#icon-cpu"/></svg></span>
+          <span class="drawer-item-label">Pengaturan AI Fansub</span>
+          <span class="drawer-item-badge">:ai</span>
+        </button>
         <button class="drawer-item" id="drawer-help">
           <span class="drawer-item-icon"><svg class="ui-icon"><use href="#icon-help"/></svg></span>
           <span class="drawer-item-label">Daftar Perintah Terminal</span>
@@ -484,6 +495,87 @@
     <div class="update-body">
       <div id="um-content" class="update-notes"></div>
       <div class="update-actions" id="um-actions"></div>
+    </div>
+  </div>
+</div>
+
+<!-- AI SETTINGS MODAL DIALOG -->
+<div id="ai-settings-modal" class="overlay hidden" role="dialog" aria-modal="true">
+  <div class="sheet ai-settings-sheet">
+    <div class="sheet-head">
+      <div>
+        <div class="eyebrow">KECERDASAN BUATAN &amp; SUBTITLE</div>
+        <h2>Pengaturan AI Fansub</h2>
+        <div class="dim small">BYOK (Bring Your Own Key) &amp; Custom Fansub Prompt</div>
+      </div>
+      <button class="icon-btn big" id="ai-modal-close" title="Tutup (Esc)"><svg class="ui-icon"><use href="#icon-close"/></svg></button>
+    </div>
+    <div class="ai-settings-body">
+      <!-- Status Card -->
+      <div class="ai-status-card">
+        <div class="ai-status-row">
+          <span class="ai-status-label">Status Provider:</span>
+          <span id="ai-status-prov" class="badge-status">Memeriksa…</span>
+        </div>
+        <div class="ai-status-row">
+          <span class="ai-status-label">Model Aktif:</span>
+          <span id="ai-status-model" class="dim">gemini-2.0-flash</span>
+        </div>
+      </div>
+
+      <!-- Provider Preset Buttons -->
+      <div class="ai-field-group">
+        <label class="ai-field-label">Preset Provider AI Cepat:</label>
+        <div class="ai-presets-row">
+          <button type="button" class="btn-preset" data-provider="gemini">Google Gemini</button>
+          <button type="button" class="btn-preset" data-provider="groq">Groq (Llama 3)</button>
+          <button type="button" class="btn-preset" data-provider="ollama">Ollama Cloud</button>
+          <button type="button" class="btn-preset" data-provider="openai">OpenAI</button>
+        </div>
+      </div>
+
+      <!-- API Key Field -->
+      <div class="ai-field-group">
+        <label for="ai-input-key" class="ai-field-label">API Key (OpenAI-compatible / Gemini / Groq):</label>
+        <input type="password" id="ai-input-key" class="ai-input" placeholder="Tempel API key di sini (AQ..., gsk_..., sk-...)">
+      </div>
+
+      <!-- Model & API URL -->
+      <div class="ai-fields-inline">
+        <div class="ai-field-group" style="flex:1">
+          <label for="ai-input-model" class="ai-field-label">Model LLM:</label>
+          <input type="text" id="ai-input-model" class="ai-input" placeholder="gemini-2.0-flash">
+        </div>
+        <div class="ai-field-group" style="flex:1.5">
+          <label for="ai-input-url" class="ai-field-label">Endpoint API URL:</label>
+          <input type="text" id="ai-input-url" class="ai-input" placeholder="https://generativelanguage.googleapis.com/v1beta/openai">
+        </div>
+      </div>
+
+      <!-- Custom Prompt Field -->
+      <div class="ai-field-group">
+        <div class="ai-field-header-row">
+          <label for="ai-input-prompt" class="ai-field-label">Custom Prompt AI Fansub (Persona &amp; Gaya Terjemahan):</label>
+          <span class="dim small">Prioritas Tinggi</span>
+        </div>
+        <div class="dim small" style="margin-bottom:6px;">Arahkan gaya bahasa (santai/baku), kata ganti (aku-kamu / lo-gue), honorifik (-san/-kun), atau istilah anime khusus:</div>
+        <textarea id="ai-input-prompt" class="ai-textarea" rows="3" placeholder="Contoh: Terjemahkan dengan gaya santai anak muda. Gunakan kata ganti 'aku-kamu'. Jangan terjemahkan istilah jurus atau teknik bertarung."></textarea>
+        <div class="ai-prompt-presets">
+          <span class="dim small">Template Gaya:</span>
+          <button type="button" class="btn-prompt-tpl" id="btn-tpl-casual">Gaya Santai / Gaul</button>
+          <button type="button" class="btn-prompt-tpl" id="btn-tpl-formal">Baku &amp; Sopan</button>
+          <button type="button" class="btn-prompt-tpl" id="btn-tpl-wibu">Honorifik &amp; Jurus</button>
+          <button type="button" class="btn-prompt-tpl-reset" id="btn-tpl-reset">Reset Prompt</button>
+        </div>
+      </div>
+
+      <!-- Modal Actions -->
+      <div class="ai-actions-row">
+        <button type="button" id="ai-btn-reset-key" class="btn-danger">Hapus API Key</button>
+        <div style="flex:1"></div>
+        <button type="button" id="ai-btn-cancel" class="btn-secondary">Batal</button>
+        <button type="button" id="ai-btn-save" class="btn-primary">Simpan Setelan</button>
+      </div>
     </div>
   </div>
 </div>
@@ -806,6 +898,9 @@
         </div>
         <button id="pm-translate" class="sub-translate" data-on="0" aria-label="Toggle translate ID">
           <svg class="ui-icon"><use href="#icon-globe"/></svg><span class="tr-label">ID</span>
+        </button>
+        <button id="pm-ai-settings" class="sub-ai-btn" title="Pengaturan AI Fansub &amp; Custom Prompt (:ai)" aria-label="Pengaturan AI Fansub">
+          <svg class="ui-icon"><use href="#icon-cpu"/></svg>
         </button>
       </div>
       <button id="pm-next" title="Episode berikutnya (n)">NEXT <svg class="ui-icon"><use href="#icon-step-next"/></svg></button>

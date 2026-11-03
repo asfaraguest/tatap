@@ -2885,8 +2885,9 @@ async def _translate_with_fallback(cues, src, tgt, requested_mode="gtx"):
             apikey = await get_setting("translate_apikey", "")
             model = await get_setting("translate_model", "gemini-2.0-flash")
             apiurl = await get_setting("translate_apiurl", "https://generativelanguage.googleapis.com/v1beta/openai")
+            custom_prompt = await get_setting("translate_custom_prompt", "")
             try:
-                translated, stats = await call_openai_translate(cues, src, tgt, apikey, model, apiurl)
+                translated, stats = await call_openai_translate(cues, src, tgt, apikey, model, apiurl, custom_prompt=custom_prompt)
                 return {"cues": translated, "level": "tier3", "engine": "ai", **stats}
             except Exception as e:
                 last_err = f"AI LLM error: {e}"
@@ -2925,8 +2926,9 @@ async def _translate_with_fallback(cues, src, tgt, requested_mode="gtx"):
             apikey = await get_setting("translate_apikey", "")
             model = await get_setting("translate_model", "gemini-2.0-flash")
             apiurl = await get_setting("translate_apiurl", "https://generativelanguage.googleapis.com/v1beta/openai")
+            custom_prompt = await get_setting("translate_custom_prompt", "")
             try:
-                translated, stats = await call_openai_translate(cues, src, tgt, apikey, model, apiurl)
+                translated, stats = await call_openai_translate(cues, src, tgt, apikey, model, apiurl, custom_prompt=custom_prompt)
                 return {"cues": translated, "level": "tier3", "engine": "ai", **stats}
             except Exception as e:
                 last_err = f"{last_err} | AI LLM error: {e}"
@@ -2962,8 +2964,9 @@ async def _translate_with_fallback(cues, src, tgt, requested_mode="gtx"):
             apikey = await get_setting("translate_apikey", "")
             model = await get_setting("translate_model", "gemini-2.0-flash")
             apiurl = await get_setting("translate_apiurl", "https://generativelanguage.googleapis.com/v1beta/openai")
+            custom_prompt = await get_setting("translate_custom_prompt", "")
             try:
-                translated, stats = await call_openai_translate(cues, src, tgt, apikey, model, apiurl)
+                translated, stats = await call_openai_translate(cues, src, tgt, apikey, model, apiurl, custom_prompt=custom_prompt)
                 return {"cues": translated, "level": "tier3", "engine": "ai", **stats}
             except Exception as e:
                 last_err = f"{last_err} | AI LLM error: {e}"
@@ -3665,6 +3668,7 @@ async def get_set():
         "translate_apikey": _v("translate_apikey", ""),
         "translate_model": _v("translate_model", "gemini-2.0-flash"),
         "translate_apiurl": _v("translate_apiurl", "https://generativelanguage.googleapis.com/v1beta/openai"),
+        "translate_custom_prompt": _v("translate_custom_prompt", ""),
         "safe_mode": _v("safe_mode", "1"),
     })
 
@@ -3686,7 +3690,7 @@ async def set_set(body: dict = None):
                     body["translate_apiurl"] = inferred_url
 
     for k in ("quality", "mode", "player", "sub_lang", "preferred_source", "safe_mode",
-              "translate_apikey", "translate_model", "translate_apiurl"):
+              "translate_apikey", "translate_model", "translate_apiurl", "translate_custom_prompt"):
         if k in body:
             await set_setting(k, body[k])
     return await get_set()

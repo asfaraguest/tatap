@@ -446,6 +446,14 @@ var TvNavigationManager = (function(){
       restoreFocusState();
       return true;
     }
+    var aiM = $("ai-settings-modal");
+    if(aiM && !aiM.classList.contains("hidden")){
+      if(e) e.preventDefault();
+      if(typeof App !== "undefined" && App.closeAiSettingsModal) App.closeAiSettingsModal();
+      else aiM.classList.add("hidden");
+      restoreFocusState();
+      return true;
+    }
     var hlp = $("help-overlay");
     if(hlp && !hlp.classList.contains("hidden")){
       if(e) e.preventDefault();
@@ -3455,6 +3463,42 @@ function closeUpdateModal(){
   if(m) m.classList.add("hidden");
 }
 
+async function openAiSettingsModal(){
+  var m = $("ai-settings-modal");
+  if(!m) return;
+  m.classList.remove("hidden");
+  try{
+    var r = await window.Tatap.getSettings();
+    var d = (r && r.success && r.data) || {};
+    var key = d.translate_apikey || "";
+    var model = d.translate_model || "gemini-2.0-flash";
+    var url = d.translate_apiurl || "https://generativelanguage.googleapis.com/v1beta/openai";
+    var prompt = d.translate_custom_prompt || "";
+
+    if($("ai-input-key")) $("ai-input-key").value = key;
+    if($("ai-input-model")) $("ai-input-model").value = model;
+    if($("ai-input-url")) $("ai-input-url").value = url;
+    if($("ai-input-prompt")) $("ai-input-prompt").value = prompt;
+
+    var provLabel = key ? (key.indexOf("gsk_")===0 ? "Groq" : (key.indexOf("AQ.")===0 || key.indexOf("AIza")===0) ? "Google Gemini" : key.indexOf("sk-")===0 ? "OpenAI" : "Aktif (Kustom)") : "Belum Disetel";
+    if($("ai-status-prov")) {
+      $("ai-status-prov").textContent = provLabel;
+      $("ai-status-prov").className = "badge-status " + (key ? "completed" : "ongoing");
+    }
+    if($("ai-status-model")) $("ai-status-model").textContent = model;
+  }catch(e){
+    console.error("Gagal memuat setelan AI", e);
+  }
+}
+
+function closeAiSettingsModal(){
+  var m = $("ai-settings-modal");
+  if(m) m.classList.add("hidden");
+}
+
+window.openAiSettingsModal = openAiSettingsModal;
+window.closeAiSettingsModal = closeAiSettingsModal;
+
 function checkForUpdate(manualTrigger){
   if(manualTrigger) toast("Memeriksa update ke GitHub…", 2000);
   window.Tatap.checkUpdate(!!manualTrigger).then(function(res){
@@ -3490,6 +3534,7 @@ App = {
   setSubDelay:setSubDelay, adjustSubDelay:adjustSubDelay,
   openDrawer:openDrawer, closeDrawer:closeDrawer,
   openUpdateModal:openUpdateModal, closeUpdateModal:closeUpdateModal,
+  openAiSettingsModal:openAiSettingsModal, closeAiSettingsModal:closeAiSettingsModal,
   checkForUpdate:checkForUpdate,
   closeResumeModal:closeResumeModal, dismissResumeModal:dismissResumeModal,
   openGenreModal:function(){
@@ -3896,6 +3941,99 @@ function init(){
   var um = $("update-modal");
   if(um) um.addEventListener("click", function(e){
     if(e.target === um) closeUpdateModal();
+  });
+
+  // AI Settings Modal & Drawer Triggers
+  var drawerAi = $("drawer-ai-settings");
+  if(drawerAi) drawerAi.addEventListener("click", function(){
+    closeDrawer();
+    openAiSettingsModal();
+  });
+  var pmAiBtn = $("pm-ai-settings");
+  if(pmAiBtn) pmAiBtn.addEventListener("click", function(){
+    openAiSettingsModal();
+  });
+  var aiClose = $("ai-modal-close");
+  if(aiClose) aiClose.addEventListener("click", closeAiSettingsModal);
+  var aiCancel = $("ai-btn-cancel");
+  if(aiCancel) aiCancel.addEventListener("click", closeAiSettingsModal);
+  var aiModal = $("ai-settings-modal");
+  if(aiModal) aiModal.addEventListener("click", function(e){
+    if(e.target === aiModal) closeAiSettingsModal();
+  });
+
+  // AI Presets
+  document.querySelectorAll(".ai-presets-row .btn-preset").forEach(function(btn){
+    btn.addEventListener("click", function(){
+      var prov = btn.getAttribute("data-provider");
+      if(prov === "gemini"){
+        if($("ai-input-model")) $("ai-input-model").value = "gemini-2.0-flash";
+        if($("ai-input-url")) $("ai-input-url").value = "https://generativelanguage.googleapis.com/v1beta/openai";
+      } else if(prov === "groq"){
+        if($("ai-input-model")) $("ai-input-model").value = "llama-3.3-70b-versatile";
+        if($("ai-input-url")) $("ai-input-url").value = "https://api.groq.com/openai/v1";
+      } else if(prov === "ollama"){
+        if($("ai-input-model")) $("ai-input-model").value = "gpt-oss:20b";
+        if($("ai-input-url")) $("ai-input-url").value = "https://ollama.com/v1";
+      } else if(prov === "openai"){
+        if($("ai-input-model")) $("ai-input-model").value = "gpt-4o-mini";
+        if($("ai-input-url")) $("ai-input-url").value = "https://api.openai.com/v1";
+      }
+    });
+  });
+
+  // Custom Prompt Templates
+  var tplCasual = $("btn-tpl-casual");
+  if(tplCasual) tplCasual.addEventListener("click", function(){
+    if($("ai-input-prompt")) $("ai-input-prompt").value = "Gaya bahasa santai & casual anak muda (gunakan aku-kamu / gue-lu secara luwes sesuai karakter). Pertahankan istilah anime populer.";
+  });
+  var tplFormal = $("btn-tpl-formal");
+  if(tplFormal) tplFormal.addEventListener("click", function(){
+    if($("ai-input-prompt")) $("ai-input-prompt").value = "Gunakan bahasa Indonesia baku, sopan, dan terstruktur baik. Hindari bahasa gaul/slang.";
+  });
+  var tplWibu = $("btn-tpl-wibu");
+  if(tplWibu) tplWibu.addEventListener("click", function(){
+    if($("ai-input-prompt")) $("ai-input-prompt").value = "Pertahankan honorifik bahasa Jepang (-san, -kun, -chan, Senpai, Sensei, Sama), nama jurus/sihir, dan istilah anime tanpa diterjemahkan.";
+  });
+  var tplReset = $("btn-tpl-reset");
+  if(tplReset) tplReset.addEventListener("click", function(){
+    if($("ai-input-prompt")) $("ai-input-prompt").value = "";
+  });
+
+  // Reset API key
+  var aiResetKey = $("ai-btn-reset-key");
+  if(aiResetKey) aiResetKey.addEventListener("click", function(){
+    window.Tatap.setSetting({ translate_apikey: "" }).then(function(){
+      if($("ai-input-key")) $("ai-input-key").value = "";
+      if($("ai-status-prov")) {
+        $("ai-status-prov").textContent = "Belum Disetel";
+        $("ai-status-prov").className = "badge-status ongoing";
+      }
+      toast("API Key AI berhasil dihapus", 2000);
+    });
+  });
+
+  // Save AI Settings
+  var aiSave = $("ai-btn-save");
+  if(aiSave) aiSave.addEventListener("click", function(){
+    var key = ($("ai-input-key") ? $("ai-input-key").value.trim() : "");
+    var model = ($("ai-input-model") ? $("ai-input-model").value.trim() : "");
+    var url = ($("ai-input-url") ? $("ai-input-url").value.trim() : "");
+    var prompt = ($("ai-input-prompt") ? $("ai-input-prompt").value.trim() : "");
+
+    var payload = {
+      translate_apikey: key,
+      translate_model: model || "gemini-2.0-flash",
+      translate_apiurl: url || "https://generativelanguage.googleapis.com/v1beta/openai",
+      translate_custom_prompt: prompt
+    };
+
+    window.Tatap.setSetting(payload).then(function(){
+      toast("Pengaturan AI Fansub berhasil disimpan!", 2500);
+      closeAiSettingsModal();
+    }).catch(function(err){
+      toast("Gagal menyimpan setelan: " + err, 3000);
+    });
   });
 
   var rmClose = $("rm-close");

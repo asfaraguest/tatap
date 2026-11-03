@@ -30,7 +30,7 @@ var Tui = (function () {
   function saveCmdHist(h){try{localStorage.setItem("tatap_hist",JSON.stringify(h.slice(0,50)));}catch(e){}}
 
   function cmdUsage(){
-    return "perintah:\n  cari <judul> | :musim | :lanjutan | :favorit | :katalog\n  :terbaru | :season <winter|spring|summer|fall> <tahun>\n  :switch [hianime|otaku] (ganti sumber video HiAnime / Otakudesu)\n  :filter [key=val...] | :filter reset\n  :genre <slug|title> | :genre | :genre --list | :genre reset\n  :subdelay <detik|reset> (sinkronisasi waktu subtitle, cth: :subdelay -0.5)\n  :tema [toggle|terang|gelap] (ganti mode terang / gelap Apple)\n  :update (cek versi rilis terbaru secara on-demand)\n  :apikey <key> | :ollama <key> | :groq <key> | :gemini <key> | :model <nama> | :apiurl <url>\n  :logs | :crt on|off|toggle | :ambient on|off|toggle\n  :riwayat | :favorit | :status | :bantuan | :q";
+    return "perintah:\n  cari <judul> | :musim | :lanjutan | :favorit | :katalog\n  :terbaru | :season <winter|spring|summer|fall> <tahun>\n  :switch [hianime|otaku] (ganti sumber video HiAnime / Otakudesu)\n  :filter [key=val...] | :filter reset\n  :genre <slug|title> | :genre | :genre --list | :genre reset\n  :subdelay <detik|reset> (sinkronisasi waktu subtitle, cth: :subdelay -0.5)\n  :tema [toggle|terang|gelap] (ganti mode terang / gelap Apple)\n  :update (cek versi rilis terbaru secara on-demand)\n  :ai (buka modal pengaturan AI) | :apikey <key> | :model <nama> | :prompt <gaya/arahan>\n  :logs | :crt on|off|toggle | :ambient on|off|toggle\n  :riwayat | :favorit | :status | :bantuan | :q";
   }
 
   function applyFilter(){
@@ -1063,7 +1063,7 @@ var Tui = (function () {
     applySeasonFilter(name, year);
   }
 
-  // ==== :apikey / :model / :apiurl / :ollama / :groq / :gemini ====
+  // ==== :apikey / :model / :apiurl / :ollama / :groq / :gemini / :prompt ====
   var TRANSLATE_KEYS = {
     apikey: {field:"translate_apikey", label:"apikey"},
     ollama: {field:"translate_apikey", label:"apikey (Ollama Cloud)"},
@@ -1071,7 +1071,9 @@ var Tui = (function () {
     gemini: {field:"translate_apikey", label:"apikey (Google AI Studio)"},
     openai: {field:"translate_apikey", label:"apikey (OpenAI)"},
     model:  {field:"translate_model",  label:"model"},
-    apiurl: {field:"translate_apiurl", label:"apiurl"}
+    apiurl: {field:"translate_apiurl", label:"apiurl"},
+    prompt: {field:"translate_custom_prompt", label:"custom prompt"},
+    fansub: {field:"translate_custom_prompt", label:"custom prompt"}
   };
   function maskKey(v){
     if(!v) return "(kosong)";
@@ -1087,12 +1089,17 @@ var Tui = (function () {
       args = args.replace(/^["']|["']$/g, "").trim();
     }
     if(!args){
-      // Status: tampilkan ketiga nilai translate (mask apikey).
+      // Status: tampilkan nilai translate (mask apikey).
       var r = await window.Tatap.getSettings();
       var d = (r && r.success && r.data) || {};
+      if(cmd === "prompt" || cmd === "fansub"){
+        log("custom prompt : "+(d.translate_custom_prompt||"(default fansub)"),"ok");
+        return;
+      }
       log("apikey : "+maskKey(d.translate_apikey||""),"ok");
       log("model  : "+(d.translate_model||"(default)"),"ok");
       log("apiurl : "+(d.translate_apiurl||"(default)"),"ok");
+      log("prompt : "+(d.translate_custom_prompt||"(default fansub)"),"ok");
       if(!d.translate_apikey){
         log("Belum ada API key AI. Preset otomatis yang didukung:", "err");
         log("  • Ollama Cloud : :apikey <key>     (gratis, model: gpt-oss:20b)", "dim");
@@ -1281,9 +1288,13 @@ var Tui = (function () {
         setView("favorit");break;
       case "logs":case "translog":
         await cmdLogs();break;
-      case "apikey":case "model":case "apiurl":
+      case "apikey":case "model":case "apiurl":case "prompt":case "fansub":
       case "ollama":case "groq":case "gemini":case "openai":
         await cmdTranslateSetting(cmd,args);break;
+      case "ai":case "aisetting":case "aisettings":
+        if(window.openAiSettingsModal){ window.openAiSettingsModal(); }
+        else { await cmdTranslateSetting("apikey", ""); }
+        break;
       case "server":
         if(!args){
           var curSrv = localStorage.getItem("tatap_server") || (location.origin && location.origin !== "null" ? location.origin : "http://127.0.0.1:8767");

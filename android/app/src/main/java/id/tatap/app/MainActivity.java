@@ -1481,6 +1481,8 @@ public class MainActivity extends Activity {
             case "openai":
             case "model":
             case "apiurl":
+            case "prompt":
+            case "fansub":
                 cmdTranslateSetting(cmd, args);
                 break;
 
@@ -2182,6 +2184,40 @@ public class MainActivity extends Activity {
             return;
         }
 
+        if (cmd.equals("prompt") || cmd.equals("fansub")) {
+            if (args.isEmpty()) {
+                new Thread(() -> {
+                    try {
+                        HttpURLConnection conn = (HttpURLConnection) new URL("http://127.0.0.1:8767/api/settings").openConnection();
+                        conn.setConnectTimeout(3000);
+                        BufferedReader r = new BufferedReader(new InputStreamReader(conn.getInputStream()));
+                        StringBuilder sb = new StringBuilder();
+                        String line;
+                        while ((line = r.readLine()) != null) sb.append(line);
+                        r.close();
+                        JSONObject res = new JSONObject(sb.toString());
+                        JSONObject d = res.optJSONObject("data");
+                        if (d == null) d = res;
+                        String p = d.optString("translate_custom_prompt", "");
+                        runOnUiThread(() -> showCommandOutput("> tatap$ [AI PROMPT] " + (p.isEmpty() ? "(default fansub)" : p), false));
+                    } catch (Exception e) {
+                        runOnUiThread(() -> showCommandOutput("> tatap$ [ERROR] " + e.getMessage(), true));
+                    }
+                }).start();
+                return;
+            }
+            if (args.equalsIgnoreCase("clear") || args.equalsIgnoreCase("reset")) {
+                JSONObject body = new JSONObject();
+                try { body.put("translate_custom_prompt", ""); } catch (Exception ignored) {}
+                saveAiSettingsAndReport(body, "Custom prompt direset ke default");
+                return;
+            }
+            JSONObject body = new JSONObject();
+            try { body.put("translate_custom_prompt", args); } catch (Exception ignored) {}
+            saveAiSettingsAndReport(body, "Custom prompt disimpan: " + args);
+            return;
+        }
+
         if (args.equalsIgnoreCase("clear") || args.equalsIgnoreCase("reset")) {
             JSONObject body = new JSONObject();
             try {
@@ -2318,6 +2354,7 @@ public class MainActivity extends Activity {
         EditText etKey = dialog.findViewById(R.id.et_ai_apikey);
         EditText etModel = dialog.findViewById(R.id.et_ai_model);
         EditText etUrl = dialog.findViewById(R.id.et_ai_apiurl);
+        EditText etPrompt = dialog.findViewById(R.id.et_ai_custom_prompt);
 
         Button btnClose = dialog.findViewById(R.id.btn_close_ai_dialog);
         Button btnSave = dialog.findViewById(R.id.btn_ai_save);
@@ -2328,6 +2365,11 @@ public class MainActivity extends Activity {
         Button btnPresetGroq = dialog.findViewById(R.id.btn_preset_groq);
         Button btnPresetOllama = dialog.findViewById(R.id.btn_preset_ollama);
         Button btnPresetOpenAI = dialog.findViewById(R.id.btn_preset_openai);
+
+        Button btnPromptCasual = dialog.findViewById(R.id.btn_prompt_preset_casual);
+        Button btnPromptFormal = dialog.findViewById(R.id.btn_prompt_preset_formal);
+        Button btnPromptWibu = dialog.findViewById(R.id.btn_prompt_preset_wibu);
+        Button btnPromptReset = dialog.findViewById(R.id.btn_prompt_preset_reset);
 
         btnClose.setOnClickListener(v -> dialog.dismiss());
 
@@ -2396,6 +2438,27 @@ public class MainActivity extends Activity {
             Toast.makeText(this, "Preset OpenAI dipilih", Toast.LENGTH_SHORT).show();
         });
 
+        if (btnPromptCasual != null) {
+            btnPromptCasual.setOnClickListener(v -> {
+                if (etPrompt != null) etPrompt.setText("Gaya bahasa santai & casual anak muda (gunakan aku-kamu / gue-lu secara luwes sesuai karakter). Pertahankan istilah anime populer.");
+            });
+        }
+        if (btnPromptFormal != null) {
+            btnPromptFormal.setOnClickListener(v -> {
+                if (etPrompt != null) etPrompt.setText("Gunakan bahasa Indonesia baku, sopan, dan terstruktur baik. Hindari bahasa gaul/slang.");
+            });
+        }
+        if (btnPromptWibu != null) {
+            btnPromptWibu.setOnClickListener(v -> {
+                if (etPrompt != null) etPrompt.setText("Pertahankan honorifik bahasa Jepang (-san, -kun, -chan, Senpai, Sensei, Sama), nama jurus/sihir, dan istilah anime tanpa diterjemahkan.");
+            });
+        }
+        if (btnPromptReset != null) {
+            btnPromptReset.setOnClickListener(v -> {
+                if (etPrompt != null) etPrompt.setText("");
+            });
+        }
+
         btnReset.setOnClickListener(v -> {
             dialog.dismiss();
             cmdTranslateSetting("apikey", "reset");
@@ -2405,12 +2468,14 @@ public class MainActivity extends Activity {
             String newKey = etKey.getText().toString().trim();
             String newModel = etModel.getText().toString().trim();
             String newUrl = etUrl.getText().toString().trim();
+            String newPrompt = etPrompt != null ? etPrompt.getText().toString().trim() : "";
 
             JSONObject payload = new JSONObject();
             try {
                 if (!newKey.isEmpty()) payload.put("translate_apikey", newKey);
                 if (!newModel.isEmpty()) payload.put("translate_model", newModel);
                 if (!newUrl.isEmpty()) payload.put("translate_apiurl", newUrl);
+                payload.put("translate_custom_prompt", newPrompt);
             } catch (Exception ignored) {}
 
             dialog.dismiss();
@@ -2434,6 +2499,7 @@ public class MainActivity extends Activity {
                 String k = d.optString("translate_apikey", "");
                 String m = d.optString("translate_model", "gemini-2.0-flash");
                 String u = d.optString("translate_apiurl", "https://generativelanguage.googleapis.com/v1beta/openai");
+                String p = d.optString("translate_custom_prompt", "");
 
                 runOnUiThread(() -> {
                     tvKey.setText("API Key : " + maskKey(k));
@@ -2441,6 +2507,7 @@ public class MainActivity extends Activity {
                     tvUrl.setText("API URL : " + u);
                     etModel.setText(m);
                     etUrl.setText(u);
+                    if (etPrompt != null) etPrompt.setText(p);
                 });
             } catch (Exception ignored) {}
         }).start();
@@ -2453,6 +2520,10 @@ public class MainActivity extends Activity {
         TvFocusHelper.attachFocusScale(btnPresetGroq, 1.05f, 4f);
         TvFocusHelper.attachFocusScale(btnPresetOllama, 1.05f, 4f);
         TvFocusHelper.attachFocusScale(btnPresetOpenAI, 1.05f, 4f);
+        if (btnPromptCasual != null) TvFocusHelper.attachFocusScale(btnPromptCasual, 1.05f, 4f);
+        if (btnPromptFormal != null) TvFocusHelper.attachFocusScale(btnPromptFormal, 1.05f, 4f);
+        if (btnPromptWibu != null) TvFocusHelper.attachFocusScale(btnPromptWibu, 1.05f, 4f);
+        if (btnPromptReset != null) TvFocusHelper.attachFocusScale(btnPromptReset, 1.05f, 4f);
 
         dialog.show();
     }

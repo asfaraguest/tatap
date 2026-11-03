@@ -19,7 +19,12 @@ Format versi menggunakan skema `MAJOR.MINOR.PATCH`:
 Kenaikan digit PATCH diterapkan sesuai kaidah Semantic Versioning 2.0.0 dan Direktif #3 [`AGENTS.md`](AGENTS.md) untuk optimasi performa resolving stream anime dan pemutaran buffering video di platform Web dan Desktop (eliminasi jeda sinkron AniSkip, master m3u8 pre-seeding dari scraper, in-memory segment ring cache, predictive next-episode pre-resolving, dan HLS.js micro-gap auto-recovery) tanpa perombakan skema database maupun modifikasi antarmuka eksternal yang tidak kompatibel.
 
 ### Added
-1. **In-Memory Segment Ring Buffer Cache (`backend/main.py`, Paritas `android/app/src/main/python/backend/main.py`):**
+1. **Custom Prompt AI Fansub & Translate di Seluruh Platform (`backend/api/translate.py`, `frontend/`, `android/`):**
+   - Mendukung instruksi persona dan gaya terjemahan khusus pengguna (`translate_custom_prompt`) yang diinjeksi dengan prioritas tinggi ke system prompt LLM AI Fansub.
+   - Tetap menjaga integritas format baris keluaran ber-ID `N|terjemahan` dan token `<br>` secara ketat sehingga parser subtitle Tatap tidak terganggu.
+   - **Web Desktop & Browser:** Menambahkan modal baru *Pengaturan AI Fansub* (`#ai-settings-modal`), tombol Drawer `:ai`, tombol langsung di footer pemutar video, serta perintah terminal `:ai` dan `:prompt <gaya/arahan>`. Dilengkapi template preset instan (*Santai/Gaul*, *Baku/Sopan*, *Honorifik & Jurus*, dan *Reset*).
+   - **Android Mobile & Android TV:** Memperbarui antarmuka `dialog_ai_settings.xml` dengan input multi-line `et_ai_custom_prompt`, tombol preset gaya, dukungan navigasi remote TV D-Pad (`TvFocusHelper`), serta integrasi langsung dari pemilih subtitle pemutar video (`PlayerActivity`).
+2. **In-Memory Segment Ring Buffer Cache (`backend/main.py`, Paritas `android/app/src/main/python/backend/main.py`):**
    - Menambahkan LRU ring buffer memori `_SEGMENT_CACHE` (hingga 35MB) untuk menyimpan segmen video TS yang baru diunduh.
    - Mengeliminasi round-trip jaringan ke upstream CDN saat pemutar melakukan rewind singkat 5–10 detik atau retry segmen akibat micro-stall.
 2. **On-Demand Skip Times Endpoint (`backend/main.py`):**
@@ -41,6 +46,7 @@ Kenaikan digit PATCH diterapkan sesuai kaidah Semantic Versioning 2.0.0 dan Dire
    - Mengimplementasikan pendeteksi celah mikro (micro-gap $\le 0.35$s) pada event `BUFFER_STALLED_ERROR` yang secara otomatis melompati jeda frame tanpa memaksa user scrubbing seekbar secara manual.
 
 ### Tests
+- Menambahkan test suite `tests/test_custom_prompt.py` untuk menguji pembuatan system prompt dengan instruksi khusus pengguna, prioritas prompt, dan persistensi database settings.
 - Menambahkan test suite `tests/test_stream_optimizations.py` untuk menguji cache master m3u8, in-memory segment ring cache, non-blocking AniSkip resolving, dan endpoint skip times.
 
 ## [2.12.6] - 2026-11-01
