@@ -2459,6 +2459,17 @@ public class MainActivity extends Activity {
             });
         }
 
+        if (etPrompt != null) {
+            etPrompt.setOnTouchListener((v, event) -> {
+                v.getParent().requestDisallowInterceptTouchEvent(true);
+                if ((event.getAction() & android.view.MotionEvent.ACTION_MASK) == android.view.MotionEvent.ACTION_UP) {
+                    v.getParent().requestDisallowInterceptTouchEvent(false);
+                }
+                return false;
+            });
+            TvFocusHelper.attachFocusScale(etPrompt, 1.02f, 4f);
+        }
+
         btnReset.setOnClickListener(v -> {
             dialog.dismiss();
             cmdTranslateSetting("apikey", "reset");

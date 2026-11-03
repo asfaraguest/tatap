@@ -3466,6 +3466,10 @@ function closeUpdateModal(){
 async function openAiSettingsModal(){
   var m = $("ai-settings-modal");
   if(!m) return;
+  var v = $("vid");
+  if(v && !v.paused){
+    try { v.pause(); } catch(e){}
+  }
   m.classList.remove("hidden");
   try{
     var r = await window.Tatap.getSettings();

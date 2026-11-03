@@ -249,6 +249,9 @@
                 android:padding="8dp"
                 android:inputType="textMultiLine"
                 android:scrollbars="vertical"
+                android:focusable="true"
+                android:focusableInTouchMode="true"
+                android:overScrollMode="always"
                 android:layout_marginBottom="6dp" />
 
             <!-- Prompt Template Buttons -->

@@ -4593,6 +4593,17 @@ public class PlayerActivity extends Activity {
             });
         }
 
+        if (etPrompt != null) {
+            etPrompt.setOnTouchListener((v, event) -> {
+                v.getParent().requestDisallowInterceptTouchEvent(true);
+                if ((event.getAction() & android.view.MotionEvent.ACTION_MASK) == android.view.MotionEvent.ACTION_UP) {
+                    v.getParent().requestDisallowInterceptTouchEvent(false);
+                }
+                return false;
+            });
+            TvFocusHelper.attachFocusScale(etPrompt, 1.02f, 4f);
+        }
+
         btnReset.setOnClickListener(v -> {
             new Thread(() -> {
                 try {
@@ -4631,6 +4642,9 @@ public class PlayerActivity extends Activity {
                     runOnUiThread(() -> {
                         Toast.makeText(this, "Pengaturan AI Fansub disimpan!", Toast.LENGTH_SHORT).show();
                         dialog.dismiss();
+                        if (subEnabled && "ai".equals(activeEngine)) {
+                            applySubtitleSelection(true);
+                        }
                     });
                 } catch (Exception e) {
                     runOnUiThread(() -> Toast.makeText(this, "Gagal menyimpan: " + e.getMessage(), Toast.LENGTH_SHORT).show());

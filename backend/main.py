@@ -2603,7 +2603,10 @@ async def _prewarm_sub_translation(url: str, referer: str, src: str = "en", lang
     base_hash = hashlib.sha1((url + "|" + (referer or "") + "|" + lang).encode("utf-8")).hexdigest()
     key_gtx = "sub2|gtx|" + base_hash
     key_gtxplus = "sub2|gtx+|" + base_hash
-    key_llm = "sub2|llm|" + base_hash
+    custom_prompt = (await get_setting("translate_custom_prompt", "")).strip()
+    active_model = (await get_setting("translate_model", "gemini-2.0-flash")).strip()
+    prompt_tag = hashlib.sha1(f"{active_model}|{custom_prompt}".encode("utf-8")).hexdigest()[:8] if custom_prompt else "def"
+    key_llm = f"sub2|llm|{base_hash}|{prompt_tag}"
     hit = await _get_validated_subtitle_cache(key_gtx, lang=lang)
     if hit is not None:
         return
@@ -2611,7 +2614,7 @@ async def _prewarm_sub_translation(url: str, referer: str, src: str = "en", lang
     if hit is not None:
         return
 
-    job_key = f"{base_hash}|{lang}|{req_mode}|dual={dual}"
+    job_key = f"{base_hash}|{lang}|{req_mode}|{prompt_tag}|dual={dual}"
     fut = _SUB_INFLIGHT.get(job_key)
     if fut is None:
         try:
@@ -2682,11 +2685,14 @@ async def proxy_sub(url: str = Query(""),
     key_gtxplus = "sub2|gtx+|" + base_hash
     key_aigtx = "sub2|aigtx|" + base_hash
     key_gtx = "sub2|gtx|" + base_hash
-    key_llm = "sub2|llm|" + base_hash
+    custom_prompt = (await get_setting("translate_custom_prompt", "")).strip()
+    active_model = (await get_setting("translate_model", "gemini-2.0-flash")).strip()
+    prompt_tag = hashlib.sha1(f"{active_model}|{custom_prompt}".encode("utf-8")).hexdigest()[:8] if custom_prompt else "def"
+    key_llm = f"sub2|llm|{base_hash}|{prompt_tag}"
     key_os_merge = "sub2|os_merge|" + os_ctx_hash
 
     if refresh:
-        for k in (key_gtx, key_gtxplus, key_aigtx, key_llm, key_os_merge, "sub2|mt|" + base_hash):
+        for k in (key_gtx, key_gtxplus, key_aigtx, key_llm, f"sub2|llm|{base_hash}", f"sub2|llm|{base_hash}|def", key_os_merge, "sub2|mt|" + base_hash):
             try:
                 await delete_subtitle_cache(k)
             except Exception:
@@ -2749,6 +2755,8 @@ async def proxy_sub(url: str = Query(""),
                 return resp
         elif req_mode == "ai":
             hit = await _get_validated_subtitle_cache(key_llm, lang=lang)
+            if not hit and prompt_tag == "def":
+                hit = await _get_validated_subtitle_cache(f"sub2|llm|{base_hash}", lang=lang)
             if hit:
                 resp = Response(content=hit, media_type="text/vtt")
                 resp.headers["X-Translate-Tier"] = "cached-llm"
@@ -2756,13 +2764,15 @@ async def proxy_sub(url: str = Query(""),
         else:
             for k, label in ((key_gtxplus, "cached-gtx+"), (key_aigtx, "cached-gtx+"), (key_llm, "cached-llm")):
                 hit = await _get_validated_subtitle_cache(k, lang=lang)
+                if not hit and k == key_llm and prompt_tag == "def":
+                    hit = await _get_validated_subtitle_cache(f"sub2|llm|{base_hash}", lang=lang)
                 if hit:
                     resp = Response(content=hit, media_type="text/vtt")
                     resp.headers["X-Translate-Tier"] = label
                     return resp
 
     # Satukan eksekusi translasi agar tidak menduplikasi request bersamaan untuk mode yang sama
-    job_key = f"{base_hash}|{lang}|{req_mode}|dual=0"
+    job_key = f"{base_hash}|{lang}|{req_mode}|{prompt_tag}|dual=0"
     fut = _SUB_INFLIGHT.get(job_key)
     if fut is None:
         fut = asyncio.ensure_future(

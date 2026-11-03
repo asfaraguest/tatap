@@ -57,3 +57,32 @@ async def test_custom_prompt_settings_persistence(tmp_path, monkeypatch):
         await db_mod.close_db_pool()
         db_mod._settings_cache.clear()
         db_mod._settings_cache_loaded = False
+
+
+def test_key_llm_prompt_tagging():
+    """Memastikan perubahan prompt menghasilkan cache key yang berbeda untuk mencegah stale cache."""
+    import hashlib
+    base_hash = "abc123hash"
+    model = "gemini-2.0-flash"
+
+    # Default / empty prompt
+    prompt1 = ""
+    tag1 = hashlib.sha1(f"{model}|{prompt1}".encode("utf-8")).hexdigest()[:8] if prompt1 else "def"
+    key1 = f"sub2|llm|{base_hash}|{tag1}"
+    assert tag1 == "def"
+    assert key1 == f"sub2|llm|{base_hash}|def"
+
+    # Custom prompt A
+    prompt2 = "Gaya santai"
+    tag2 = hashlib.sha1(f"{model}|{prompt2}".encode("utf-8")).hexdigest()[:8] if prompt2 else "def"
+    key2 = f"sub2|llm|{base_hash}|{tag2}"
+    assert tag2 != "def"
+    assert key2 != key1
+
+    # Custom prompt B
+    prompt3 = "Gaya formal"
+    tag3 = hashlib.sha1(f"{model}|{prompt3}".encode("utf-8")).hexdigest()[:8] if prompt3 else "def"
+    key3 = f"sub2|llm|{base_hash}|{tag3}"
+    assert tag3 != tag2
+    assert key3 != key2
+

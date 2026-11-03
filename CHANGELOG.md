@@ -45,6 +45,18 @@ Kenaikan digit PATCH diterapkan sesuai kaidah Semantic Versioning 2.0.0 dan Dire
    - Memperluas durasi buffer: `maxBufferLength: 60s`, `maxMaxBufferLength: 120s`, `maxBufferSize: 60MB`, dan `startBufferDuration: 2s`.
    - Mengimplementasikan pendeteksi celah mikro (micro-gap $\le 0.35$s) pada event `BUFFER_STALLED_ERROR` yang secara otomatis melompati jeda frame tanpa memaksa user scrubbing seekbar secara manual.
 
+### Fixed
+1. **Modal Stacking & Z-Index Collision di Web & Desktop (`frontend/css/style.css`, `frontend/js/app.js`):**
+   - Menetapkan z-index eksplisit `#ai-settings-modal.overlay { z-index: 160; background: rgba(0, 0, 0, 0.88); }` sehingga modal setelan AI Fansub selalu muncul di atas layer pemutar video `#player-modal`.
+   - Menghentikan pemutaran video secara otomatis (`v.pause()`) saat modal setelan dibuka dari dalam pemutar.
+2. **Dynamic Subtitle Cache Invalidation on Custom Prompt Change (`backend/main.py`, Paritas Chaquopy):**
+   - Mengikat kunci cache subtitle AI (`key_llm`) dengan hash kombinasi model dan prompt kustom pengguna (`sub2|llm|{base_hash}|{prompt_tag}`).
+   - Menghindari penyajian subtitle lama (stale cache) saat pengguna mengubah persona atau instruksi terjemahan di pengaturan AI Fansub.
+3. **Penyempurnaan Navigasi Input & Auto-Reload Subtitle di Android (`MainActivity.java`, `PlayerActivity.java`, `dialog_ai_settings.xml`):**
+   - Menambahkan penanganan `requestDisallowInterceptTouchEvent` pada `et_ai_custom_prompt` untuk mencegah tersangkutnya gestur gulir sentuh oleh `ScrollView` induk di perangkat layar sentuh.
+   - Mengintegrasikan penskalaan visual fokus D-Pad remote Android TV (`TvFocusHelper.attachFocusScale`).
+   - Otomatis memicu pemuatan ulang subtitle terjemahan (`applySubtitleSelection(true)`) saat pengguna menyimpan setelan AI Fansub dari dalam pemutar video aktif.
+
 ### Tests
 - Menambahkan test suite `tests/test_custom_prompt.py` untuk menguji pembuatan system prompt dengan instruksi khusus pengguna, prioritas prompt, dan persistensi database settings.
 - Menambahkan test suite `tests/test_stream_optimizations.py` untuk menguji cache master m3u8, in-memory segment ring cache, non-blocking AniSkip resolving, dan endpoint skip times.
