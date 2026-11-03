@@ -53,6 +53,41 @@ def _master_cache_set(url: str, text: str):
             _MASTER_CACHE.pop(k, None)
 
 
+# ---------------------------------------------------------------------------
+# In-memory segment ring cache (LRU) untuk segmen video (.ts / mp4).
+# Mengeliminasi re-buffering saat rewind 5-10s dan fragment retry.
+# ---------------------------------------------------------------------------
+from collections import OrderedDict as _OrderedDict
+_SEGMENT_CACHE = _OrderedDict()   # url -> (media_type, bytes)
+_SEGMENT_CACHE_MAX_BYTES = 35 * 1024 * 1024  # 35 MB
+_SEGMENT_CACHE_CUR_BYTES = 0
+
+def _segment_cache_get(url: str):
+    """Ambil segmen video dari RAM cache."""
+    if not url:
+        return None
+    val = _SEGMENT_CACHE.get(url)
+    if val is not None:
+        _SEGMENT_CACHE.move_to_end(url)
+        return val
+    return None
+
+def _segment_cache_set(url: str, media_type: str, data: bytes):
+    """Simpan segmen video ke ring buffer memori dengan batas 35MB."""
+    global _SEGMENT_CACHE_CUR_BYTES
+    if not url or not data or len(data) > 6 * 1024 * 1024:
+        return
+    if url in _SEGMENT_CACHE:
+        _, old_data = _SEGMENT_CACHE[url]
+        _SEGMENT_CACHE_CUR_BYTES -= len(old_data)
+        _SEGMENT_CACHE.pop(url)
+    while (_SEGMENT_CACHE_CUR_BYTES + len(data)) > _SEGMENT_CACHE_MAX_BYTES and _SEGMENT_CACHE:
+        _, (_, ev_data) = _SEGMENT_CACHE.popitem(last=False)
+        _SEGMENT_CACHE_CUR_BYTES -= len(ev_data)
+    _SEGMENT_CACHE[url] = (media_type, data)
+    _SEGMENT_CACHE_CUR_BYTES += len(data)
+
+
 # Failover per-judul: mapping slug -> sumber alternatif. Nilai SELALU "anichan".
 # Dibatasi jumlah entri agar tidak tumbuh tanpa batas pada sesi panjang.
 _ANIME_FAILOVER_CACHE: dict = {}
@@ -1684,6 +1719,62 @@ async def _resolve_mal_id(slug: str, title: str = "", anilist_id: str = "") -> s
     return ""
 
 
+async def _async_update_skip_times(cache_slug: str, ep: int, mode: str, ep_data: dict, mal_id: str, title: str, hi_slug: str = "", clean_slug: str = ""):
+    """Mengambil AniSkip skip times di background dan memperbarui SQLite episode_cache serta memory cache tanpa menahan playback."""
+    try:
+        eff_mal = str(mal_id or "").strip()
+        if not eff_mal:
+            eff_mal = await _resolve_mal_id(slug=clean_slug or cache_slug, title=title)
+        if not eff_mal:
+            return
+        loop = asyncio.get_running_loop()
+        sk = await asyncio.wait_for(
+            loop.run_in_executor(None, lambda: aniskip.get_skip_times(eff_mal, ep, episode_length=0)),
+            timeout=3.0
+        )
+        if not sk:
+            return
+        intro = ep_data.get("intro") or {"start": 0, "end": 0}
+        outro = ep_data.get("outro") or {"start": 0, "end": 0}
+        has_update = False
+        if sk.get("intro", {}).get("end", 0) > 0 and intro.get("end", 0) == 0:
+            intro = sk["intro"]
+            has_update = True
+        if sk.get("outro", {}).get("end", 0) > 0 and outro.get("end", 0) == 0:
+            outro = sk["outro"]
+            has_update = True
+        if has_update:
+            aniskip.store_skip_times(mal_id=eff_mal, title=title, ep=ep, intro=intro, outro=outro)
+            if hi_slug and hi_slug != clean_slug:
+                aniskip.store_skip_times(mal_id=eff_mal, title=hi_slug, ep=ep, intro=intro, outro=outro)
+            await set_episode_cache(cache_slug, ep, mode, ep_data["master"], ep_data["variants"],
+                                    ep_data.get("sub"), ep_data.get("sub_lang"),
+                                    ep_data.get("referer"), ep_data.get("server"),
+                                    subtitles=ep_data.get("subtitles"),
+                                    intro=intro, outro=outro)
+    except Exception:
+        pass
+
+
+@app.get("/api/episode/skip_times")
+async def episode_skip_times(mal_id: str = Query(""), title: str = Query(""), slug: str = Query(""), ep: int = Query(1)):
+    """Ambil skip times (intro/outro) on-demand tanpa menghalangi stream playback."""
+    try:
+        eff_mal = mal_id.strip()
+        eff_title = title.strip() or slug.strip()
+        if not eff_mal and eff_title:
+            eff_mal = await _resolve_mal_id(slug=slug, title=eff_title)
+        sk = aniskip.get_cached_skip_times(mal_id=eff_mal, title=eff_title, ep=ep)
+        if not sk and eff_mal:
+            loop = asyncio.get_running_loop()
+            sk = await loop.run_in_executor(None, lambda: aniskip.get_skip_times(eff_mal, ep, episode_length=0))
+            if sk:
+                aniskip.store_skip_times(mal_id=eff_mal, title=eff_title, ep=ep, intro=sk.get("intro"), outro=sk.get("outro"))
+        return ok(sk or {"intro": {"start": 0, "end": 0}, "outro": {"start": 0, "end": 0}})
+    except Exception as e:
+        return fail(str(e))
+
+
 @app.get("/api/stream/resolve")
 @app.get("/api/episode")
 async def resolve(slug: str = Query(""), ep: int = Query(1), mode: str = Query("sub"), q: str = Query("best"), source: str = Query(""), force: bool = Query(False), refresh: bool = Query(False), title: str = Query(""), mal_id: str = Query(""), anilist_id: str = Query("")):
@@ -1830,7 +1921,7 @@ async def resolve(slug: str = Query(""), ep: int = Query(1), mode: str = Query("
                     loop = asyncio.get_running_loop()
                     sk = await asyncio.wait_for(
                         loop.run_in_executor(None, lambda: aniskip.get_skip_times(eff_mal_id, ep, episode_length=0)),
-                        timeout=1.8
+                        timeout=0.35
                     )
                     has_updated_sk = False
                     if sk.get("intro", {}).get("end", 0) > 0 and hit["intro"].get("end", 0) == 0:
@@ -1846,7 +1937,7 @@ async def resolve(slug: str = Query(""), ep: int = Query(1), mode: str = Query("
                                                 subtitles=hit.get("subtitles"),
                                                 intro=hit["intro"], outro=hit["outro"])
                 except Exception:
-                    pass
+                    _spawn_background(_async_update_skip_times(cache_slug, ep, hit.get("mode") or mode, hit, eff_mal_id, eff_title_hit, clean_slug=clean_slug_hit))
 
             aniskip.store_skip_times(
                 mal_id=eff_mal_id,
@@ -1963,6 +2054,9 @@ async def resolve(slug: str = Query(""), ep: int = Query(1), mode: str = Query("
         got["intro"] = got.get("intro") or {"start": 0, "end": 0}
         got["outro"] = got.get("outro") or {"start": 0, "end": 0}
 
+        if got.get("master_body") and got.get("master"):
+            _master_cache_set(got["master"], got["master_body"])
+
         # Resolusi mal_id jika belum tersedia
         eff_title = title or raw_title or clean_slug
         eff_mal_id = str(got.get("mal_id") or mal_id or "").strip()
@@ -1985,14 +2079,14 @@ async def resolve(slug: str = Query(""), ep: int = Query(1), mode: str = Query("
             try:
                 sk = await asyncio.wait_for(
                     loop.run_in_executor(None, lambda: aniskip.get_skip_times(eff_mal_id, ep, episode_length=0)),
-                    timeout=1.8
+                    timeout=0.35
                 )
                 if sk.get("intro", {}).get("end", 0) > 0 and got["intro"].get("end", 0) == 0:
                     got["intro"] = sk["intro"]
                 if sk.get("outro", {}).get("end", 0) > 0 and got["outro"].get("end", 0) == 0:
                     got["outro"] = sk["outro"]
             except Exception:
-                pass
+                _spawn_background(_async_update_skip_times(cache_slug, ep, actual_mode, got, eff_mal_id, eff_title, hi_slug=hi_slug, clean_slug=clean_slug))
 
         # 2. Simpan ke cross-provider cache jika valid
         aniskip.store_skip_times(
@@ -2153,15 +2247,40 @@ async def proxy_video(url: str = Query(""), referer: str = Query(""), range: str
                                       "embermeadow", "megacloud", "rapid-cloud", "rabbitstream", "dokicloud")) or "/anime/" in u_low:
             referer = "https://megaplay.buzz/"
 
+    # Cache segmen media dalam memori jika tanpa range header (playback normal / rewind cepat)
+    if not is_m3u8 and not range_header:
+        cached_seg = _segment_cache_get(url)
+        if cached_seg is not None:
+            c_type, c_bytes = cached_seg
+            return Response(
+                content=c_bytes,
+                media_type=c_type or media_type,
+                headers={
+                    "Access-Control-Allow-Origin": "*",
+                    "Cache-Control": "public, max-age=86400, immutable",
+                    "Accept-Ranges": "bytes",
+                    "Content-Length": str(len(c_bytes)),
+                }
+            )
+
+    resp_headers = {
+        "Access-Control-Allow-Origin": "*",
+    }
+    if is_m3u8:
+        resp_headers["Cache-Control"] = "no-cache, no-transform"
+    else:
+        resp_headers["Cache-Control"] = "public, max-age=86400, immutable"
+        resp_headers["Accept-Ranges"] = "bytes"
+
     # Jika host terdeteksi diblokir DPI ISP, gunakan TLS desync murni (aman dari Sangfor)
     from api.hianime import _host_from, _is_dpi_blocked_host
     host = _host_from(url)
     if _is_dpi_blocked_host(host):
         return _SR(_pipe_desync_video(url, referer, range_header=range_header), media_type=media_type,
-                   headers={"Access-Control-Allow-Origin": "*"})
+                   headers=resp_headers)
 
     return _SR(_pipe_video(url, referer, range_header=range_header), media_type=media_type,
-               headers={"Access-Control-Allow-Origin": "*"})
+               headers=resp_headers)
 
 
 def _rewrite_m3u8_content(txt: str, base_url: str, referer: str) -> str:
@@ -2237,9 +2356,14 @@ async def _pipe_desync_video(url: str, referer: str, range_header: str = ""):
         return
 
     # Segmen TS: stream per bongkah via desync TLS generator
+    collected = []
     async for chunk in tls_desync_stream(url, headers=headers):
         if chunk:
+            if not range_header:
+                collected.append(chunk)
             yield chunk
+    if not range_header and collected:
+        _segment_cache_set(url, "video/mp2t", b"".join(collected))
 
 
 _direct_client = None
@@ -2315,6 +2439,7 @@ async def _pipe_video(url: str, referer: str, range_header: str = ""):
 
                 skipped = 0
                 need_strip = bool(_SR2.search(url))
+                collected = []
                 async for chunk in r.aiter_bytes(65536):
                     if need_strip and skipped < _SB:
                         cut = min(len(chunk), _SB - skipped)
@@ -2323,7 +2448,11 @@ async def _pipe_video(url: str, referer: str, range_header: str = ""):
                         if not chunk:
                             continue
                     if chunk:
+                        if not range_header and not is_playlist:
+                            collected.append(chunk)
                         yield chunk
+                if not range_header and not is_playlist and collected:
+                    _segment_cache_set(url, "video/mp2t", b"".join(collected))
                 return
         except HTTPException as he:
             if attempt == 0 and ("403" in str(he.detail) or "502" in str(he.detail)):

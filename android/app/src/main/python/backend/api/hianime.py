@@ -1116,6 +1116,7 @@ def _try_megaplay(embed: str):
     outro = cfg.get("outro") or {"start": 0, "end": 0}
 
     return {"master": master, "variants": variants,
+            "master_body": text,
             "sub": sub_url,
             "sub_lang": sub_lang,
             "referer": origin + "/", "mal_id": "",
@@ -1317,6 +1318,7 @@ def _try_embed_legacy(embed: str):
     outro = cfg.get("outro") or {"start": 0, "end": 0}
 
     return {"master": master, "variants": variants,
+            "master_body": probe_content or "",
             "sub": sub_url,
             "sub_lang": sub_lang,
             "referer": referer, "mal_id": mal_id,

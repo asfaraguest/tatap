@@ -217,8 +217,8 @@ async def test_resolve_mal_id_and_stream_skip_injection(monkeypatch):
     monkeypatch.setattr(aniskip, "get_skip_times", mock_get_skip)
 
     # Mock hi resolver
-    monkeypatch.setattr(hi, "hianime_episodes", lambda s: [{"ep": 1, "ep_id": "111"}])
-    monkeypatch.setattr(hi, "hianime_m3u8", lambda maps, e, m, s: {
+    mock_episodes = lambda s: [{"ep": 1, "ep_id": "111"}]
+    mock_m3u8 = lambda maps, e, m, s: {
         "master": "https://example.com/dandadan.m3u8",
         "variants": [{"q": "1080p", "url": "https://example.com/dandadan.m3u8"}],
         "sub": "https://example.com/sub.vtt",
@@ -229,7 +229,11 @@ async def test_resolve_mal_id_and_stream_skip_injection(monkeypatch):
         "intro": {"start": 0, "end": 0},
         "outro": {"start": 0, "end": 0},
         "mal_id": ""
-    })
+    }
+    monkeypatch.setattr(hi, "hianime_episodes", mock_episodes)
+    monkeypatch.setattr(main.hi, "hianime_episodes", mock_episodes)
+    monkeypatch.setattr(hi, "hianime_m3u8", mock_m3u8)
+    monkeypatch.setattr(main.hi, "hianime_m3u8", mock_m3u8)
 
     res = await main.resolve(slug=slug, ep=ep, mode="sub", force=True, title="Dandadan")
     assert res["success"] is True

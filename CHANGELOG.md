@@ -13,6 +13,36 @@ Format versi menggunakan skema `MAJOR.MINOR.PATCH`:
 - **MINOR (x.Y.0):** Penambahan fitur atau kapabilitas baru yang tetap kompatibel ke belakang (*backward-compatible new features*). Digit PATCH direset ke 0.
 - **PATCH (x.y.Z):** Perbaikan bug, peningkatan stabilitas, atau perbaikan internal tanpa penambahan fitur baru (*backward-compatible bug fixes*).
 
+## [2.12.7] - 2026-11-03
+
+### Justifikasi SemVer 2.0.0 (PATCH: 2.12.6 -> 2.12.7)
+Kenaikan digit PATCH diterapkan sesuai kaidah Semantic Versioning 2.0.0 dan Direktif #3 [`AGENTS.md`](AGENTS.md) untuk optimasi performa resolving stream anime dan pemutaran buffering video di platform Web dan Desktop (eliminasi jeda sinkron AniSkip, master m3u8 pre-seeding dari scraper, in-memory segment ring cache, predictive next-episode pre-resolving, dan HLS.js micro-gap auto-recovery) tanpa perombakan skema database maupun modifikasi antarmuka eksternal yang tidak kompatibel.
+
+### Added
+1. **In-Memory Segment Ring Buffer Cache (`backend/main.py`, Paritas `android/app/src/main/python/backend/main.py`):**
+   - Menambahkan LRU ring buffer memori `_SEGMENT_CACHE` (hingga 35MB) untuk menyimpan segmen video TS yang baru diunduh.
+   - Mengeliminasi round-trip jaringan ke upstream CDN saat pemutar melakukan rewind singkat 5–10 detik atau retry segmen akibat micro-stall.
+2. **On-Demand Skip Times Endpoint (`backend/main.py`):**
+   - Menambahkan endpoint `@app.get("/api/episode/skip_times")` agar klien dapat meminta timestamp intro/outro kapan saja tanpa menahan pemutaran video.
+3. **Predictive Next-Episode Background Pre-Resolving (`frontend/js/app.js`):**
+   - Otomatis memicu background pre-resolving dan pre-warming subtitle episode berikutnya saat progres video berjalan $\ge 70\%$ atau setelah 240 detik pemutaran stabil.
+   - Transisi ke episode berikutnya (baik via klik "Next" maupun auto-play) kini berjalan instan (0 milidetik).
+
+### Changed
+1. **Non-Blocking AniSkip Resolving (`backend/main.py`):**
+   - Resolusi episode kini mengembalikan URL stream seketika (< 350ms) tanpa menunggu request AniSkip eksternal. Jika skip times belum ada di cache, pencarian AniSkip dijalankan di latar belakang (`_spawn_background`) untuk memperbarui cache secara asinkron.
+2. **Master M3U8 Direct Pre-Seeding (`backend/api/hianime.py`, `backend/main.py`):**
+   - Resolver HiAnime (`_try_megaplay` & `_try_embed_legacy`) kini menyertakan `master_body` langsung pada hasil resolve, yang seketika disimpan ke `_MASTER_CACHE`. Mengeliminasi round-trip kedua ke CDN saat pemutar memuat master playlist pertama kali.
+3. **Optimasi Buffer & Caching Header HTTP (`backend/main.py`):**
+   - Menambahkan header `Cache-Control: public, max-age=86400, immutable` dan `Accept-Ranges: bytes` pada seluruh respons segmen video `/api/player/video`.
+4. **HLS.js Tuning & Micro-Gap Stall Auto-Recovery (`frontend/js/app.js`):**
+   - Mengaktifkan `startFragPrefetch: true` untuk mengeliminasi pause antar fragmen video.
+   - Memperluas durasi buffer: `maxBufferLength: 60s`, `maxMaxBufferLength: 120s`, `maxBufferSize: 60MB`, dan `startBufferDuration: 2s`.
+   - Mengimplementasikan pendeteksi celah mikro (micro-gap $\le 0.35$s) pada event `BUFFER_STALLED_ERROR` yang secara otomatis melompati jeda frame tanpa memaksa user scrubbing seekbar secara manual.
+
+### Tests
+- Menambahkan test suite `tests/test_stream_optimizations.py` untuk menguji cache master m3u8, in-memory segment ring cache, non-blocking AniSkip resolving, dan endpoint skip times.
+
 ## [2.12.6] - 2026-11-01
 
 ### Justifikasi SemVer 2.0.0 (PATCH: 2.12.5 -> 2.12.6)

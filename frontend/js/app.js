@@ -1128,6 +1128,22 @@ function recordWatchProgress(force){
   window.Tatap.saveProgress(cur.slug, cur.ep, curPos, dur).then(function(){
     renderContinue();
   }).catch(function(){});
+
+  // Predictive Next-Episode Pre-resolving:
+  // Ketika tontonan mencapai >= 70% atau > 240 detik pemutaran stabil,
+  // resolve episode berikutnya di background agar pergantian episode menjadi 0ms (instan).
+  if(dur > 90 && curPos > 0 && (curPos / dur >= 0.70 || curPos >= 240)){
+    var preKey = cur.slug + ":" + (cur.ep + 1);
+    if(window._lastPreResolvedEp !== preKey){
+      window._lastPreResolvedEp = preKey;
+      var nextEp = cur.ep + 1;
+      var canPre = true;
+      if(cur.totalEps && nextEp > cur.totalEps) canPre = false;
+      if(canPre && window.Tatap && window.Tatap.resolve){
+        window.Tatap.resolve(cur.slug, nextEp, cur.mode, cur.quality, cur.source || "", false, cur.title).catch(function(){});
+      }
+    }
+  }
 }
 
 var _activeResumeCleanup = null;
@@ -2542,15 +2558,16 @@ function playUrl(url,referrer,sub,subRef,resumeTime,token){
   if(window.Hls&&window.Hls.isSupported()&&isHls){
     if(window._hls){try{window._hls.destroy();}catch(e){}}
     var h=new Hls({
-      maxBufferLength:30,
-      maxMaxBufferLength:60,
-      maxBufferSize:40*1000*1000,
+      maxBufferLength:60,
+      maxMaxBufferLength:120,
+      maxBufferSize:60*1000*1000,
       startLevel:-1,
       capLevelToPlayerSize:true,
       fragLoadingMaxRetry:6,
       manifestLoadingMaxRetry:4,
       levelLoadingMaxRetry:4,
-      fragLoadingMaxRetryTimeout:12000,
+      fragLoadingRetryDelay:800,
+      fragLoadingMaxRetryTimeout:16000,
       backBufferLength:30,
       liveSyncDurationCount:2,
       maxFragLookUpTolerance:0.5,
@@ -2560,17 +2577,9 @@ function playUrl(url,referrer,sub,subRef,resumeTime,token){
       highBufferWatchdogPeriod:2,
       testBandwidth:false,
       progressive:true,
-      // Estimasi bandwidth awal dinaikkan dari default HLS.js (500 kbps) ke
-      // 3 Mbit/s. Dengan startLevel:-1 + testBandwidth:false, HLS.js memulai
-      // dari estimasi ini; pada 500 kbps player butuh 10-30 detik untuk
-      // meramping ke resolusi layak sehingga terasa lambat saat start.
-      // 3 Mbit/s adalah titik tengah yang realistis untuk koneksi lokal
-      // (proxy di 127.0.0.1) tanpa langsung melompat ke 1080p di jaringan
-      // lambat. Sejalan dengan Android yang memakai initial estimate 25 Mbps.
       abrEwmaDefaultEstimate:3*1000*1000,
-      // Buffer awal lebih agresif supaya playback tidak sering rebuffer
-      // saat kualitas naik (ABR switch = renegosiasi + unduhan baru).
-      startBufferDuration:3,
+      startBufferDuration:2,
+      startFragPrefetch:true,
       lowLatencyMode:false,
       defaultAudioCodec:"mp4a.40.2",
       enableWorker:true
@@ -2668,10 +2677,21 @@ function playUrl(url,referrer,sub,subRef,resumeTime,token){
     h.on(Hls.Events.ERROR,function(ev,d){
       if(!d)return;
       if(d.details === Hls.ErrorDetails.BUFFER_STALLED_ERROR || d.details === "bufferStalledError"){
-        // Recovery stall TANPA seek. Seek 80ms sebelumnya membatalkan fragment
-        // load yang sedang berjalan di HLS.js sehingga memaksa unduhan ulang
-        // segmen dari keyframe lewat proxy Python — mahal dan memperparah stall.
-        try{ h.startLoad(); }catch(_){}
+        // Recovery stall cerdas: periksa apakah player terjebak pada micro-gap buffer
+        try{
+          if(v && v.buffered && v.buffered.length > 0 && !v.paused){
+            var ct = v.currentTime;
+            for(var bi = 0; bi < v.buffered.length; bi++){
+              var bStart = v.buffered.start(bi);
+              if(bStart > ct && (bStart - ct) <= 0.35){
+                v.currentTime = bStart + 0.05;
+                v.play().catch(function(){});
+                return;
+              }
+            }
+          }
+          h.startLoad();
+        }catch(_){}
         return;
       }
       if(d.fatal){
