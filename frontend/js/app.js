@@ -2042,7 +2042,13 @@ function paintCue(){
   if(!box||!v)return;
   var s=box.querySelector("span");
   if(!s)return;
-  if($("player-modal").classList.contains("hidden")){s.innerHTML="";return;}
+  if($("player-modal").classList.contains("hidden")){
+    s.innerHTML="";
+    if(window.art && window.art.template && window.art.template.$subtitle){
+      window.art.template.$subtitle.innerHTML="";
+    }
+    return;
+  }
   var t=v.currentTime||0;
   var subTime = t - (cur.subDelay || 0.0);
   if(isVideoFullscreen() && !isDesktopEnv()){
@@ -2059,6 +2065,13 @@ function paintCue(){
     }
     var html=activeParts.join("<br>");
     if(s._last!==html){s.innerHTML=html;s._last=html;}
+    if(window.art && window.art.template && window.art.template.$subtitle){
+      var artSub = window.art.template.$subtitle;
+      if(artSub._last !== html){
+        artSub.innerHTML = html ? ("<div class='art-subtitle-inner'>" + html + "</div>") : "";
+        artSub._last = html;
+      }
+    }
   }
   checkSkipTimes(t);
 }
@@ -2536,9 +2549,13 @@ function playUrl(url,referrer,sub,subRef,resumeTime,token){
   var pm = $("player-modal");
   var v=$("vid");
   if(!pm || pm.classList.contains("hidden") || (token && cur.playToken !== token)){
+    if(window.art){try{window.art.destroy(false);window.art=null;}catch(e){}}
     if(window._hls){try{window._hls.destroy();window._hls=null;}catch(e){}}
     if(v){try{v.pause();v.removeAttribute("src");v.load();}catch(e){}}
     return;
+  }
+  if(window.art){
+    try{window.art.destroy(false);window.art=null;}catch(e){}
   }
   if(v){
     v.muted=false;
@@ -2555,195 +2572,475 @@ function playUrl(url,referrer,sub,subRef,resumeTime,token){
   var onCan=function(){
     $("pm-spinner").classList.add("hidden");
     if(resumeTime && resumeTime > 0){
-      try{v.currentTime = resumeTime;}catch(e){}
+      try{
+        if(window.art) window.art.currentTime = resumeTime;
+        else if(v) v.currentTime = resumeTime;
+      }catch(e){}
     }
   };
-  v.addEventListener("canplay",onCan,{once:true});
+  if(v) v.addEventListener("canplay",onCan,{once:true});
   var cleanPath = (url || "").split("?")[0].toLowerCase();
   var isSeg = cleanPath.endsWith(".ts") || cleanPath.endsWith(".ts.jpg") || cleanPath.endsWith(".mp4") || cleanPath.endsWith(".aac");
   var isHls = !isSeg && ((url.indexOf(".m3u8") >= 0) || (url.indexOf("format=m3u8") >= 0) || (url.indexOf("/api/hls") >= 0) || (url.indexOf("/hls/playlist") >= 0));
-  if(window.Hls&&window.Hls.isSupported()&&isHls){
-    if(window._hls){try{window._hls.destroy();}catch(e){}}
-    var h=new Hls({
-      maxBufferLength:60,
-      maxMaxBufferLength:120,
-      maxBufferSize:60*1000*1000,
-      startLevel:-1,
-      capLevelToPlayerSize:true,
-      fragLoadingMaxRetry:6,
-      manifestLoadingMaxRetry:4,
-      levelLoadingMaxRetry:4,
-      fragLoadingRetryDelay:800,
-      fragLoadingMaxRetryTimeout:16000,
-      backBufferLength:30,
-      liveSyncDurationCount:2,
-      maxFragLookUpTolerance:0.5,
-      nudgeOffset:0.1,
-      nudgeMaxRetry:5,
-      maxStarvationDelay:4,
-      highBufferWatchdogPeriod:2,
-      testBandwidth:false,
-      progressive:true,
-      abrEwmaDefaultEstimate:3*1000*1000,
-      startBufferDuration:2,
-      startFragPrefetch:true,
-      lowLatencyMode:false,
-      defaultAudioCodec:"mp4a.40.2",
-      enableWorker:true
-    });
-    window._hls=h;
-    h._networkRetryCount = 0;
-    h._mediaRetryCount = 0;
-    h.on(Hls.Events.FRAG_LOADED, function(){
-      h._networkRetryCount = 0;
-      h._mediaRetryCount = 0;
-    });
-    h.on(Hls.Events.AUDIO_TRACKS_UPDATED,function(ev,data){
-      if(data&&data.audioTracks&&data.audioTracks.length){
-        var isDub = (cur.mode === "dub");
-        var selectedIdx = -1;
-        if(isDub){
-          for(var ai=0;ai<data.audioTracks.length;ai++){
-            var t = data.audioTracks[ai];
-            var lang = (t.lang || "").toLowerCase();
-            var name = (t.name || "").toLowerCase();
-            if(lang === "en" || name.indexOf("english") >= 0 || name.indexOf("dub") >= 0){
-              selectedIdx = ai;
-              break;
-            }
-          }
-        } else {
-          for(var ai=0;ai<data.audioTracks.length;ai++){
-            var t = data.audioTracks[ai];
-            var lang = (t.lang || "").toLowerCase();
-            var name = (t.name || "").toLowerCase();
-            if(lang === "ja" || lang === "jpn" || name.indexOf("japan") >= 0 || t.default){
-              selectedIdx = ai;
-              break;
-            }
+
+  var artContainer = $("artplayer-container");
+  if(typeof Artplayer !== "undefined" && artContainer){
+    var art = new Artplayer({
+      container: artContainer,
+      url: prox,
+      type: isHls ? "m3u8" : "mp4",
+      title: cur.title || "",
+      poster: cur.poster || "",
+      volume: (v && v.volume !== undefined) ? v.volume : 1.0,
+      isLive: false,
+      muted: false,
+      autoplay: true,
+      autoSize: false,
+      autoMini: false,
+      screenshot: false,
+      setting: true,
+      loop: false,
+      flip: true,
+      playbackRate: true,
+      aspectRatio: true,
+      fullscreen: true,
+      fullscreenWeb: true,
+      miniProgressBar: true,
+      mutex: true,
+      backdrop: true,
+      playsInline: true,
+      autoPlayback: true,
+      theme: "#38bdf8",
+      lang: "id",
+      customType: {
+        m3u8: function(video, playUrl, artInstance){
+          if(window.Hls && window.Hls.isSupported()){
+            if(window._hls){ try{ window._hls.destroy(); }catch(e){} }
+            var h = new Hls({
+              maxBufferLength: 60,
+              maxMaxBufferLength: 120,
+              maxBufferSize: 60 * 1000 * 1000,
+              startLevel: -1,
+              capLevelToPlayerSize: true,
+              fragLoadingMaxRetry: 6,
+              manifestLoadingMaxRetry: 4,
+              levelLoadingMaxRetry: 4,
+              fragLoadingRetryDelay: 800,
+              fragLoadingMaxRetryTimeout: 16000,
+              backBufferLength: 30,
+              liveSyncDurationCount: 2,
+              maxFragLookUpTolerance: 0.5,
+              nudgeOffset: 0.1,
+              nudgeMaxRetry: 5,
+              maxStarvationDelay: 4,
+              highBufferWatchdogPeriod: 2,
+              testBandwidth: false,
+              progressive: true,
+              abrEwmaDefaultEstimate: 3 * 1000 * 1000,
+              startBufferDuration: 2,
+              startFragPrefetch: true,
+              lowLatencyMode: false,
+              defaultAudioCodec: "mp4a.40.2",
+              enableWorker: true
+            });
+            window._hls = h;
+            artInstance.hls = h;
+            h._networkRetryCount = 0;
+            h._mediaRetryCount = 0;
+            h.on(Hls.Events.FRAG_LOADED, function(){
+              h._networkRetryCount = 0;
+              h._mediaRetryCount = 0;
+            });
+            h.on(Hls.Events.AUDIO_TRACKS_UPDATED, function(ev, data){
+              if(data && data.audioTracks && data.audioTracks.length){
+                var isDub = (cur.mode === "dub");
+                var selectedIdx = -1;
+                if(isDub){
+                  for(var ai=0; ai<data.audioTracks.length; ai++){
+                    var t = data.audioTracks[ai];
+                    var lang = (t.lang || "").toLowerCase();
+                    var name = (t.name || "").toLowerCase();
+                    if(lang === "en" || name.indexOf("english") >= 0 || name.indexOf("dub") >= 0){
+                      selectedIdx = ai; break;
+                    }
+                  }
+                } else {
+                  for(var ai=0; ai<data.audioTracks.length; ai++){
+                    var t = data.audioTracks[ai];
+                    var lang = (t.lang || "").toLowerCase();
+                    var name = (t.name || "").toLowerCase();
+                    if(lang === "ja" || lang === "jpn" || name.indexOf("japan") >= 0 || t.default){
+                      selectedIdx = ai; break;
+                    }
+                  }
+                }
+                if(selectedIdx !== -1) h.audioTrack = selectedIdx;
+                else if(h.audioTrack === -1 || h.audioTrack === undefined) h.audioTrack = 0;
+              }
+            });
+            h.on(Hls.Events.MANIFEST_PARSED, function(ev, data){
+              if(data && data.levels && data.levels.length > 1){
+                var hlsVars = [];
+                for(var li=0; li<data.levels.length; li++){
+                  var lvl = data.levels[li];
+                  var lHeight = lvl.height || 0;
+                  var lLabel = lHeight ? (lHeight + "p") : ("Level " + (li+1));
+                  hlsVars.push({ q: lLabel, levelIdx: li, height: lHeight, url: lvl.url || (lvl.details && lvl.details.url) || "" });
+                }
+                hlsVars.sort(function(a,b){ return b.height - a.height; });
+                hlsVars.unshift({ q: "Auto", levelIdx: -1, height: 99999, url: "" });
+                cur.res = cur.res || {};
+                cur.res.hlsLevels = hlsVars;
+                renderVariants();
+                if(cur.quality && cur.quality.toLowerCase() !== "auto" && cur.quality.toLowerCase() !== "best"){
+                  var targetQ = cur.quality.toLowerCase();
+                  for(var qk=0; qk<hlsVars.length; qk++){
+                    if(hlsVars[qk].q.toLowerCase().indexOf(targetQ) >= 0 || targetQ.indexOf(hlsVars[qk].q.toLowerCase()) >= 0){
+                      if(hlsVars[qk].levelIdx !== -1){
+                        h.currentLevel = hlsVars[qk].levelIdx;
+                        break;
+                      }
+                    }
+                  }
+                }
+              }
+            });
+            h.on(Hls.Events.LEVEL_SWITCHED, function(ev, data){
+              if(cur.res && cur.res.hlsLevels){
+                var curIdx = h.currentLevel;
+                var autoMode = (h.autoLevelEnabled || curIdx === -1);
+                var activeLabel = "AUTO";
+                if(!autoMode){
+                  for(var hi=0; hi<cur.res.hlsLevels.length; hi++){
+                    if(cur.res.hlsLevels[hi].levelIdx === curIdx){
+                      activeLabel = cur.res.hlsLevels[hi].q.toUpperCase();
+                      break;
+                    }
+                  }
+                }
+                var sel = $("pm-quality-select");
+                if(sel && !sel.classList.contains("user-interacting")){
+                  sel.value = autoMode ? "Auto" : activeLabel.toLowerCase();
+                }
+              }
+            });
+            h.loadSource(playUrl);
+            h.attachMedia(video);
+            h.on(Hls.Events.ERROR, function(ev, d){
+              if(!d) return;
+              if(d.details === Hls.ErrorDetails.BUFFER_STALLED_ERROR || d.details === "bufferStalledError"){
+                try{
+                  if(video && video.buffered && video.buffered.length > 0 && !video.paused){
+                    var ct = video.currentTime;
+                    for(var bi = 0; bi < video.buffered.length; bi++){
+                      var bStart = video.buffered.start(bi);
+                      if(bStart > ct && (bStart - ct) <= 0.35){
+                        video.currentTime = bStart + 0.05;
+                        video.play().catch(function(){});
+                        return;
+                      }
+                    }
+                  }
+                  h.startLoad();
+                }catch(_){}
+                return;
+              }
+              if(d.fatal){
+                if(d.type === Hls.ErrorTypes.NETWORK_ERROR){
+                  h._networkRetryCount = (h._networkRetryCount || 0) + 1;
+                  if(h._networkRetryCount <= 4){
+                    $("pm-status").textContent = "mencoba memulihkan koneksi stream (" + h._networkRetryCount + "/4)...";
+                    setTimeout(function(){ try{ h.startLoad(); }catch(_){} }, 600);
+                    return;
+                  }
+                } else if(d.type === Hls.ErrorTypes.MEDIA_ERROR){
+                  h._mediaRetryCount = (h._mediaRetryCount || 0) + 1;
+                  if(h._mediaRetryCount <= 3){
+                    $("pm-status").textContent = "mencoba memulihkan codec media (" + h._mediaRetryCount + "/3)...";
+                    setTimeout(function(){ try{ h.recoverMediaError(); }catch(_){} }, 500);
+                    return;
+                  }
+                }
+                $("pm-status").textContent = "player error: " + (d.type || "fatal") + " — " + (d.details || "");
+                try{ h.destroy(); }catch(_){}
+                return;
+              }
+              if(d.details === "fragLoadError" || d.details === "manifestLoadError" || d.details === "networkError"){
+                $("pm-status").textContent = "gagal load: " + (d.details || "network");
+              }
+            });
+          } else if(video.canPlayType("application/vnd.apple.mpegurl")){
+            video.src = playUrl;
           }
         }
-        if(selectedIdx !== -1){
-          h.audioTrack = selectedIdx;
-        } else if(h.audioTrack === -1 || h.audioTrack === undefined){
-          h.audioTrack = 0;
+      },
+      controls: [
+        {
+          name: "prev-btn",
+          position: "left",
+          index: 10,
+          html: '<span style="font-weight:700;font-size:12px;padding:2px 8px;cursor:pointer;opacity:0.9;" title="Episode Sebelumnya (p)">⏮ PREV</span>',
+          tooltip: "Episode Sebelumnya (p)",
+          click: function(){ stepEp(-1); }
+        },
+        {
+          name: "next-btn",
+          position: "left",
+          index: 11,
+          html: '<span style="font-weight:700;font-size:12px;padding:2px 8px;cursor:pointer;opacity:0.9;" title="Episode Berikutnya (n)">NEXT ⏭</span>',
+          tooltip: "Episode Berikutnya (n)",
+          click: function(){ stepEp(1); }
+        },
+        {
+          name: "mpv-btn",
+          position: "right",
+          index: 20,
+          html: '<span style="font-weight:700;font-size:11px;background:rgba(255,255,255,0.12);padding:3px 8px;border-radius:4px;border:1px solid rgba(255,255,255,0.2);cursor:pointer;" title="Putar di MPV Eksternal">MPV</span>',
+          tooltip: "Putar di MPV Eksternal",
+          click: function(){ playMPV(); }
+        },
+        {
+          name: "ai-btn",
+          position: "right",
+          index: 21,
+          html: '<span style="font-weight:700;font-size:11px;background:rgba(56,189,248,0.15);color:#38bdf8;padding:3px 8px;border-radius:4px;border:1px solid #38bdf8;cursor:pointer;" title="Pengaturan AI Fansub (:ai)">AI</span>',
+          tooltip: "Pengaturan AI Fansub (:ai)",
+          click: function(){ openAiSettingsModal(); }
         }
+      ]
+    });
+
+    window.art = art;
+
+    if(art.template && art.template.$video){
+      art.template.$video.id = "vid";
+      art.template.$video.setAttribute("controlsList", "nodownload nofullscreen noremoteplayback");
+      art.template.$video.setAttribute("disablePictureInPicture", "");
+      v = art.template.$video;
+    }
+
+    // Default Full-Browser Screen
+    art.fullscreenWeb = true;
+
+    // Monitor Fullscreen Handler terintegrasi dengan launcher Windows Portable (1 Monitor)
+    art.on("fullscreen", function(state){
+      if(typeof window.tatap_set_fullscreen === "function"){
+        try{ window.tatap_set_fullscreen(state); }catch(_){}
+      }
+      var stageEl = document.querySelector(".ambient-stage");
+      if(stageEl){
+        if(state) stageEl.classList.add("is-fullscreen");
+        else stageEl.classList.remove("is-fullscreen");
+      }
+      syncFullscreenSubtitles();
+    });
+
+    art.on("video:canplay", function(){
+      $("pm-spinner").classList.add("hidden");
+      if(resumeTime && resumeTime > 0){
+        try{ art.currentTime = resumeTime; }catch(e){}
       }
     });
-    h.on(Hls.Events.MANIFEST_PARSED,function(ev,data){
-      if(data&&data.levels&&data.levels.length>1){
-        var hlsVars=[];
-        for(var li=0;li<data.levels.length;li++){
-          var lvl=data.levels[li];
-          var lHeight = lvl.height || 0;
-          var lLabel = lHeight ? (lHeight + "p") : ("Level " + (li+1));
-          hlsVars.push({q: lLabel, levelIdx: li, height: lHeight, url: lvl.url || (lvl.details && lvl.details.url) || ""});
-        }
-        // Urutkan dari tertinggi ke terendah
-        hlsVars.sort(function(a,b){return b.height - a.height;});
-        // Tambahkan opsi Auto di awal
-        hlsVars.unshift({q: "Auto", levelIdx: -1, height: 99999, url: ""});
-        cur.res = cur.res || {};
-        cur.res.hlsLevels = hlsVars;
-        renderVariants();
-        // Terapkan kualitas yang cocok jika user memilih kualitas tertentu
-        if(cur.quality && cur.quality.toLowerCase() !== "auto" && cur.quality.toLowerCase() !== "best"){
-          var targetQ = cur.quality.toLowerCase();
-          for(var qk=0; qk<hlsVars.length; qk++){
-            if(hlsVars[qk].q.toLowerCase().indexOf(targetQ) >= 0 || targetQ.indexOf(hlsVars[qk].q.toLowerCase()) >= 0){
-              if(hlsVars[qk].levelIdx !== -1){
-                h.currentLevel = hlsVars[qk].levelIdx;
+
+    art.on("video:timeupdate", function(){
+      paintCue();
+      recordWatchProgress();
+    });
+
+    art.on("video:ended", function(){
+      markCurrentEpisodeFinished();
+      stepEp(1);
+    });
+
+    art.on("video:pause", function(){
+      recordWatchProgress(true);
+    });
+  } else {
+    if(window.Hls&&window.Hls.isSupported()&&isHls){
+      if(window._hls){try{window._hls.destroy();}catch(e){}}
+      var h=new Hls({
+        maxBufferLength:60,
+        maxMaxBufferLength:120,
+        maxBufferSize:60*1000*1000,
+        startLevel:-1,
+        capLevelToPlayerSize:true,
+        fragLoadingMaxRetry:6,
+        manifestLoadingMaxRetry:4,
+        levelLoadingMaxRetry:4,
+        fragLoadingRetryDelay:800,
+        fragLoadingMaxRetryTimeout:16000,
+        backBufferLength:30,
+        liveSyncDurationCount:2,
+        maxFragLookUpTolerance:0.5,
+        nudgeOffset:0.1,
+        nudgeMaxRetry:5,
+        maxStarvationDelay:4,
+        highBufferWatchdogPeriod:2,
+        testBandwidth:false,
+        progressive:true,
+        abrEwmaDefaultEstimate:3*1000*1000,
+        startBufferDuration:2,
+        startFragPrefetch:true,
+        lowLatencyMode:false,
+        defaultAudioCodec:"mp4a.40.2",
+        enableWorker:true
+      });
+      window._hls=h;
+      h._networkRetryCount = 0;
+      h._mediaRetryCount = 0;
+      h.on(Hls.Events.FRAG_LOADED, function(){
+        h._networkRetryCount = 0;
+        h._mediaRetryCount = 0;
+      });
+      h.on(Hls.Events.AUDIO_TRACKS_UPDATED,function(ev,data){
+        if(data&&data.audioTracks&&data.audioTracks.length){
+          var isDub = (cur.mode === "dub");
+          var selectedIdx = -1;
+          if(isDub){
+            for(var ai=0;ai<data.audioTracks.length;ai++){
+              var t = data.audioTracks[ai];
+              var lang = (t.lang || "").toLowerCase();
+              var name = (t.name || "").toLowerCase();
+              if(lang === "en" || name.indexOf("english") >= 0 || name.indexOf("dub") >= 0){
+                selectedIdx = ai;
+                break;
+              }
+            }
+          } else {
+            for(var ai=0;ai<data.audioTracks.length;ai++){
+              var t = data.audioTracks[ai];
+              var lang = (t.lang || "").toLowerCase();
+              var name = (t.name || "").toLowerCase();
+              if(lang === "ja" || lang === "jpn" || name.indexOf("japan") >= 0 || t.default){
+                selectedIdx = ai;
                 break;
               }
             }
           }
-        }
-      }
-    });
-    h.on(Hls.Events.LEVEL_SWITCHED,function(ev,data){
-      if(cur.res && cur.res.hlsLevels){
-        var curIdx = h.currentLevel;
-        var autoMode = (h.autoLevelEnabled || curIdx === -1);
-        var activeLabel = "AUTO";
-        if(!autoMode){
-          for(var hi=0;hi<cur.res.hlsLevels.length;hi++){
-            if(cur.res.hlsLevels[hi].levelIdx === curIdx){
-              activeLabel = cur.res.hlsLevels[hi].q.toUpperCase();
-              break;
-            }
+          if(selectedIdx !== -1){
+            h.audioTrack = selectedIdx;
+          } else if(h.audioTrack === -1 || h.audioTrack === undefined){
+            h.audioTrack = 0;
           }
         }
-        var sel=$("pm-quality-select");
-        if(sel && !sel.classList.contains("user-interacting")){
-          sel.value = autoMode ? "Auto" : activeLabel.toLowerCase();
-        }
-      }
-    });
-    h.loadSource(prox);
-    h.attachMedia(v);
-    h.on(Hls.Events.ERROR,function(ev,d){
-      if(!d)return;
-      if(d.details === Hls.ErrorDetails.BUFFER_STALLED_ERROR || d.details === "bufferStalledError"){
-        // Recovery stall cerdas: periksa apakah player terjebak pada micro-gap buffer
-        try{
-          if(v && v.buffered && v.buffered.length > 0 && !v.paused){
-            var ct = v.currentTime;
-            for(var bi = 0; bi < v.buffered.length; bi++){
-              var bStart = v.buffered.start(bi);
-              if(bStart > ct && (bStart - ct) <= 0.35){
-                v.currentTime = bStart + 0.05;
-                v.play().catch(function(){});
-                return;
+      });
+      h.on(Hls.Events.MANIFEST_PARSED,function(ev,data){
+        if(data&&data.levels&&data.levels.length>1){
+          var hlsVars=[];
+          for(var li=0;li<data.levels.length;li++){
+            var lvl=data.levels[li];
+            var lHeight = lvl.height || 0;
+            var lLabel = lHeight ? (lHeight + "p") : ("Level " + (li+1));
+            hlsVars.push({q: lLabel, levelIdx: li, height: lHeight, url: lvl.url || (lvl.details && lvl.details.url) || ""});
+          }
+          // Urutkan dari tertinggi ke terendah
+          hlsVars.sort(function(a,b){return b.height - a.height;});
+          // Tambahkan opsi Auto di awal
+          hlsVars.unshift({q: "Auto", levelIdx: -1, height: 99999, url: ""});
+          cur.res = cur.res || {};
+          cur.res.hlsLevels = hlsVars;
+          renderVariants();
+          // Terapkan kualitas yang cocok jika user memilih kualitas tertentu
+          if(cur.quality && cur.quality.toLowerCase() !== "auto" && cur.quality.toLowerCase() !== "best"){
+            var targetQ = cur.quality.toLowerCase();
+            for(var qk=0; qk<hlsVars.length; qk++){
+              if(hlsVars[qk].q.toLowerCase().indexOf(targetQ) >= 0 || targetQ.indexOf(hlsVars[qk].q.toLowerCase()) >= 0){
+                if(hlsVars[qk].levelIdx !== -1){
+                  h.currentLevel = hlsVars[qk].levelIdx;
+                  break;
+                }
               }
             }
           }
-          h.startLoad();
-        }catch(_){}
-        return;
-      }
-      if(d.fatal){
-        if(d.type===Hls.ErrorTypes.NETWORK_ERROR){
-          h._networkRetryCount = (h._networkRetryCount || 0) + 1;
-          if(h._networkRetryCount <= 4){
-            $("pm-status").textContent="mencoba memulihkan koneksi stream ("+h._networkRetryCount+"/4)...";
-            setTimeout(function(){ try{h.startLoad();}catch(_){} }, 600);
-            return;
+        }
+      });
+      h.on(Hls.Events.LEVEL_SWITCHED,function(ev,data){
+        if(cur.res && cur.res.hlsLevels){
+          var curIdx = h.currentLevel;
+          var autoMode = (h.autoLevelEnabled || curIdx === -1);
+          var activeLabel = "AUTO";
+          if(!autoMode){
+            for(var hi=0;hi<cur.res.hlsLevels.length;hi++){
+              if(cur.res.hlsLevels[hi].levelIdx === curIdx){
+                activeLabel = cur.res.hlsLevels[hi].q.toUpperCase();
+                break;
+              }
+            }
           }
-        }else if(d.type===Hls.ErrorTypes.MEDIA_ERROR){
-          h._mediaRetryCount = (h._mediaRetryCount || 0) + 1;
-          if(h._mediaRetryCount <= 3){
-            $("pm-status").textContent="mencoba memulihkan codec media ("+h._mediaRetryCount+"/3)...";
-            setTimeout(function(){ try{h.recoverMediaError();}catch(_){} }, 500);
-            return;
+          var sel=$("pm-quality-select");
+          if(sel && !sel.classList.contains("user-interacting")){
+            sel.value = autoMode ? "Auto" : activeLabel.toLowerCase();
           }
         }
-        $("pm-status").textContent="player error: "+(d.type||"fatal")+" — "+(d.details||"");
-        try{h.destroy();}catch(_){}
-        return;
-      }
-      // Non-fatal: fragLoadError / manifestLoadError / networkError — kalau host
-      // mati (dramahot.top RST), proxy return 502; HLS.js fire ini. Beri pesan
-      // jelas di spinner & stop setelah beberapa retry agar user tidak hang.
-      var n=(h.config&&h.config.fragLoadingMaxRetry)||4;
-      if(d.details==="fragLoadError"||d.details==="manifestLoadError"||d.details==="networkError"){
-        $("pm-status").textContent="gagal load: "+(d.details||"network");
-      }
-    });
-  }else{
-    v.src=isHls?prox:url;
+      });
+      h.loadSource(prox);
+      h.attachMedia(v);
+      h.on(Hls.Events.ERROR,function(ev,d){
+        if(!d)return;
+        if(d.details === Hls.ErrorDetails.BUFFER_STALLED_ERROR || d.details === "bufferStalledError"){
+          // Recovery stall cerdas: periksa apakah player terjebak pada micro-gap buffer
+          try{
+            if(v && v.buffered && v.buffered.length > 0 && !v.paused){
+              var ct = v.currentTime;
+              for(var bi = 0; bi < v.buffered.length; bi++){
+                var bStart = v.buffered.start(bi);
+                if(bStart > ct && (bStart - ct) <= 0.35){
+                  v.currentTime = bStart + 0.05;
+                  v.play().catch(function(){});
+                  return;
+                }
+              }
+            }
+            h.startLoad();
+          }catch(_){}
+          return;
+        }
+        if(d.fatal){
+          if(d.type===Hls.ErrorTypes.NETWORK_ERROR){
+            h._networkRetryCount = (h._networkRetryCount || 0) + 1;
+            if(h._networkRetryCount <= 4){
+              $("pm-status").textContent="mencoba memulihkan koneksi stream ("+h._networkRetryCount+"/4)...";
+              setTimeout(function(){ try{h.startLoad();}catch(_){} }, 600);
+              return;
+            }
+          }else if(d.type===Hls.ErrorTypes.MEDIA_ERROR){
+            h._mediaRetryCount = (h._mediaRetryCount || 0) + 1;
+            if(h._mediaRetryCount <= 3){
+              $("pm-status").textContent="mencoba memulihkan codec media ("+h._mediaRetryCount+"/3)...";
+              setTimeout(function(){ try{h.recoverMediaError();}catch(_){} }, 500);
+              return;
+            }
+          }
+          $("pm-status").textContent="player error: "+(d.type||"fatal")+" — "+(d.details||"");
+          try{h.destroy();}catch(_){}
+          return;
+        }
+        // Non-fatal: fragLoadError / manifestLoadError / networkError — kalau host
+        // mati (dramahot.top RST), proxy return 502; HLS.js fire ini. Beri pesan
+        // jelas di spinner & stop setelah beberapa retry agar user tidak hang.
+        var n=(h.config&&h.config.fragLoadingMaxRetry)||4;
+        if(d.details==="fragLoadError"||d.details==="manifestLoadError"||d.details==="networkError"){
+          $("pm-status").textContent="gagal load: "+(d.details||"network");
+        }
+      });
+    }else{
+      v.src=isHls?prox:url;
+    }
   }
   if(pm.classList.contains("hidden") || (token && cur.playToken !== token)){
     if(window._hls){try{window._hls.destroy();window._hls=null;}catch(e){}}
     if(v){try{v.pause();v.removeAttribute("src");v.load();}catch(e){}}
     return;
   }
-  v.play().catch(function(err){
-    $("pm-spinner").classList.add("hidden");
-    if(err && err.name === "NotAllowedError"){
-      v.muted = true;
-      v.play().catch(function(){});
-    }
-  });
+  if(v && !window.art){
+    v.play().catch(function(err){
+      $("pm-spinner").classList.add("hidden");
+      if(err && err.name === "NotAllowedError"){
+        v.muted = true;
+        v.play().catch(function(){});
+      }
+    });
+  }
   armAutohide();
 }
 function switchQ(q){
@@ -2805,6 +3102,13 @@ function closePlayer(){
   cur.playToken = ++_playTokenCounter;
   TvNavigationManager.hidePlayerControls();
   closeOpenSubtitlesPicker();
+
+  if(window.art){
+    try{
+      window.art.destroy(false);
+      window.art = null;
+    }catch(e){}
+  }
 
   // 2. Safely stop and destroy video & HLS stream
   var v=$("vid");

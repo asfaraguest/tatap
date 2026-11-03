@@ -863,7 +863,8 @@
     <div class="ambient-stage">
       <div id="ambient-fallback" aria-hidden="true"></div>
       <canvas id="ambient" width="96" height="54" aria-hidden="true"></canvas>
-      <video id="vid" controls controlsList="nodownload nofullscreen noremoteplayback" disablePictureInPicture playsinline preload="auto"></video>
+      <div id="artplayer-container" class="artplayer-app"></div>
+      <video id="vid" controls controlsList="nodownload nofullscreen noremoteplayback" disablePictureInPicture playsinline preload="auto" style="display:none"></video>
       <div id="pm-gesture-stage" class="gesture-stage" aria-hidden="true">
         <div id="pm-ripple-left" class="gesture-ripple left"><span class="ripple-icon"><svg class="ui-icon"><use href="#icon-rewind"/></svg></span><span class="ripple-text">-10s</span></div>
         <div id="pm-ripple-right" class="gesture-ripple right"><span class="ripple-icon"><svg class="ui-icon"><use href="#icon-forward"/></svg></span><span class="ripple-text">+10s</span></div>
@@ -945,6 +946,7 @@
 
 <div id="toast" class="toast hidden"><span id="toast-msg"></span></div>
 
+<script src="/js/vendor/artplayer.js"></script>
 <script src="/js/vendor/hls.min.js"></script>
 <script src="/js/api.js"></script>
 <script src="/js/term.js"></script>
