@@ -449,8 +449,7 @@ var TvNavigationManager = (function(){
     var aiM = $("ai-settings-modal");
     if(aiM && !aiM.classList.contains("hidden")){
       if(e) e.preventDefault();
-      if(typeof App !== "undefined" && App.closeAiSettingsModal) App.closeAiSettingsModal();
-      else aiM.classList.add("hidden");
+      closeAiSettingsModal();
       restoreFocusState();
       return true;
     }
@@ -3466,6 +3465,7 @@ function closeUpdateModal(){
 async function openAiSettingsModal(){
   var m = $("ai-settings-modal");
   if(!m) return;
+  if(window.TvNavigationManager) window.TvNavigationManager.setPlayerModalState(true);
   var v = $("vid");
   if(v && !v.paused){
     try { v.pause(); } catch(e){}
@@ -3498,6 +3498,7 @@ async function openAiSettingsModal(){
 function closeAiSettingsModal(){
   var m = $("ai-settings-modal");
   if(m) m.classList.add("hidden");
+  if(window.TvNavigationManager) window.TvNavigationManager.setPlayerModalState(false);
 }
 
 window.openAiSettingsModal = openAiSettingsModal;
@@ -4035,6 +4036,12 @@ function init(){
     window.Tatap.setSetting(payload).then(function(){
       toast("Pengaturan AI Fansub berhasil disimpan!", 2500);
       closeAiSettingsModal();
+      if(!$("player-modal").classList.contains("hidden") && cur.subLang === "Indonesian (AI)"){
+        cur._subPrefetch = null;
+        if(cur.activeSub){
+          switchSubtitleTrack(cur.activeSub, "id");
+        }
+      }
     }).catch(function(err){
       toast("Gagal menyimpan setelan: " + err, 3000);
     });

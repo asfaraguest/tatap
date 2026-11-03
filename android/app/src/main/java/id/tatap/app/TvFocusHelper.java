@@ -1,6 +1,7 @@
 package id.tatap.app;
 
 import android.app.AlertDialog;
+import android.app.Dialog;
 import android.app.UiModeManager;
 import android.content.Context;
 import android.content.DialogInterface;
@@ -146,6 +147,39 @@ public class TvFocusHelper {
                         }
                     }
                 }
+            }
+        };
+
+        if (dialog.isShowing()) {
+            android.view.Window w = dialog.getWindow();
+            if (w != null && w.getDecorView() != null) {
+                w.getDecorView().post(focusAction);
+            } else {
+                focusAction.run();
+            }
+        } else {
+            dialog.setOnShowListener(di -> focusAction.run());
+        }
+        return dialog;
+    }
+
+    /**
+     * Menerapkan fokus otomatis kursor remote D-Pad pada Dialog kustom di Android TV.
+     */
+    public static Dialog applyCustomDialogTvFocus(Dialog dialog) {
+        if (dialog == null) return null;
+        Context context = dialog.getContext();
+        if (!isTv(context)) return dialog;
+
+        Runnable focusAction = () -> {
+            View decor = dialog.getWindow() != null ? dialog.getWindow().getDecorView() : null;
+            View target = dialog.findViewById(R.id.btn_close_ai_dialog);
+            if (target == null || target.getVisibility() != View.VISIBLE) {
+                target = findEditText(decor);
+            }
+            if (target != null && target.getVisibility() == View.VISIBLE) {
+                target.setFocusable(true);
+                target.requestFocus();
             }
         };
 

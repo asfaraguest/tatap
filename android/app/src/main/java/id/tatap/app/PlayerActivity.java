@@ -4224,7 +4224,7 @@ public class PlayerActivity extends Activity {
         b.setNegativeButton("Batal", (dialog, which) -> dialog.dismiss());
         AlertDialog dialog = b.create();
         dialog.setOnDismissListener(d -> restoreSubPickerTvFocus());
-        TvFocusHelper.applyDialogTvFocus(dialog);
+        TvFocusHelper.applyCustomDialogTvFocus(dialog);
         dialog.show();
     }
 
@@ -4695,6 +4695,8 @@ public class PlayerActivity extends Activity {
         if (btnPromptWibu != null) TvFocusHelper.attachFocusScale(btnPromptWibu, 1.05f, 4f);
         if (btnPromptReset != null) TvFocusHelper.attachFocusScale(btnPromptReset, 1.05f, 4f);
 
+        dialog.setOnDismissListener(d -> restoreSubPickerTvFocus());
+        TvFocusHelper.applyCustomDialogTvFocus(dialog);
         dialog.show();
     }
 

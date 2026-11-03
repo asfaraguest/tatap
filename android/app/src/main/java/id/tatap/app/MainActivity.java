@@ -2536,6 +2536,7 @@ public class MainActivity extends Activity {
         if (btnPromptWibu != null) TvFocusHelper.attachFocusScale(btnPromptWibu, 1.05f, 4f);
         if (btnPromptReset != null) TvFocusHelper.attachFocusScale(btnPromptReset, 1.05f, 4f);
 
+        TvFocusHelper.applyCustomDialogTvFocus(dialog);
         dialog.show();
     }
 

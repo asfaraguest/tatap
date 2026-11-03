@@ -56,6 +56,12 @@ Kenaikan digit PATCH diterapkan sesuai kaidah Semantic Versioning 2.0.0 dan Dire
    - Menambahkan penanganan `requestDisallowInterceptTouchEvent` pada `et_ai_custom_prompt` untuk mencegah tersangkutnya gestur gulir sentuh oleh `ScrollView` induk di perangkat layar sentuh.
    - Mengintegrasikan penskalaan visual fokus D-Pad remote Android TV (`TvFocusHelper.attachFocusScale`).
    - Otomatis memicu pemuatan ulang subtitle terjemahan (`applySubtitleSelection(true)`) saat pengguna menyimpan setelan AI Fansub dari dalam pemutar video aktif.
+4. **Live Subtitle Reload & Modal HUD State Machine di Web & Desktop (`frontend/js/app.js`):**
+   - Menambahkan reload otomatis subtitle AI Fansub seketika saat tombol *Simpan & Terapkan* diklik pada modal pengaturan ketika pemutar video aktif.
+   - Mengintegrasikan `TvNavigationManager.setPlayerModalState(true/false)` dan pembersihan `handleBack` agar penekanan tombol Escape menutup modal AI terlebih dahulu tanpa menutup pemutar video.
+5. **Pemulihan Fokus Remote D-Pad pada Dialog AI di Android TV (`TvFocusHelper.java`, `PlayerActivity.java`, `MainActivity.java`):**
+   - Menambahkan `dialog.setOnDismissListener(d -> restoreSubPickerTvFocus())` pada dialog pengaturan AI di `PlayerActivity.java`, mengeliminasi total masalah hilangnya kursor remote D-Pad (*dead cursor*) saat dialog ditutup di Android TV.
+   - Menyediakan metode `TvFocusHelper.applyCustomDialogTvFocus(Dialog)` untuk memfokuskan tombol navigasi awal secara otomatis saat dialog dibuka.
 
 ### Tests
 - Menambahkan test suite `tests/test_custom_prompt.py` untuk menguji pembuatan system prompt dengan instruksi khusus pengguna, prioritas prompt, dan persistensi database settings.
