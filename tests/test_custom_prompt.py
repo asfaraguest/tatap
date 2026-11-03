@@ -35,17 +35,25 @@ def test_fansub_system_prompt_generic_with_custom_prompt():
 @pytest.mark.asyncio
 async def test_custom_prompt_settings_persistence(tmp_path, monkeypatch):
     test_db = str(tmp_path / "test_anime.db")
+    await db_mod.close_db_pool()
     monkeypatch.setattr(db_mod, "DB_PATH", test_db)
+    db_mod._settings_cache.clear()
+    db_mod._settings_cache_loaded = False
     await db_mod.init_db()
 
-    # Default harus string kosong
-    val = await db_mod.get_setting("translate_custom_prompt", "")
-    assert val == ""
+    try:
+        # Default harus string kosong
+        val = await db_mod.get_setting("translate_custom_prompt", "")
+        assert val == ""
 
-    # Simpan custom prompt
-    custom_text = "Gunakan persona santai dan jangan terjemahkan kata 'Senpai'."
-    await db_mod.set_setting("translate_custom_prompt", custom_text)
+        # Simpan custom prompt
+        custom_text = "Gunakan persona santai dan jangan terjemahkan kata 'Senpai'."
+        await db_mod.set_setting("translate_custom_prompt", custom_text)
 
-    # Verifikasi tersimpan
-    val_after = await db_mod.get_setting("translate_custom_prompt", "")
-    assert val_after == custom_text
+        # Verifikasi tersimpan
+        val_after = await db_mod.get_setting("translate_custom_prompt", "")
+        assert val_after == custom_text
+    finally:
+        await db_mod.close_db_pool()
+        db_mod._settings_cache.clear()
+        db_mod._settings_cache_loaded = False
