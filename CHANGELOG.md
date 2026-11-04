@@ -60,8 +60,8 @@ Kenaikan digit PATCH diterapkan sesuai kaidah Semantic Versioning 2.0.0 dan Dire
    - Mengimplementasikan pendeteksi celah mikro (micro-gap $\le 0.35$s) pada event `BUFFER_STALLED_ERROR` yang secara otomatis melompati jeda frame tanpa memaksa user scrubbing seekbar secara manual.
 
 5. **Redesign Total Antarmuka Modal Pengaturan AI Fansub (`frontend/index.html`, `frontend/css/style.css`):**
-   - Mengganti tampilan modal `#ai-settings-modal` yang sebelumnya bergaya form lawas menjadi antarmuka *Cyber Glassmorphism* ultra-modern yang menyatu sempurna (*blend*) dengan kontrol Artplayer dan tema cyberpunk Tatap.
-   - Menggunakan backdrop blur tebal (`blur(28px) saturate(180%)`), kontainer modular cards (`.ai-glass-card`), badge status bercahaya neon cyan (`.ai-cyber-badge`, `.ai-badge-dot`), tombol preset provider dengan ikon SVG minimalis, input password bertema cyber dark, serta textarea custom prompt dengan template instan bergaya tags.
+   - Mengganti tampilan modal `#ai-settings-modal` yang sebelumnya bergaya form lawas menjadi antarmuka cyber modern yang menyatu sempurna (*blend*) dengan kontrol Artplayer dan tema Tatap.
+   - Menggunakan latar belakang gelap konsisten tanpa membebani GPU perangkat berspesifikasi rendah (*Zero Backdrop Blur Tax*), kontainer modular cards (`.ai-glass-card`), badge status bercahaya neon cyan (`.ai-cyber-badge`, `.ai-badge-dot`), tombol preset provider dengan ikon SVG minimalis, input password bertema cyber dark, serta textarea custom prompt dengan template instan bergaya tags.
 
 ### Fixed
 1. **Pencegahan Ketat Subtitle Mismatch / Tertukar dengan Judul Anime Lain (`backend/api/opensubtitles.py`, `backend/api/animetosho.py`, `backend/main.py`, Paritas Chaquopy `android/`):**
@@ -70,11 +70,19 @@ Kenaikan digit PATCH diterapkan sesuai kaidah Semantic Versioning 2.0.0 dan Dire
    - Jika tidak ada kandidat subtitle fansub eksternal ID yang valid cocok, sistem secara otomatis menolak merge salah dan beralih ke Smart GTX+ translate langsung dari teks dialog resmi animenya.
    - Membersihkan entri korup `sub2|os_merge|%` dari database SQLite `subtitle_cache`.
 2. **Perbaikan Web Fullscreen (Fullwebscreen) Menjadi 100vw × 100vh Penuh (`frontend/css/style.css`, `frontend/js/app.js`):**
+   - Mengeliminasi pembatasan tinggi `max-height: calc(96vh - 110px)` dan `border-radius: 8px` warisan container `.ambient-stage video` pada elemen Artplayer `<video class="art-video">`, sehingga video mengisi 100% viewport pemutar secara proporsional tanpa terpotong atau menyisakan celah kosong di mode Web Fullscreen (`100vw` $\times$ `100vh`) maupun monitor fullscreen.
    - Memperbaiki layout `.is-fullscreen-web` pada `#player-modal`, `.player-shell`, `.ambient-stage`, dan `.art-video-player` agar mengisi seluruh jendela browser (`100vw` $\times$ `100vh`) tanpa offset, tanpa border, dan tanpa pergeseran scrollbar.
    - Menambahkan shortcut keyboard `w` / `W` untuk toggle Web Fullscreen secara instan, serta memastikan tombol `Escape` keluar dari Web Fullscreen secara halus tanpa menutup modal pemutar.
 3. **Perbaikan Monitor Fullscreen Sejati (True Fullscreen) & Bridge Native Desktop (`frontend/js/app.js`, `frontend/css/style.css`):**
-   - Memperbaiki fungsi `toggleFullscreen()` agar secara tangguh menyinkronkan state monitor fullscreen dengan bridge Go Windows Portable WebView2 (`window.tatap_set_fullscreen`) dan HTML5 Container Fullscreen Top-Layer pada browser dan Linux.
+   - Memperbaiki fungsi `toggleFullscreen()` dari kondisi *double requestFullscreen race condition*, sehingga menyinkronkan state monitor fullscreen secara tangguh dengan bridge Go Windows Portable WebView2 (`window.tatap_set_fullscreen`) dan HTML5 Container Fullscreen Top-Layer pada browser dan Linux.
    - Shortcut `f` / `F` dan double click kini mengeksekusi monitor fullscreen sejati 1-monitor tanpa window displacement.
+4. **Penanganan Modal Global & Interaktivitas UI (`frontend/js/term.js`, `frontend/index.html`):**
+   - Menambahkan `ai-settings-modal` ke dalam daftar `isModalOpen()` di `frontend/js/term.js`, sehingga penekanan tombol `Escape` maupun shortcut katalog saat modal pengaturan AI terbuka tidak bocor (*key event leak*) ke grid katalog anime di latar belakang.
+   - Menghapus atribut inline `style="display:none;"` dan menyelaraskan penanganan kelas `.hidden` secara bersih di HTML dan CSS untuk mencegah modal terkunci secara tidak sengaja.
+   - Menambahkan parameter *cache-busting* `?v=2.12.7` pada seluruh tag aset script dan stylesheet di `frontend/index.html`.
+5. **Kepatuhan Invarian Arsitektur & Kinerja Rendering Low-End GPU (`frontend/css/style.css`):**
+   - Memulihkan z-index `#resume-modal.overlay { z-index: 160; background: rgba(0,0,0,0.88); }` sesuai test suite `test_interactive_resume_modal_frontend`.
+   - Menghapus penggunaan `backdrop-filter: blur(...)` pada kontrol Artplayer, dropdown selector, in-player toast notice, modal dialog AI, dan toast global demi mematuhi kaidah *Zero Backdrop Blur Tax* untuk stabilitas CPU/GPU perangkat hemat daya.
 4. **Eliminasi UI Tumpang Tindih Pemutar Shell Lama / Player Shell Nyangkut (`frontend/css/style.css`, `frontend/js/app.js`):**
    - Menyembunyikan bar kontrol luar lama (`.player-head`, `.player-foot`, `.player-hint`, `#pm-subs-overlay`, `#pm-gesture-stage`, `#pm-skip-btn`) saat `#player-modal` terbuka, sehingga Artplayer tampil murni 100% cinema mode tanpa sisa kontrol lama yang bertumpuk.
    - Menambahkan header layer Artplayer terintegrasi (`.art-header-layer`) yang memuat judul anime/episode di kiri atas dan tombol tutup sleek (`✕`) di kanan atas yang otomatis bersembunyi saat kursor diam bersama kontrol bawaan Artplayer.

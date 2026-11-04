@@ -210,12 +210,10 @@ body.no-crt #crt{display:none}
 .update-btn{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;background:var(--ok);color:#000000;font-weight:700;font-size:12px;border:none;border-radius:var(--r);cursor:pointer;text-decoration:none;transition:opacity .15s}
 .update-btn:hover{opacity:.88}
 
-/* ---- AI SETTINGS MODAL STYLING (CYBER GLASSMORPHISM) ---- */
+/* ---- AI SETTINGS MODAL STYLING (CYBER DARK) ---- */
 #ai-settings-modal.overlay {
   z-index: 999999 !important;
-  background: radial-gradient(circle at center, rgba(14, 20, 32, 0.94) 0%, rgba(6, 10, 18, 0.98) 100%) !important;
-  backdrop-filter: blur(28px) saturate(180%) !important;
-  -webkit-backdrop-filter: blur(28px) saturate(180%) !important;
+  background: radial-gradient(circle at center, rgba(14, 20, 32, 0.96) 0%, rgba(6, 10, 18, 0.99) 100%) !important;
   align-items: center;
   justify-content: center;
 }
@@ -326,14 +324,13 @@ body.no-crt #crt{display:none}
 }
 
 .ai-glass-card {
-  background: rgba(15, 23, 42, 0.65);
+  background: rgba(15, 23, 42, 0.88);
   border: 1px solid rgba(255, 255, 255, 0.07);
   border-radius: 14px;
   padding: 13px 15px;
   display: flex;
   flex-direction: column;
   gap: 9px;
-  backdrop-filter: blur(12px);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
@@ -586,7 +583,7 @@ body.no-crt #crt{display:none}
 .sub-ai-btn:hover{border-color:var(--accent);color:var(--accent)}
 
 /* ---- RESUME MODAL STYLING ---- */
-#resume-modal.overlay{z-index:99999 !important;background:rgba(0,0,0,0.88)}
+#resume-modal.overlay{z-index:160;background:rgba(0,0,0,0.88)}
 .resume-sheet{width:min(490px,94vw);max-height:86vh;display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-card);padding:20px;gap:14px;box-shadow:0 16px 40px rgba(0,0,0,0.8)}
 .rm-anime-title{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:380px;margin:2px 0 4px}
 .rm-badge-ep{display:inline-block;font-size:10px;font-weight:700;color:var(--accent);background:var(--accent-soft);border:1px solid rgba(56,189,248,0.3);padding:1px 6px;border-radius:4px;margin-right:6px;vertical-align:middle}
@@ -1089,6 +1086,16 @@ button{font-family:inherit}
 .ambient-stage{position:relative;border-radius:10px;border:1px solid rgba(255,255,255,0.08);box-shadow:0 12px 36px rgba(0,0,0,0.75);background:#000;flex:1 1 auto;min-height:0;display:flex;align-items:center;justify-content:center;overflow:hidden;width:100%}
 .ambient-stage.idle{cursor:none}
 .ambient-stage video{position:relative;z-index:2;width:100%;height:auto;max-height:calc(96vh - 110px);aspect-ratio:16/9;background:#000;display:block;border-radius:8px;object-fit:contain}
+.art-video-player .art-video,
+#artplayer-container video {
+  width: 100% !important;
+  height: 100% !important;
+  max-width: 100% !important;
+  max-height: 100% !important;
+  border-radius: 0 !important;
+  aspect-ratio: unset !important;
+  object-fit: contain !important;
+}
 .ambient-stage > video#vid,
 .ambient-stage > video:not(.art-video) {
   display: none !important;
@@ -1284,7 +1291,7 @@ body.mobile-native-sub video::cue {
 .player-foot>.variants{flex:0 1 auto;max-width:55%}
 .player-foot>.sub-picker{flex:0 0 auto}
 .player-hint{margin-top:8px;text-align:center;font-size:clamp(10px,0.3vw + 0.55rem,11px)}
-.toast{position:fixed;bottom:calc(var(--status-h) + 60px);left:50%;transform:translateX(-50%);z-index:999999 !important;background:rgba(15, 23, 42, 0.95) !important;backdrop-filter:blur(16px) !important;border:1px solid rgba(56, 189, 248, 0.45) !important;color:#f1f5f9 !important;box-shadow:0 10px 30px rgba(0,0,0,0.7), 0 0 16px rgba(56,189,248,0.25) !important;padding:9px 18px;border-radius:var(--r);font-size:12.5px;font-weight:600;max-width:92vw;text-align:center}
+.toast{position:fixed;bottom:calc(var(--status-h) + 60px);left:50%;transform:translateX(-50%);z-index:999999 !important;background:rgba(15, 23, 42, 0.96) !important;border:1px solid rgba(56, 189, 248, 0.45) !important;color:#f1f5f9 !important;box-shadow:0 10px 30px rgba(0,0,0,0.7), 0 0 16px rgba(56,189,248,0.25) !important;padding:9px 18px;border-radius:var(--r);font-size:12.5px;font-weight:600;max-width:92vw;text-align:center}
 .toast.hidden{display:none !important}
 
 /* ==================== BREAKPOINTS ==================== */
@@ -1951,19 +1958,17 @@ body.mobile-native-sub video::cue {
   pointer-events: auto !important;
 }
 
-/* Flat Translucent Glassmorphic Artplayer controls */
+/* Flat Translucent Artplayer controls (Zero Backdrop Blur for Low-End GPU) */
 .art-video-player .art-controls {
-  background: rgba(10, 14, 22, 0.72) !important;
-  backdrop-filter: blur(20px) saturate(180%) !important;
-  -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
-  border: 1px solid rgba(255, 255, 255, 0.10) !important;
+  background: rgba(10, 14, 22, 0.92) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
   border-radius: 12px !important;
   margin: 0 16px 14px 16px !important;
   padding: 4px 10px !important;
   height: 48px !important;
   display: flex !important;
   align-items: center !important;
-  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
+  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
 }
 
 .art-video-player .art-controls-left,
@@ -2103,9 +2108,7 @@ body.mobile-native-sub video::cue {
 
 /* Selector Popup Dropdowns (Quality & Subtitle Selection List) */
 .art-control-selector .art-selector-list {
-  background: rgba(10, 14, 22, 0.94) !important;
-  backdrop-filter: blur(22px) saturate(180%) !important;
-  -webkit-backdrop-filter: blur(22px) saturate(180%) !important;
+  background: rgba(10, 14, 22, 0.98) !important;
   border: 1px solid rgba(255, 255, 255, 0.15) !important;
   border-radius: 10px !important;
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.85), inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
@@ -2172,9 +2175,7 @@ body.mobile-native-sub video::cue {
   z-index: 120 !important;
 }
 .art-video-player .art-notice-inner {
-  background: rgba(10, 14, 22, 0.90) !important;
-  backdrop-filter: blur(18px) saturate(180%) !important;
-  -webkit-backdrop-filter: blur(18px) saturate(180%) !important;
+  background: rgba(10, 14, 22, 0.96) !important;
   border: 1px solid rgba(56, 189, 248, 0.45) !important;
   border-radius: 9px !important;
   color: #f8fafc !important;

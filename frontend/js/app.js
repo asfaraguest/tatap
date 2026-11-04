@@ -2304,40 +2304,46 @@ function toggleFullscreen(){
   }
 
   // 2. Jalankan fullscreen pada Artplayer jika aktif
+  var artHandled = false;
   if(window.art){
     try {
       window.art.fullscreen = targetState;
+      artHandled = true;
     } catch(e){
       console.warn("art.fullscreen toggle error:", e);
     }
   }
 
-  // 3. Fallback browser HTML5 requestFullscreen jika browser belum mengubah DOM
-  var stage = document.getElementById("player-modal") || document.querySelector(".ambient-stage");
-  if(targetState){
-    if(!fsEl && stage){
-      var req = stage.requestFullscreen || stage.webkitRequestFullscreen || stage.mozRequestFullScreen || stage.msRequestFullscreen;
-      if(req){
-        try{
-          var p = req.call(stage);
-          if(p && p.catch) p.catch(function(){});
-        }catch(_){}
+  // 3. Fallback browser HTML5 requestFullscreen jika Artplayer belum menangani fullscreen
+  if(!artHandled){
+    var stage = (window.art && window.art.template && window.art.template.$player) || document.getElementById("player-modal") || document.querySelector(".ambient-stage");
+    if(targetState){
+      if(!fsEl && stage){
+        var req = stage.requestFullscreen || stage.webkitRequestFullscreen || stage.mozRequestFullScreen || stage.msRequestFullscreen;
+        if(req){
+          try{
+            var p = req.call(stage);
+            if(p && p.catch) p.catch(function(){});
+          }catch(_){}
+        }
+      }
+    } else {
+      if(fsEl){
+        var exit = document.exitFullscreen || document.webkitExitFullscreen || document.mozCancelFullScreen || document.msExitFullscreen;
+        if(exit){
+          try{
+            var p = exit.call(document);
+            if(p && p.catch) p.catch(function(){});
+          }catch(_){}
+        }
       }
     }
-    var pm = $("player-modal");
-    if(pm) pm.classList.add("is-fullscreen");
-  } else {
-    if(fsEl){
-      var exit = document.exitFullscreen || document.webkitExitFullscreen || document.mozCancelFullScreen || document.msExitFullscreen;
-      if(exit){
-        try{
-          var p = exit.call(document);
-          if(p && p.catch) p.catch(function(){});
-        }catch(_){}
-      }
-    }
-    var pm = $("player-modal");
-    if(pm) pm.classList.remove("is-fullscreen");
+  }
+
+  var pm = $("player-modal");
+  if(pm){
+    if(targetState) pm.classList.add("is-fullscreen");
+    else pm.classList.remove("is-fullscreen");
   }
 
   var stageEl = document.querySelector(".ambient-stage");
