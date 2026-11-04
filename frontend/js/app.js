@@ -35,6 +35,12 @@ function setSubDelay(sec, notify){
     var signStr = val > 0 ? "+" : "";
     window.art.notice.show = "Offset Subtitle: " + signStr + val.toFixed(2) + "s";
   }
+  if(window.art && window.art.setting && window.art.setting.cache && window.art.setting.cache.has("subtitle-delay")){
+    try{
+      var sgn = val > 0 ? "+" : "";
+      window.art.setting.update({ name: "subtitle-delay", tooltip: sgn + val.toFixed(2) + "s" });
+    }catch(_){}
+  }
   if(notify){
     var signStr = val > 0 ? "+" : "";
     toast("Sinkronisasi Subtitle: " + signStr + val.toFixed(2) + " detik", 1500);
@@ -1459,6 +1465,34 @@ function renderVariants(){
     }
   }
   syncArtplayerQuality();
+
+  if(window.art && window.art.setting && cur.res && cur.res.variants && cur.res.variants.length > 1){
+    try{
+      var sList = cur.res.variants.map(function(sv, sidx){
+        return {
+          html: sv.q || ("Server " + (sidx+1)),
+          variant: sv,
+          default: cur.res.picked && cur.res.picked.url === sv.url
+        };
+      });
+      var serverSetting = {
+        name: "stream-server",
+        width: 220,
+        html: "Server Stream",
+        tooltip: (cur.res.picked && cur.res.picked.q) || "Server",
+        selector: sList,
+        onSelect: function(item){
+          switchQ(item.html);
+          return item.html;
+        }
+      };
+      if(window.art.setting.cache && window.art.setting.cache.has("stream-server")){
+        window.art.setting.update(serverSetting);
+      } else {
+        window.art.setting.add(serverSetting);
+      }
+    }catch(_){}
+  }
 }
 
 
@@ -1566,8 +1600,7 @@ function isExactEnglishSubTrack(s){
   return isPureEnglishSubTrack(s)&&(lab==="english"||lab==="english [full]"||lab==="eng");
 }
 
-function syncArtplayerSubtitles(subtitles, activeUrl){
-  if(!window.art || !window.art.setting) return;
+function buildSubtitleControl(subtitles, activeUrl){
   subtitles = subtitles || (cur.res && cur.res.subtitles) || [];
   var trackList = [
     { name: "sub-off", html: "Off (Matikan Subtitle)", value: "", default: !activeUrl }
@@ -1612,6 +1645,54 @@ function syncArtplayerSubtitles(subtitles, activeUrl){
     default: false
   });
 
+  return {
+    name: "sub-control",
+    position: "right",
+    index: 17,
+    style: { marginRight: "4px" },
+    html: '<span class="art-sub-control-btn" title="Pilih Subtitle"><svg style="width:14px;height:14px;vertical-align:middle;margin-right:2px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="2" y="4" width="20" height="16" rx="3"></rect><path d="M7 15h3M14 15h3M7 11h10"></path></svg>SUB</span>',
+    tooltip: "Pilih Subtitle",
+    selector: trackList,
+    onSelect: function(item){
+      var sel = $("pm-subs");
+      if(sel){
+        sel.value = item.value;
+        if(typeof sel.onchange === "function") sel.onchange();
+      } else {
+        switchSubtitleTrack(item.value);
+      }
+      if(window.art && window.art.notice) window.art.notice.show = "Subtitle: " + item.html;
+      return '<span class="art-sub-control-btn" title="Pilih Subtitle"><svg style="width:14px;height:14px;vertical-align:middle;margin-right:2px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="2" y="4" width="20" height="16" rx="3"></rect><path d="M7 15h3M14 15h3M7 11h10"></path></svg>SUB</span>';
+    },
+    mounted: function($control){
+      $control.addEventListener("click", function(e){
+        if(e.target.closest(".art-selector-item")){
+          $control.classList.remove("show");
+          $control.classList.remove("art-selector-show");
+          return;
+        }
+        $control.classList.toggle("show");
+        $control.classList.toggle("art-selector-show");
+      });
+    }
+  };
+}
+
+function syncArtplayerSubtitles(subtitles, activeUrl){
+  if(!window.art) return;
+  subtitles = subtitles || (cur.res && cur.res.subtitles) || [];
+  var subCtrl = buildSubtitleControl(subtitles, activeUrl);
+  var trackList = subCtrl.selector;
+
+  try{
+    if(window.art.controls){
+      if(window.art.controls.cache && window.art.controls.cache.has("sub-control")){
+        window.art.controls.remove("sub-control");
+      }
+      window.art.controls.add(subCtrl);
+    }
+  }catch(_){}
+
   var curActive = trackList.find(function(t){ return t.default; }) || trackList[0];
   var settingItem = {
     name: "subtitle-track",
@@ -1632,10 +1713,12 @@ function syncArtplayerSubtitles(subtitles, activeUrl){
     }
   };
   try{
-    if(window.art.setting.cache && window.art.setting.cache.has("subtitle-track")){
-      window.art.setting.update(settingItem);
-    } else {
-      window.art.setting.add(settingItem);
+    if(window.art.setting){
+      if(window.art.setting.cache && window.art.setting.cache.has("subtitle-track")){
+        window.art.setting.update(settingItem);
+      } else {
+        window.art.setting.add(settingItem);
+      }
     }
     if(window.art.subtitle){
       try { window.art.subtitle.show = !!activeUrl; } catch(_){}
@@ -1646,46 +1729,86 @@ function syncArtplayerSubtitles(subtitles, activeUrl){
   }catch(_){}
 }
 
-function syncArtplayerQuality(levels){
-  if(!window.art) return;
-  levels = levels || (cur.res && cur.res.hlsLevels) || [];
-  if(!levels.length) return;
-  var activeQ = "Auto";
+function buildQualityControl(levels, activeQ){
+  levels = levels || (cur.res && cur.res.hlsLevels && cur.res.hlsLevels.length ? cur.res.hlsLevels : (cur.res && cur.res.variants)) || [];
+  activeQ = activeQ || "Auto";
   if(window._hls && (window._hls.autoLevelEnabled || window._hls.currentLevel === -1)){
     activeQ = "Auto";
-  } else if(window._hls && window._hls.currentLevel >= 0){
+  } else if(window._hls && window._hls.currentLevel >= 0 && levels.length){
     for(var i=0; i<levels.length; i++){
       if(levels[i].levelIdx === window._hls.currentLevel){
         activeQ = levels[i].q; break;
       }
     }
+  } else if(cur.res && cur.res.picked && cur.res.picked.q){
+    activeQ = cur.res.picked.q;
   }
-  var selList = levels.map(function(l){
-    return {
-      html: l.q,
-      levelIdx: l.levelIdx,
-      default: l.q.toLowerCase() === activeQ.toLowerCase()
-    };
-  });
 
-  var qualityControl = {
+  var selList = [];
+  if(levels && levels.length > 0){
+    selList = levels.map(function(l, lidx){
+      var label = l.q || (l.height ? (l.height + "p") : ("Level " + (lidx + 1)));
+      return {
+        html: label,
+        levelIdx: l.levelIdx !== undefined ? l.levelIdx : lidx,
+        default: label.toLowerCase() === activeQ.toLowerCase()
+      };
+    });
+  } else {
+    selList = [{ html: "Auto", levelIdx: -1, default: true }];
+  }
+
+  return {
     name: "quality",
     position: "right",
     index: 18,
-    style: { marginRight: "6px" },
-    html: '<span id="art-quality-label" style="font-weight:700;font-size:11px;background:rgba(255,255,255,0.12);padding:2px 8px;border-radius:4px;border:1px solid rgba(255,255,255,0.2);cursor:pointer;" title="Pilih Resolusi Video">' + activeQ.toUpperCase() + '</span>',
+    style: { marginRight: "4px" },
+    html: '<span class="art-quality-label">' + activeQ.toUpperCase() + '</span>',
+    tooltip: "Pilih Resolusi Video",
     selector: selList,
     onSelect: function(item){
       switchQ(item.html);
-      if(window.art && window.art.notice) window.art.notice.show = "Kualitas: " + item.html;
-      return item.html;
+      if(window.art && window.art.notice) window.art.notice.show = "Resolusi: " + item.html;
+      return '<span class="art-quality-label">' + item.html.toUpperCase() + '</span>';
+    },
+    mounted: function($control){
+      $control.addEventListener("click", function(e){
+        if(e.target.closest(".art-selector-item")){
+          $control.classList.remove("show");
+          $control.classList.remove("art-selector-show");
+          return;
+        }
+        $control.classList.toggle("show");
+        $control.classList.toggle("art-selector-show");
+      });
     }
   };
+}
+
+function syncArtplayerQuality(levels){
+  if(!window.art) return;
+  levels = levels || (cur.res && cur.res.hlsLevels && cur.res.hlsLevels.length ? cur.res.hlsLevels : (cur.res && cur.res.variants)) || [];
+  
+  var activeQ = "Auto";
+  if(window._hls && (window._hls.autoLevelEnabled || window._hls.currentLevel === -1)){
+    activeQ = "Auto";
+  } else if(window._hls && window._hls.currentLevel >= 0 && levels.length){
+    for(var i=0; i<levels.length; i++){
+      if(levels[i].levelIdx === window._hls.currentLevel){
+        activeQ = levels[i].q; break;
+      }
+    }
+  } else if(cur.res && cur.res.picked && cur.res.picked.q){
+    activeQ = cur.res.picked.q;
+  }
+
+  var qualityControl = buildQualityControl(levels, activeQ);
 
   try{
-    if(window.art.controls && window.art.controls.quality){
-      window.art.controls.update(qualityControl);
-    } else if(window.art.controls && typeof window.art.controls.add === "function"){
+    if(window.art.controls){
+      if(window.art.controls.cache && window.art.controls.cache.has("quality")){
+        window.art.controls.remove("quality");
+      }
       window.art.controls.add(qualityControl);
     }
   }catch(_){}
@@ -1696,10 +1819,10 @@ function syncArtplayerQuality(levels){
       width: 220,
       html: "Kualitas Video",
       tooltip: activeQ.toUpperCase(),
-      selector: selList,
+      selector: qualityControl.selector,
       onSelect: function(item){
         switchQ(item.html);
-        if(window.art && window.art.notice) window.art.notice.show = "Kualitas: " + item.html;
+        if(window.art && window.art.notice) window.art.notice.show = "Resolusi: " + item.html;
         return item.html;
       }
     };
@@ -1709,6 +1832,37 @@ function syncArtplayerQuality(levels){
       window.art.setting.add(qualitySetting);
     }
   }catch(_){}
+}
+
+function syncTranslateBtn(){
+  if(!window.art || !window.art.controls) return;
+  var trControl = {
+    name: "tr-btn",
+    position: "right",
+    index: 19,
+    style: { marginRight: "4px" },
+    html: '<span class="art-tr-btn' + (cur.translate ? ' active' : '') + '" title="Terjemahan Bahasa Indonesia (ID)">TR-ID</span>',
+    tooltip: cur.translate ? "Terjemahan Indonesia: Aktif" : "Terjemahan Indonesia: Nonaktif",
+    click: function(){
+      setTranslate(!cur.translate);
+    }
+  };
+  try{
+    if(window.art.controls.cache && window.art.controls.cache.has("tr-btn")){
+      window.art.controls.remove("tr-btn");
+    }
+    window.art.controls.add(trControl);
+  }catch(_){}
+
+  if(window.art.setting && window.art.setting.cache && window.art.setting.cache.has("subtitle-translate")){
+    try{
+      window.art.setting.update({
+        name: "subtitle-translate",
+        tooltip: cur.translate ? "Aktif" : "Nonaktif",
+        switch: !!cur.translate
+      });
+    }catch(_){}
+  }
 }
 
 function renderSubtitles(subtitles, activeUrl){
@@ -2795,6 +2949,10 @@ function playUrl(url,referrer,sub,subRef,resumeTime,token){
     }
     artContainer.innerHTML = "";
     var epTitle = (cur.title || "") + (cur.ep ? (" - Episode " + cur.ep) : "");
+    var initialSubCtrl = buildSubtitleControl((cur.res && cur.res.subtitles) || [], validSub);
+    var initialQualityCtrl = buildQualityControl((cur.res && cur.res.hlsLevels) || (cur.res && cur.res.variants), cur.quality || "Auto");
+    var initialSubLabel = (initialSubCtrl.selector.find(function(t){ return t.default; }) || {}).html || "Off";
+
     var art = new Artplayer({
       container: artContainer,
       url: prox,
@@ -2807,7 +2965,7 @@ function playUrl(url,referrer,sub,subRef,resumeTime,token){
       autoplay: true,
       autoSize: false,
       autoMini: false,
-      screenshot: false,
+      screenshot: true,
       setting: true,
       loop: false,
       flip: true,
@@ -2825,6 +2983,32 @@ function playUrl(url,referrer,sub,subRef,resumeTime,token){
       theme: "#38bdf8",
       lang: "id",
       settings: [
+        {
+          name: "subtitle-track",
+          width: 290,
+          html: "Pilih Subtitle",
+          tooltip: initialSubLabel,
+          selector: initialSubCtrl.selector,
+          onSelect: function(item){
+            var sel = $("pm-subs");
+            if(sel){ sel.value = item.value; if(typeof sel.onchange === "function") sel.onchange(); }
+            else switchSubtitleTrack(item.value);
+            if(window.art && window.art.notice) window.art.notice.show = "Subtitle: " + item.html;
+            return item.html;
+          }
+        },
+        {
+          name: "video-quality",
+          width: 220,
+          html: "Kualitas Video",
+          tooltip: (cur.quality || "Auto").toUpperCase(),
+          selector: initialQualityCtrl.selector,
+          onSelect: function(item){
+            switchQ(item.html);
+            if(window.art && window.art.notice) window.art.notice.show = "Resolusi: " + item.html;
+            return item.html;
+          }
+        },
         {
           name: "subtitle-size",
           width: 220,
@@ -2912,17 +3096,16 @@ function playUrl(url,referrer,sub,subRef,resumeTime,token){
           tooltip: "Episode Berikutnya (n)",
           click: function(){ stepEp(1); }
         },
+        initialSubCtrl,
+        initialQualityCtrl,
         {
-          name: "quality",
+          name: "tr-btn",
           position: "right",
-          index: 18,
-          style: { marginRight: "6px" },
-          html: '<span id="art-quality-label" style="font-weight:700;font-size:11px;background:rgba(255,255,255,0.12);padding:2px 8px;border-radius:4px;border:1px solid rgba(255,255,255,0.2);cursor:pointer;" title="Pilih Resolusi Video">AUTO</span>',
-          tooltip: "Pilih Resolusi Video",
-          click: function(){
-            var sel = $("pm-quality-select");
-            if(sel) sel.click();
-          }
+          index: 19,
+          style: { marginRight: "4px" },
+          html: '<span class="art-tr-btn' + (cur.translate ? ' active' : '') + '" title="Terjemahan Bahasa Indonesia (ID)">TR-ID</span>',
+          tooltip: cur.translate ? "Terjemahan Indonesia: Aktif" : "Terjemahan Indonesia: Nonaktif",
+          click: function(){ setTranslate(!cur.translate); }
         },
         {
           name: "mpv-btn",
@@ -3064,6 +3247,36 @@ function playUrl(url,referrer,sub,subRef,resumeTime,token){
                 }
                 if(selectedIdx !== -1) h.audioTrack = selectedIdx;
                 else if(h.audioTrack === -1 || h.audioTrack === undefined) h.audioTrack = 0;
+
+                if(data.audioTracks.length > 1 && artInstance && artInstance.setting){
+                  var aList = data.audioTracks.map(function(trk, ti){
+                    return {
+                      html: trk.name || trk.lang || ("Audio " + (ti+1)),
+                      trackIdx: ti,
+                      default: ti === (selectedIdx !== -1 ? selectedIdx : 0)
+                    };
+                  });
+                  var activeAudioName = (data.audioTracks[h.audioTrack] && (data.audioTracks[h.audioTrack].name || data.audioTracks[h.audioTrack].lang)) || "Audio";
+                  try{
+                    var audioSettingItem = {
+                      name: "audio-track",
+                      width: 220,
+                      html: "Trek Audio (Sulih Suara)",
+                      tooltip: activeAudioName,
+                      selector: aList,
+                      onSelect: function(item){
+                        h.audioTrack = item.trackIdx;
+                        toast("Trek Audio: " + item.html);
+                        return item.html;
+                      }
+                    };
+                    if(artInstance.setting.cache && artInstance.setting.cache.has("audio-track")){
+                      artInstance.setting.update(audioSettingItem);
+                    } else {
+                      artInstance.setting.add(audioSettingItem);
+                    }
+                  }catch(_){}
+                }
               }
             });
             h.on(Hls.Events.MANIFEST_PARSED, function(ev, data){
@@ -3227,6 +3440,8 @@ function playUrl(url,referrer,sub,subRef,resumeTime,token){
     syncSubSize();
     updatePrevNext();
     syncArtplayerSubtitles((cur.res && cur.res.subtitles) || [], cur.activeSub);
+    syncArtplayerQuality();
+    syncTranslateBtn();
 
     art.once("video:canplay", function(){
       $("pm-spinner").classList.add("hidden");
@@ -3467,6 +3682,7 @@ function switchQ(q){
         }
         if(cur.res.picked) cur.res.picked.q = hl.q;
         renderVariants();
+        syncArtplayerQuality();
         return;
       }
     }
@@ -3474,11 +3690,12 @@ function switchQ(q){
 
   // 2. Fallback: reload varian URL jika bukan live multi-level HLS.js
   if(!cur.res||!cur.res.variants)return;
-  var curTime = ($("vid") && $("vid").currentTime) || 0;
+  var curTime = (window.art && !isNaN(window.art.currentTime)) ? window.art.currentTime : (($("vid") && $("vid").currentTime) || 0);
   for(var i=0;i<cur.res.variants.length;i++){
     if(cur.res.variants[i].q.toLowerCase()===qLow){
       cur.res.picked=cur.res.variants[i];
       renderVariants();
+      syncArtplayerQuality();
       var validFallbackSub = (cur.res && cur.res.sub && typeof cur.res.sub === "string" && !/^\d+$/.test(cur.res.sub.trim())) ? cur.res.sub : null;
       playUrl(cur.res.variants[i].url,cur.res.referer,cur.activeSub||validFallbackSub,cur.res.referer,curTime);
       toast("Resolusi: "+cur.res.variants[i].q.toUpperCase());
@@ -4109,6 +4326,9 @@ function setSubSize(sz){
   cur.subSize=sz;
   try{localStorage.setItem("tatap_subsize",sz);}catch(e){}
   syncSubSize();
+  if(window.art && window.art.setting && window.art.setting.cache && window.art.setting.cache.has("subtitle-size")){
+    try{ window.art.setting.update({ name: "subtitle-size", tooltip: sz.toUpperCase() }); }catch(_){}
+  }
 }
 
 function syncTranslate(){
@@ -4131,6 +4351,8 @@ function setTranslate(on){
     }
   }
   renderSubtitles(subs, cur.activeSub);
+  syncArtplayerSubtitles(subs, cur.activeSub);
+  syncTranslateBtn();
   toast("Translate: "+(cur.translate?"ON":"OFF"));
 }
 

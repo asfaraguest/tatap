@@ -101,6 +101,10 @@ Kenaikan digit PATCH diterapkan sesuai kaidah Semantic Versioning 2.0.0 dan Dire
    - Menjeda (`pause`) video web secara otomatis saat MPV eksternal diluncurkan untuk mencegah tabrakan audio ganda (*dual-audio*).
    - Menyelaraskan opacity tombol Prev/Next pada bar kontrol Artplayer sesuai ketersediaan episode.
    - Menjamin isolasi DOM tanpa kebocoran memori saat berganti episode via pembersihan `art.destroy(true)` dan pembersihan container.
+8. **Migrasi Penuh Fungsi HTML5 Player ke Native Artplayer, Eliminasi Efek Vignette, & Opsi Resolusi Interaktif (`frontend/js/app.js`, `frontend/css/style.css`):**
+   - Menghilangkan total efek vignette / gradien hitam di bagian bawah video (`.art-bottom`, `.art-bottom-gradient`) agar subtitle 100% jernih, kontras, dan tidak tertutupi bayangan hitam.
+   - Menghadirkan tombol opsi resolusi (`quality`) interaktif pada bar kontrol dan menu Setting Artplayer lengkap dengan pop-up selector (Auto, 1080p, 720p, 480p, 360p) yang langsung terhubung ke multi-level HLS.js dan varian stream.
+   - Memigrasikan seluruh fitur player bawaan ke kontrol native Artplayer: pemilih track subtitle cepat (CC dropdown), toggle terjemahan ID (TR-ID), kustomisasi delay dan ukuran subtitle, seleksi trek audio ganda (Sub vs Dub), penangkapan tangkapan layar (screenshot native), rasio aspek, flip, mini progress bar, dan tombol MPV/AI Fansub.
 
 ### Tests
 - Menambahkan test suite `tests/test_custom_prompt.py` untuk menguji pembuatan system prompt dengan instruksi khusus pengguna, prioritas prompt, dan persistensi database settings.
