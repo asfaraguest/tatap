@@ -59,8 +59,23 @@ Kenaikan digit PATCH diterapkan sesuai kaidah Semantic Versioning 2.0.0 dan Dire
    - Memperluas durasi buffer: `maxBufferLength: 60s`, `maxMaxBufferLength: 120s`, `maxBufferSize: 60MB`, dan `startBufferDuration: 2s`.
    - Mengimplementasikan pendeteksi celah mikro (micro-gap $\le 0.35$s) pada event `BUFFER_STALLED_ERROR` yang secara otomatis melompati jeda frame tanpa memaksa user scrubbing seekbar secara manual.
 
+5. **Redesign Total Antarmuka Modal Pengaturan AI Fansub (`frontend/index.html`, `frontend/css/style.css`):**
+   - Mengganti tampilan modal `#ai-settings-modal` yang sebelumnya bergaya form lawas menjadi antarmuka *Cyber Glassmorphism* ultra-modern yang menyatu sempurna (*blend*) dengan kontrol Artplayer dan tema cyberpunk Tatap.
+   - Menggunakan backdrop blur tebal (`blur(28px) saturate(180%)`), kontainer modular cards (`.ai-glass-card`), badge status bercahaya neon cyan (`.ai-cyber-badge`, `.ai-badge-dot`), tombol preset provider dengan ikon SVG minimalis, input password bertema cyber dark, serta textarea custom prompt dengan template instan bergaya tags.
+
 ### Fixed
-1. **Eliminasi UI Tumpang Tindih Pemutar Shell Lama / Player Shell Nyangkut (`frontend/css/style.css`, `frontend/js/app.js`):**
+1. **Pencegahan Ketat Subtitle Mismatch / Tertukar dengan Judul Anime Lain (`backend/api/opensubtitles.py`, `backend/api/animetosho.py`, `backend/main.py`, Paritas Chaquopy `android/`):**
+   - Menambahkan fungsi validasi kesamaan token judul `is_accurate_sub_title_match()` dan `_title_similarity()` dengan ambang batas kesamaan $\ge 0.70$ pada pencarian OpenSubtitles dan AnimeTosho.
+   - Mengeliminasi bug pemilihan kandidat salah (misalnya anime *No Game, No Life* ep 5 yang sebelumnya mencocokkan *My Next Life as a Villainess* akibat kemiripan parsial kata "life").
+   - Jika tidak ada kandidat subtitle fansub eksternal ID yang valid cocok, sistem secara otomatis menolak merge salah dan beralih ke Smart GTX+ translate langsung dari teks dialog resmi animenya.
+   - Membersihkan entri korup `sub2|os_merge|%` dari database SQLite `subtitle_cache`.
+2. **Perbaikan Web Fullscreen (Fullwebscreen) Menjadi 100vw × 100vh Penuh (`frontend/css/style.css`, `frontend/js/app.js`):**
+   - Memperbaiki layout `.is-fullscreen-web` pada `#player-modal`, `.player-shell`, `.ambient-stage`, dan `.art-video-player` agar mengisi seluruh jendela browser (`100vw` $\times$ `100vh`) tanpa offset, tanpa border, dan tanpa pergeseran scrollbar.
+   - Menambahkan shortcut keyboard `w` / `W` untuk toggle Web Fullscreen secara instan, serta memastikan tombol `Escape` keluar dari Web Fullscreen secara halus tanpa menutup modal pemutar.
+3. **Perbaikan Monitor Fullscreen Sejati (True Fullscreen) & Bridge Native Desktop (`frontend/js/app.js`, `frontend/css/style.css`):**
+   - Memperbaiki fungsi `toggleFullscreen()` agar secara tangguh menyinkronkan state monitor fullscreen dengan bridge Go Windows Portable WebView2 (`window.tatap_set_fullscreen`) dan HTML5 Container Fullscreen Top-Layer pada browser dan Linux.
+   - Shortcut `f` / `F` dan double click kini mengeksekusi monitor fullscreen sejati 1-monitor tanpa window displacement.
+4. **Eliminasi UI Tumpang Tindih Pemutar Shell Lama / Player Shell Nyangkut (`frontend/css/style.css`, `frontend/js/app.js`):**
    - Menyembunyikan bar kontrol luar lama (`.player-head`, `.player-foot`, `.player-hint`, `#pm-subs-overlay`, `#pm-gesture-stage`, `#pm-skip-btn`) saat `#player-modal` terbuka, sehingga Artplayer tampil murni 100% cinema mode tanpa sisa kontrol lama yang bertumpuk.
    - Menambahkan header layer Artplayer terintegrasi (`.art-header-layer`) yang memuat judul anime/episode di kiri atas dan tombol tutup sleek (`✕`) di kanan atas yang otomatis bersembunyi saat kursor diam bersama kontrol bawaan Artplayer.
 2. **Sinkronisasi Waktu Subtitle & Eliminasi Duplikasi Video ID pada Artplayer (`frontend/js/app.js`, `frontend/css/style.css`):**

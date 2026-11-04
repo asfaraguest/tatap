@@ -2289,55 +2289,60 @@ function syncNativeTextTrack(vttText, cues, langCode){
   }
 }
 function toggleFullscreen(){
+  var fsEl = document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement;
+  var isFs = !!fsEl || (window.art && window.art.fullscreen) || (window._isTatapDesktopFs === true);
+  var targetState = !isFs;
+
+  // 1. Sinkronkan ke native Go WebView2 jika ada (Windows Portable)
+  window._isTatapDesktopFs = targetState;
+  if(typeof window.tatap_set_fullscreen === "function"){
+    try{ window.tatap_set_fullscreen(targetState); }catch(_){}
+  }
+
+  // 2. Jalankan fullscreen pada Artplayer jika aktif
   if(window.art){
     try {
-      window.art.fullscreen = !window.art.fullscreen;
-      return;
-    } catch(e){}
-  }
-  var v=$("vid");
-  var stage=document.querySelector(".ambient-stage");
-  var fsEl=document.fullscreenElement||document.webkitFullscreenElement||document.mozFullScreenElement||document.msFullscreenElement;
-  var isVideoFs=(v&&v.webkitDisplayingFullscreen);
-
-  if(fsEl||isVideoFs){
-    if(document.exitFullscreen){
-      try{document.exitFullscreen().catch(function(){});}catch(e){}
-    }else if(document.webkitExitFullscreen){
-      try{document.webkitExitFullscreen();}catch(e){}
-    }else if(document.mozCancelFullScreen){
-      try{document.mozCancelFullScreen();}catch(e){}
-    }else if(document.msExitFullscreen){
-      try{document.msExitFullscreen();}catch(e){}
-    }
-    if(v&&v.webkitExitFullscreen&&v.webkitDisplayingFullscreen){
-      try{v.webkitExitFullscreen();}catch(e){}
-    }
-    if(typeof window.tatap_set_fullscreen === "function"){
-      try{ window.tatap_set_fullscreen(false); }catch(_){}
-    }
-    return;
-  }
-
-  // iOS Safari video native fullscreen
-  if(v&&v.webkitEnterFullscreen&&(!stage||!stage.requestFullscreen)){
-    try{
-      v.webkitEnterFullscreen();
-      return;
-    }catch(err){
-      console.warn("webkitEnterFullscreen error:",err);
+      window.art.fullscreen = targetState;
+    } catch(e){
+      console.warn("art.fullscreen toggle error:", e);
     }
   }
 
-  var enterVideoFs=function(){
-    if(!v)return;
-    if(v.requestFullscreen){
-      try{v.requestFullscreen().catch(function(){if(v.webkitEnterFullscreen)v.webkitEnterFullscreen();});}catch(e){if(v.webkitEnterFullscreen)v.webkitEnterFullscreen();}
-    }else if(v.webkitRequestFullscreen){
-      try{v.webkitRequestFullscreen();}catch(e){if(v.webkitEnterFullscreen)v.webkitEnterFullscreen();}
-    }else if(v.mozRequestFullScreen){
-      try{v.mozRequestFullScreen();}catch(e){}
-    }else if(v.msRequestFullscreen){
+  // 3. Fallback browser HTML5 requestFullscreen jika browser belum mengubah DOM
+  var stage = document.getElementById("player-modal") || document.querySelector(".ambient-stage");
+  if(targetState){
+    if(!fsEl && stage){
+      var req = stage.requestFullscreen || stage.webkitRequestFullscreen || stage.mozRequestFullScreen || stage.msRequestFullscreen;
+      if(req){
+        try{
+          var p = req.call(stage);
+          if(p && p.catch) p.catch(function(){});
+        }catch(_){}
+      }
+    }
+    var pm = $("player-modal");
+    if(pm) pm.classList.add("is-fullscreen");
+  } else {
+    if(fsEl){
+      var exit = document.exitFullscreen || document.webkitExitFullscreen || document.mozCancelFullScreen || document.msExitFullscreen;
+      if(exit){
+        try{
+          var p = exit.call(document);
+          if(p && p.catch) p.catch(function(){});
+        }catch(_){}
+      }
+    }
+    var pm = $("player-modal");
+    if(pm) pm.classList.remove("is-fullscreen");
+  }
+
+  var stageEl = document.querySelector(".ambient-stage");
+  if(stageEl){
+    if(targetState) stageEl.classList.add("is-fullscreen");
+    else stageEl.classList.remove("is-fullscreen");
+  }
+  syncFullscreenSubtitles();
+}
       try{v.msRequestFullscreen();}catch(e){}
     }else if(v.webkitEnterFullscreen){
       try{v.webkitEnterFullscreen();}catch(e){}
@@ -3455,8 +3460,14 @@ function playUrl(url,referrer,sub,subRef,resumeTime,token){
 
     // Monitor Fullscreen Handler terintegrasi dengan launcher Windows Portable (1 Monitor)
     art.on("fullscreen", function(state){
+      window._isTatapDesktopFs = !!state;
       if(typeof window.tatap_set_fullscreen === "function"){
         try{ window.tatap_set_fullscreen(state); }catch(_){}
+      }
+      var pm = $("player-modal");
+      if(pm){
+        if(state) pm.classList.add("is-fullscreen");
+        else pm.classList.remove("is-fullscreen");
       }
       var stageEl = document.querySelector(".ambient-stage");
       if(stageEl){
@@ -3467,11 +3478,17 @@ function playUrl(url,referrer,sub,subRef,resumeTime,token){
     });
 
     art.on("fullscreenWeb", function(state){
+      var pm = $("player-modal");
+      if(pm){
+        if(state) pm.classList.add("is-fullscreen-web");
+        else pm.classList.remove("is-fullscreen-web");
+      }
       var stageEl = document.querySelector(".ambient-stage");
       if(stageEl){
         if(state) stageEl.classList.add("is-fullscreen-web");
         else stageEl.classList.remove("is-fullscreen-web");
       }
+      document.body.classList.toggle("is-webfs-locked", !!state);
       syncFullscreenSubtitles();
     });
 
@@ -3854,6 +3871,19 @@ function closePlayer(){
   $("pm-spinner").classList.add("hidden");
 
   // 4. Exit fullscreen safely if active
+  if(window.art){
+    try{
+      if(window.art.fullscreenWeb) window.art.fullscreenWeb = false;
+      if(window.art.fullscreen) window.art.fullscreen = false;
+    }catch(_){}
+  }
+  window._isTatapDesktopFs = false;
+  var pm = $("player-modal");
+  if(pm){
+    pm.classList.remove("is-fullscreen");
+    pm.classList.remove("is-fullscreen-web");
+  }
+  document.body.classList.remove("is-webfs-locked");
   if(document.fullscreenElement || document.webkitFullscreenElement){
     try{
       if(document.exitFullscreen) document.exitFullscreen();
@@ -4195,6 +4225,14 @@ function onKeyPlayer(e){
       // Fullscreen will be closed natively by browser, keep player modal open
       return;
     }
+    if(window.art && window.art.fullscreenWeb){
+      window.art.fullscreenWeb = false;
+      return;
+    }
+    if(window._isTatapDesktopFs){
+      toggleFullscreen();
+      return;
+    }
     if(TvNavigationManager.handleBack(e)) return;
     if(!$("player-modal").classList.contains("hidden"))closePlayer();
     else if(!$("title-modal").classList.contains("hidden"))closeTitle();
@@ -4340,6 +4378,12 @@ function onKeyPlayer(e){
       try { document.activeElement.blur(); } catch(_){}
     }
     toggleFullscreen();
+  }
+  else if(e.key==="w"||e.key==="W"){
+    e.preventDefault();
+    if(window.art){
+      window.art.fullscreenWeb = !window.art.fullscreenWeb;
+    }
   }
   else if(e.key==="n"||e.key==="N"){e.preventDefault();stepEp(1);}
   else if(e.key==="p"||e.key==="P"){e.preventDefault();stepEp(-1);}

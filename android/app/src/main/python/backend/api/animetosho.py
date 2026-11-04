@@ -174,6 +174,11 @@ def search_animetosho_indonesian(title: str, slug: str = "", ep: int = 1, season
                 # Lewati rilis yang nomor episodenya tidak cocok
                 continue
 
+            # Verifikasi ketat kecocokan judul anime agar subtitle tidak tertukar
+            from api.opensubtitles import is_accurate_sub_title_match
+            if not any(is_accurate_sub_title_match(c_title, t_title) for c_title in clean_titles):
+                continue
+
             v_url = f"https://animetosho.net/view/{t_id}"
             v_html_bytes = _http_get_raw(v_url, timeout=6.0)
             if not v_html_bytes:

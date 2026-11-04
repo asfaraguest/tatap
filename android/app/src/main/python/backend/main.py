@@ -3022,6 +3022,7 @@ async def _opensubtitles_merge_sub_job(
         search_opensubtitles,
         download_opensubtitle_text,
         strip_opensubtitles_ads,
+        is_accurate_sub_title_match,
     )
 
     loop = asyncio.get_running_loop()
@@ -3089,8 +3090,14 @@ async def _opensubtitles_merge_sub_job(
                     None,
                     lambda: search_opensubtitles(title=title, slug=slug, ep=ep, lang="id"),
                 )
-                id_os_cands = [c for c in os_cands if (c.get("lang") or "").lower() in ("id", "ind", "indonesian")]
-                if id_os_cands:
+                id_os_cands = [
+                    c for c in os_cands
+                    if (c.get("lang") or "").lower() in ("id", "ind", "indonesian")
+                    and is_accurate_sub_title_match(title or slug, c.get("filename", ""))
+                ]
+                if not id_os_cands and os_cands:
+                    log_translate(f"[Smart Fansub & Merge] Melewati kandidat OpenSubtitles karena tidak cocok dengan judul '{title}'")
+                elif id_os_cands:
                     picked_cand = id_os_cands[0]
                     raw_txt = await loop.run_in_executor(
                         None,
@@ -3176,7 +3183,7 @@ async def api_search_external_subtitles(
     """Cari daftar subtitle khusus Bahasa Indonesia yang tersedia di AnimeTosho dan OpenSubtitles."""
     try:
         from api.animetosho import search_animetosho_indonesian
-        from api.opensubtitles import search_opensubtitles
+        from api.opensubtitles import search_opensubtitles, is_accurate_sub_title_match
         loop = asyncio.get_running_loop()
 
         at_task = loop.run_in_executor(None, lambda: search_animetosho_indonesian(title=title, slug=slug, ep=ep, season=season or 1))
@@ -3189,8 +3196,9 @@ async def api_search_external_subtitles(
         if isinstance(os_items, list):
             for it in os_items:
                 if (it.get("lang") or "id").lower() in ("id", "ind", "indonesian"):
-                    it["source"] = "OpenSubtitles"
-                    items.append(it)
+                    if not title or is_accurate_sub_title_match(title or slug, it.get("filename", "")):
+                        it["source"] = "OpenSubtitles"
+                        items.append(it)
 
         return ok({"items": items, "count": len(items), "title": title, "slug": slug, "ep": ep})
     except Exception as e:

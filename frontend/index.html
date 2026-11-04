@@ -502,70 +502,85 @@
 <!-- AI SETTINGS MODAL DIALOG -->
 <div id="ai-settings-modal" class="overlay hidden" role="dialog" aria-modal="true">
   <div class="sheet ai-settings-sheet">
-    <div class="sheet-head">
+    <div class="sheet-head ai-sheet-head">
       <div>
-        <div class="eyebrow">KECERDASAN BUATAN &amp; SUBTITLE</div>
-        <h2>Pengaturan AI Fansub</h2>
-        <div class="dim small">BYOK (Bring Your Own Key) &amp; Custom Fansub Prompt</div>
+        <div class="ai-cyber-badge"><span class="ai-badge-dot"></span> AI FANSUB ENGINE</div>
+        <h2>Pengaturan AI Fansub &amp; Terjemahan</h2>
+        <div class="dim small">BYOK (Bring Your Own Key) &amp; Custom Translation Persona</div>
       </div>
-      <button class="icon-btn big" id="ai-modal-close" title="Tutup (Esc)"><svg class="ui-icon"><use href="#icon-close"/></svg></button>
+      <button class="icon-btn big ai-modal-close-btn" id="ai-modal-close" title="Tutup (Esc)"><svg class="ui-icon"><use href="#icon-close"/></svg></button>
     </div>
     <div class="ai-settings-body">
       <!-- Status Card -->
-      <div class="ai-status-card">
+      <div class="ai-glass-card ai-status-card">
         <div class="ai-status-row">
           <span class="ai-status-label">Status Provider:</span>
           <span id="ai-status-prov" class="badge-status">Memeriksa…</span>
         </div>
         <div class="ai-status-row">
           <span class="ai-status-label">Model Aktif:</span>
-          <span id="ai-status-model" class="dim">gemini-2.0-flash</span>
+          <span id="ai-status-model" class="ai-model-tag">gemini-2.0-flash</span>
         </div>
       </div>
 
       <!-- Provider Preset Buttons -->
-      <div class="ai-field-group">
-        <label class="ai-field-label">Preset Provider AI Cepat:</label>
+      <div class="ai-glass-card">
+        <label class="ai-field-label">Pilih Template Provider AI Cepat:</label>
         <div class="ai-presets-row">
-          <button type="button" class="btn-preset" data-provider="gemini">Google Gemini</button>
-          <button type="button" class="btn-preset" data-provider="groq">Groq (Llama 3)</button>
-          <button type="button" class="btn-preset" data-provider="ollama">Ollama Cloud</button>
-          <button type="button" class="btn-preset" data-provider="openai">OpenAI</button>
+          <button type="button" class="btn-preset" data-provider="gemini">
+            <svg class="ai-preset-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M2 12h20M4.93 4.93l14.14 14.14M4.93 19.07l14.14-14.14"/></svg>
+            Google Gemini
+          </button>
+          <button type="button" class="btn-preset" data-provider="groq">
+            <svg class="ai-preset-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+            Groq (Llama 3)
+          </button>
+          <button type="button" class="btn-preset" data-provider="ollama">
+            <svg class="ai-preset-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><circle cx="9" cy="9" r="1.5"/><circle cx="15" cy="9" r="1.5"/><path d="M9 15c1 1 5 1 6 0"/></svg>
+            Ollama Cloud
+          </button>
+          <button type="button" class="btn-preset" data-provider="openai">
+            <svg class="ai-preset-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M8 12h8M12 8v8"/></svg>
+            OpenAI
+          </button>
         </div>
       </div>
 
-      <!-- API Key Field -->
-      <div class="ai-field-group">
-        <label for="ai-input-key" class="ai-field-label">API Key (OpenAI-compatible / Gemini / Groq):</label>
-        <input type="password" id="ai-input-key" class="ai-input" placeholder="Tempel API key di sini (AQ..., gsk_..., sk-...)">
+      <!-- API Key & Endpoints Card -->
+      <div class="ai-glass-card">
+        <div class="ai-field-group">
+          <label for="ai-input-key" class="ai-field-label">API Key (OpenAI-compatible / Gemini / Groq):</label>
+          <div class="ai-input-wrap">
+            <input type="password" id="ai-input-key" class="ai-input" placeholder="Tempel API key di sini (AQ..., gsk_..., sk-...)">
+          </div>
+        </div>
+
+        <div class="ai-fields-inline">
+          <div class="ai-field-group" style="flex:1">
+            <label for="ai-input-model" class="ai-field-label">Model LLM:</label>
+            <input type="text" id="ai-input-model" class="ai-input" placeholder="gemini-2.0-flash">
+          </div>
+          <div class="ai-field-group" style="flex:1.5">
+            <label for="ai-input-url" class="ai-field-label">Endpoint API URL:</label>
+            <input type="text" id="ai-input-url" class="ai-input" placeholder="https://generativelanguage.googleapis.com/v1beta/openai">
+          </div>
+        </div>
       </div>
 
-      <!-- Model & API URL -->
-      <div class="ai-fields-inline">
-        <div class="ai-field-group" style="flex:1">
-          <label for="ai-input-model" class="ai-field-label">Model LLM:</label>
-          <input type="text" id="ai-input-model" class="ai-input" placeholder="gemini-2.0-flash">
-        </div>
-        <div class="ai-field-group" style="flex:1.5">
-          <label for="ai-input-url" class="ai-field-label">Endpoint API URL:</label>
-          <input type="text" id="ai-input-url" class="ai-input" placeholder="https://generativelanguage.googleapis.com/v1beta/openai">
-        </div>
-      </div>
-
-      <!-- Custom Prompt Field -->
-      <div class="ai-field-group">
+      <!-- Custom Prompt Card -->
+      <div class="ai-glass-card">
         <div class="ai-field-header-row">
-          <label for="ai-input-prompt" class="ai-field-label">Custom Prompt AI Fansub (Persona &amp; Gaya Terjemahan):</label>
-          <span class="dim small">Prioritas Tinggi</span>
+          <label for="ai-input-prompt" class="ai-field-label">Custom Persona &amp; Gaya Terjemahan Fansub:</label>
+          <span class="ai-badge-priority">PROMPT KUSTOM</span>
         </div>
-        <div class="dim small" style="margin-bottom:6px;">Arahkan gaya bahasa (santai/baku), kata ganti (aku-kamu / lo-gue), honorifik (-san/-kun), atau istilah anime khusus:</div>
+        <div class="ai-field-desc">Arahkan gaya bahasa (santai/baku), kata ganti (aku-kamu / lo-gue), honorifik (-san/-kun), atau istilah anime khusus:</div>
         <textarea id="ai-input-prompt" class="ai-textarea" rows="3" placeholder="Contoh: Terjemahkan dengan gaya santai anak muda. Gunakan kata ganti 'aku-kamu'. Jangan terjemahkan istilah jurus atau teknik bertarung."></textarea>
         <div class="ai-prompt-presets">
-          <span class="dim small">Template Gaya:</span>
-          <button type="button" class="btn-prompt-tpl" id="btn-tpl-casual">Gaya Santai / Gaul</button>
-          <button type="button" class="btn-prompt-tpl" id="btn-tpl-formal">Baku &amp; Sopan</button>
-          <button type="button" class="btn-prompt-tpl" id="btn-tpl-wibu">Honorifik &amp; Jurus</button>
-          <button type="button" class="btn-prompt-tpl-reset" id="btn-tpl-reset">Reset Prompt</button>
+          <span class="ai-prompt-presets-label">Template Cepat:</span>
+          <button type="button" class="btn-prompt-tpl" id="btn-tpl-casual">⚡ Gaya Gaul / Santai</button>
+          <button type="button" class="btn-prompt-tpl" id="btn-tpl-formal">🏛️ Baku &amp; Sopan</button>
+          <button type="button" class="btn-prompt-tpl" id="btn-tpl-wibu">🎌 Honorifik &amp; Jurus</button>
+          <button type="button" class="btn-prompt-tpl-reset" id="btn-tpl-reset">🔄 Reset Prompt</button>
         </div>
       </div>
 
@@ -574,7 +589,7 @@
         <button type="button" id="ai-btn-reset-key" class="btn-danger">Hapus API Key</button>
         <div style="flex:1"></div>
         <button type="button" id="ai-btn-cancel" class="btn-secondary">Batal</button>
-        <button type="button" id="ai-btn-save" class="btn-primary">Simpan Setelan</button>
+        <button type="button" id="ai-btn-save" class="btn-primary">Simpan Pengaturan</button>
       </div>
     </div>
   </div>

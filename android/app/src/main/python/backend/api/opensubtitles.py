@@ -169,7 +169,11 @@ def _http_get_bytes(url: str, headers: dict = None, timeout: float = 9.0, prefer
 
 def _norm_tokens(s: str) -> set:
     s = re.sub(r"[^a-zA-Z0-9\s]", " ", (s or "").lower())
-    stop = {"the", "a", "an", "no", "wa", "ga", "ni", "to", "of", "in", "on", "animation", "tv", "series"}
+    stop = {
+        "the", "a", "an", "wa", "ga", "ni", "to", "of", "in", "on", "animation",
+        "tv", "series", "episode", "ep", "season", "sub", "indo", "indonesia",
+        "subtitle", "srt", "ass", "vtt", "1080p", "720p", "webrip", "webdl", "bdrip",
+    }
     return {t for t in s.split() if len(t) > 1 and t not in stop}
 
 
@@ -179,7 +183,24 @@ def _title_similarity(query_title: str, candidate_title: str) -> float:
     if not ta or not tb:
         return 0.0
     inter = ta.intersection(tb)
-    return len(inter) / max(1, min(len(ta), len(tb)))
+    if not inter:
+        return 0.0
+    cov = len(inter) / len(ta)
+    jaccard = len(inter) / len(ta.union(tb))
+    # Jika query pendek (<= 2 token seperti 'No Game', 'Solo Leveling'), semua token wajib hadir
+    if len(ta) <= 2:
+        return cov if cov >= 0.99 else 0.0
+    # Jika query panjang, butuh coverage >= 70% dan jaccard >= 0.20
+    if cov >= 0.70 and jaccard >= 0.20:
+        return cov
+    return 0.0
+
+
+def is_accurate_sub_title_match(anime_title: str, candidate_title: str) -> bool:
+    """True jika judul file/rilis subtitle cocok dengan judul anime yang dicari."""
+    if not anime_title or not candidate_title:
+        return False
+    return _title_similarity(anime_title, candidate_title) >= 0.70
 
 
 def resolve_imdb_id(title: str, slug: str = "") -> tuple:
@@ -295,7 +316,7 @@ def search_opensubtitles(title: str = "", slug: str = "", ep: int = 1, season: i
 
     candidates_by_id = {}
 
-    def _add_candidate(file_id: str, filename: str, raw_lang: str, dl_url: str, backup_url: str = "", downloads: int = 0, rating: float = 0.0, tier_name: str = "public_api"):
+    def _add_candidate(file_id: str, filename: str, raw_lang: str, dl_url: str, backup_url: str = "", downloads: int = 0, rating: float = 0.0, tier_name: str = "public_api", meta_title: str = ""):
         fid = str(file_id or "").strip()
         if not fid or not dl_url:
             return
@@ -303,6 +324,13 @@ def search_opensubtitles(title: str = "", slug: str = "", ep: int = 1, season: i
         if norm_lang != target_lang:
             return
         fname = (filename or f"OpenSubtitles_{fid}.srt").strip()
+
+        # Validasi ketat kecocokan judul anime jika base_title tersedia (mencegah anime & sub berbeda)
+        if base_title:
+            combined_cand = f"{fname} {meta_title or ''}".strip()
+            if not is_accurate_sub_title_match(base_title, combined_cand):
+                return
+
         sc = _score_subtitle_candidate(fname, ep, season_num, target_lang, norm_lang, downloads)
         if sc < 0:
             return
@@ -338,6 +366,7 @@ def search_opensubtitles(title: str = "", slug: str = "", ep: int = 1, season: i
                     m_fid = re.search(r"/file/(\d+)", dl_u)
                     fid = m_fid.group(1) if m_fid else str(sub.get("id") or "")
                     fname = sub.get("subtitleFileName") or sub.get("movieReleaseName") or f"OpenSubtitles_{ s_try }x{ ep }_{ fid }.srt"
+                    meta_name = sub.get("movieReleaseName") or sub.get("title") or ""
                     _add_candidate(
                         file_id=fid,
                         filename=fname,
@@ -346,6 +375,7 @@ def search_opensubtitles(title: str = "", slug: str = "", ep: int = 1, season: i
                         backup_url=dl_u,
                         downloads=int(sub.get("g") or 0),
                         tier_name="os_v3_api",
+                        meta_title=meta_name,
                     )
             except Exception:
                 pass
@@ -389,6 +419,7 @@ def search_opensubtitles(title: str = "", slug: str = "", ep: int = 1, season: i
                 for it in items[:25]:
                     fid = str(it.get("IDSubtitleFile") or "").strip()
                     fname = (it.get("SubFileName") or it.get("MovieReleaseName") or "").strip()
+                    meta_name = (it.get("MovieName") or it.get("MovieReleaseName") or "").strip()
                     dl_cnt = 0
                     try:
                         dl_cnt = int(it.get("SubDownloadsCnt") or 0)
@@ -409,6 +440,7 @@ def search_opensubtitles(title: str = "", slug: str = "", ep: int = 1, season: i
                         downloads=dl_cnt,
                         rating=rating,
                         tier_name="os_rest_api",
+                        meta_title=meta_name,
                     )
                 if any(c["lang"] == target_lang for c in candidates_by_id.values()):
                     break
