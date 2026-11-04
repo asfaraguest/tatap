@@ -90,6 +90,17 @@ Kenaikan digit PATCH diterapkan sesuai kaidah Semantic Versioning 2.0.0 dan Dire
    - Menghapus atribut `controls` bawaan browser pada elemen `<video id="vid">` statis di `frontend/index.html` dan menambahkan `style="display:none !important"`.
    - Mengeliminasi seluruh panggilan injeksi `v.setAttribute("controls", "")` pada `armAutohide()` di `frontend/js/app.js` yang sebelumnya memicu browser engine (Chromium, Firefox, Webview) merender kontrol media HTML5 native di dalam video Artplayer setiap kali kursor digerakkan atau video dijeda.
    - Menggantinya dengan penegakan eksplisit `v.removeAttribute("controls")` dan menambahkan aturan CSS global untuk mensupresi total shadow DOM media controls browser (`video::-webkit-media-controls* { display: none !important; }`), serta menyembunyikan video non-Artplayer di dalam stage (`.ambient-stage > video:not(.art-video) { display: none !important; }`).
+7. **Perbaikan Menyeluruh Bug & Sinkronisasi Event Pemutar Artplayer.js (`frontend/js/app.js`, `frontend/css/style.css`):**
+   - Mengeliminasi fatal JS `ReferenceError` pada event `video:ended` akibat pemanggilan fungsi `markCurrentEpisodeFinished()` yang tidak ada, digantikan dengan penyimpanan progres 100%, pencatatan episode tuntas `recordEpisodeWatched()`, dan auto-play episode berikutnya (`stepEp(1)`) atau penutupan rapi.
+   - Mengaktifkan kembali Ambient Lighting dengan mendinamisasi closure elemen video pada `startAmbient()` agar membaca frame langsung dari `window.art.template.$video`.
+   - Menghilangkan tabrakan shortcut keyboard (double trigger pada tombol Space dan Arrow) dengan menonaktifkan internal hotkey Artplayer (`hotkey: false`) dan memusatkannya pada master key handler Tatap.
+   - Menambahkan kontrol resolusi video HLS (`quality`) ke control bar Artplayer dan menu Setting Artplayer.
+   - Mengintegrasikan persistensi ukuran subtitle pengguna (`syncSubSize()`) secara otomatis saat episode baru diputar serta menambahkan skalabilitas font responsif di perangkat mobile dan wrapping seimbang `text-wrap: balance;`.
+   - Mengeliminasi phantom click pada tombol AniSkip saat tombol berstatus `hidden`.
+   - Menampilkan status proses penerjemahan subtitle langsung di dalam viewport Artplayer.
+   - Menjeda (`pause`) video web secara otomatis saat MPV eksternal diluncurkan untuk mencegah tabrakan audio ganda (*dual-audio*).
+   - Menyelaraskan opacity tombol Prev/Next pada bar kontrol Artplayer sesuai ketersediaan episode.
+   - Menjamin isolasi DOM tanpa kebocoran memori saat berganti episode via pembersihan `art.destroy(true)` dan pembersihan container.
 
 ### Tests
 - Menambahkan test suite `tests/test_custom_prompt.py` untuk menguji pembuatan system prompt dengan instruksi khusus pengguna, prioritas prompt, dan persistensi database settings.

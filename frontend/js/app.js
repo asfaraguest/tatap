@@ -1668,20 +1668,26 @@ function syncArtplayerQuality(levels){
     };
   });
 
+  var qualityControl = {
+    name: "quality",
+    position: "right",
+    index: 18,
+    style: { marginRight: "6px" },
+    html: '<span id="art-quality-label" style="font-weight:700;font-size:11px;background:rgba(255,255,255,0.12);padding:2px 8px;border-radius:4px;border:1px solid rgba(255,255,255,0.2);cursor:pointer;" title="Pilih Resolusi Video">' + activeQ.toUpperCase() + '</span>',
+    selector: selList,
+    onSelect: function(item){
+      switchQ(item.html);
+      if(window.art && window.art.notice) window.art.notice.show = "Kualitas: " + item.html;
+      return item.html;
+    }
+  };
+
   try{
-    window.art.controls.update({
-      name: "quality",
-      position: "right",
-      index: 18,
-      style: { marginRight: "6px" },
-      html: '<span style="font-weight:700;font-size:11px;background:rgba(255,255,255,0.12);padding:2px 8px;border-radius:4px;border:1px solid rgba(255,255,255,0.2);cursor:pointer;" title="Pilih Resolusi Video">' + activeQ.toUpperCase() + '</span>',
-      selector: selList,
-      onSelect: function(item){
-        switchQ(item.html);
-        if(window.art && window.art.notice) window.art.notice.show = "Kualitas: " + item.html;
-        return item.html;
-      }
-    });
+    if(window.art.controls && window.art.controls.quality){
+      window.art.controls.update(qualityControl);
+    } else if(window.art.controls && typeof window.art.controls.add === "function"){
+      window.art.controls.add(qualityControl);
+    }
   }catch(_){}
 
   try{
@@ -2120,6 +2126,12 @@ function syncNativeTextTrack(vttText, cues, langCode){
   }
 }
 function toggleFullscreen(){
+  if(window.art){
+    try {
+      window.art.fullscreen = !window.art.fullscreen;
+      return;
+    } catch(e){}
+  }
   var v=$("vid");
   var stage=document.querySelector(".ambient-stage");
   var fsEl=document.fullscreenElement||document.webkitFullscreenElement||document.mozFullScreenElement||document.msFullscreenElement;
@@ -2459,6 +2471,10 @@ function switchSubtitleTrack(url, langCode){
         osp._last=osp.textContent;
       }
     }
+    if(window.art && window.art.template && window.art.template.$subtitle){
+      window.art.template.$subtitle.innerHTML = "<div class='art-subtitle-inner' style='opacity:0.75;font-size:14px;'>[" + esc(waitMsg) + "]</div>";
+      window.art.template.$subtitle._last = waitMsg;
+    }
   }
   var ref=cur.res&&cur.res.referer||"";
   var subPromise = prefetchSubtitleTrack(originalUrl, ref, langCode);
@@ -2591,25 +2607,31 @@ var TouchGestures = {
     if(this.armed) return;
     this.armed = true;
     var stage = document.querySelector(".ambient-stage");
-    var v = $("vid");
-    if(!stage || !v) return;
+    if(!stage) return;
 
     var self = this;
+    var getVid = function(){
+      return (window.art && window.art.template && window.art.template.$video) || $("vid");
+    };
 
     stage.addEventListener("touchstart", function(e){
       if(e.touches.length !== 1) return;
+      var v = getVid();
+      if(!v) return;
       var touch = e.touches[0];
       var rect = stage.getBoundingClientRect();
       self.startX = touch.clientX;
       self.startY = touch.clientY;
       self.mode = null;
-      self.initVol = v.volume;
+      self.initVol = (window.art && typeof window.art.volume === "number") ? window.art.volume : (v.volume || 1);
       self.initBright = self.currentBright;
-      self.initTime = v.currentTime;
+      self.initTime = (window.art && typeof window.art.currentTime === "number") ? window.art.currentTime : (v.currentTime || 0);
     }, {passive: true});
 
     stage.addEventListener("touchmove", function(e){
       if(e.touches.length !== 1) return;
+      var v = getVid();
+      if(!v) return;
       var touch = e.touches[0];
       var rect = stage.getBoundingClientRect();
       var dx = touch.clientX - self.startX;
@@ -2625,7 +2647,7 @@ var TouchGestures = {
       }
 
       if(self.mode === "seek"){
-        var dur = v.duration || 1400;
+        var dur = (window.art && window.art.duration) || v.duration || 1400;
         var scrub = (dx / rect.width) * 90; // geser penuh layar = +/- 90 detik
         var target = Math.max(0, Math.min(dur, self.initTime + scrub));
         var diff = Math.round(target - self.initTime);
@@ -2638,6 +2660,7 @@ var TouchGestures = {
       } else if(self.mode === "volume"){
         var deltaV = (-dy / rect.height) * 1.5;
         var nv = Math.max(0, Math.min(1, self.initVol + deltaV));
+        if(window.art) window.art.volume = nv;
         v.volume = nv;
         v.muted = (nv === 0);
         var ic = nv === 0 ? '<svg class="ui-icon"><use href="#icon-volume-mute"/></svg>' : (nv < 0.5 ? '<svg class="ui-icon"><use href="#icon-volume-mid"/></svg>' : '<svg class="ui-icon"><use href="#icon-volume-high"/></svg>');
@@ -2655,8 +2678,10 @@ var TouchGestures = {
     }, {passive: true});
 
     stage.addEventListener("touchend", function(e){
+      var v = getVid();
       if(self.mode === "seek" && self._targetSeek != null){
-        v.currentTime = self._targetSeek;
+        if(window.art) window.art.currentTime = self._targetSeek;
+        else if(v) v.currentTime = self._targetSeek;
         self._targetSeek = null;
         self.mode = null;
         return;
@@ -2675,13 +2700,17 @@ var TouchGestures = {
         // Double Tap
         self.lastTap = 0; // reset
         if(relX < 0.35){
-          v.currentTime = Math.max(0, v.currentTime - 10);
+          if(window.art) window.art.seek = Math.max(0, window.art.currentTime - 10);
+          else if(v) v.currentTime = Math.max(0, v.currentTime - 10);
           self.triggerRipple("left", "-10s");
         } else if(relX > 0.65){
-          v.currentTime = Math.min(v.duration || 99999, v.currentTime + 10);
+          var dur = (window.art && window.art.duration) || (v && v.duration) || 99999;
+          if(window.art) window.art.seek = Math.min(dur, window.art.currentTime + 10);
+          else if(v) v.currentTime = Math.min(dur, v.currentTime + 10);
           self.triggerRipple("right", "+10s");
         } else {
-          if(v.paused) v.play(); else v.pause();
+          if(window.art) window.art.toggle();
+          else if(v) { if(v.paused) v.play(); else v.pause(); }
         }
       } else {
         self.lastTap = now;
@@ -2762,8 +2791,9 @@ function playUrl(url,referrer,sub,subRef,resumeTime,token){
   var artContainer = $("artplayer-container");
   if(typeof Artplayer !== "undefined" && artContainer){
     if(window.art){
-      try{ window.art.destroy(false); window.art = null; }catch(_){}
+      try{ window.art.destroy(true); window.art = null; }catch(_){}
     }
+    artContainer.innerHTML = "";
     var epTitle = (cur.title || "") + (cur.ep ? (" - Episode " + cur.ep) : "");
     var art = new Artplayer({
       container: artContainer,
@@ -2783,7 +2813,7 @@ function playUrl(url,referrer,sub,subRef,resumeTime,token){
       flip: true,
       playbackRate: true,
       aspectRatio: true,
-      hotkey: true,
+      hotkey: false,
       pip: true,
       fullscreen: true,
       fullscreenWeb: true,
@@ -2883,6 +2913,18 @@ function playUrl(url,referrer,sub,subRef,resumeTime,token){
           click: function(){ stepEp(1); }
         },
         {
+          name: "quality",
+          position: "right",
+          index: 18,
+          style: { marginRight: "6px" },
+          html: '<span id="art-quality-label" style="font-weight:700;font-size:11px;background:rgba(255,255,255,0.12);padding:2px 8px;border-radius:4px;border:1px solid rgba(255,255,255,0.2);cursor:pointer;" title="Pilih Resolusi Video">AUTO</span>',
+          tooltip: "Pilih Resolusi Video",
+          click: function(){
+            var sel = $("pm-quality-select");
+            if(sel) sel.click();
+          }
+        },
+        {
           name: "mpv-btn",
           position: "right",
           index: 20,
@@ -2922,6 +2964,15 @@ function playUrl(url,referrer,sub,subRef,resumeTime,token){
             zIndex: 25,
             pointerEvents: "none"
           },
+          mounted: function($layer){
+            var btn = $layer.querySelector("#art-header-close");
+            if(btn){
+              btn.addEventListener("click", function(e){
+                e.stopPropagation();
+                closePlayer();
+              });
+            }
+          },
           click: function(e){
             if(e.target && (e.target.id === "art-header-close" || e.target.closest("#art-header-close"))){
               closePlayer();
@@ -2942,7 +2993,10 @@ function playUrl(url,referrer,sub,subRef,resumeTime,token){
             pointerEvents: "auto"
           },
           click: function(){
-            doSkip();
+            var artBtn = $("art-aniskip-btn");
+            if(artBtn && !artBtn.classList.contains("hidden")){
+              doSkip();
+            }
           }
         }
       ],
@@ -3150,6 +3204,15 @@ function playUrl(url,referrer,sub,subRef,resumeTime,token){
       syncFullscreenSubtitles();
     });
 
+    art.on("fullscreenWeb", function(state){
+      var stageEl = document.querySelector(".ambient-stage");
+      if(stageEl){
+        if(state) stageEl.classList.add("is-fullscreen-web");
+        else stageEl.classList.remove("is-fullscreen-web");
+      }
+      syncFullscreenSubtitles();
+    });
+
     art.on("pip", function(state){
       toast(state ? "Masuk ke mode Picture-in-Picture (PiP)" : "Keluar dari mode Picture-in-Picture", 1500);
     });
@@ -3161,12 +3224,15 @@ function playUrl(url,referrer,sub,subRef,resumeTime,token){
       }
     });
 
+    syncSubSize();
+    updatePrevNext();
     syncArtplayerSubtitles((cur.res && cur.res.subtitles) || [], cur.activeSub);
 
-    art.on("video:canplay", function(){
+    art.once("video:canplay", function(){
       $("pm-spinner").classList.add("hidden");
       if(resumeTime && resumeTime > 0){
         try{ art.currentTime = resumeTime; }catch(e){}
+        resumeTime = 0;
       }
     });
 
@@ -3176,8 +3242,22 @@ function playUrl(url,referrer,sub,subRef,resumeTime,token){
     });
 
     art.on("video:ended", function(){
-      markCurrentEpisodeFinished();
-      stepEp(1);
+      var endedSlug = cur.slug;
+      var endedEp = cur.ep;
+      if(endedSlug && endedEp){
+        var dur = Math.floor((window.art && window.art.duration) || 0);
+        window.Tatap.saveProgress(endedSlug, endedEp, dur, dur).catch(function(){});
+        recordEpisodeWatched(endedSlug, endedEp);
+      }
+      var idx = -1;
+      for(var i=0; i<cur.eps.length; i++) if(cur.eps[i].ep === cur.ep) idx = i;
+      if(idx >= 0 && idx < cur.eps.length - 1){
+        toast("Episode " + cur.ep + " selesai. Memutar episode berikutnya...", 1500);
+        stepEp(1);
+      } else {
+        closePlayer();
+        toast("Episode " + cur.ep + " selesai diputar (episode terakhir)");
+      }
     });
 
     art.on("video:pause", function(){
@@ -3410,8 +3490,18 @@ function switchQ(q){
 function updatePrevNext(){
   var idx=-1;
   for(var i=0;i<cur.eps.length;i++)if(cur.eps[i].ep===cur.ep)idx=i;
-  $("pm-prev").disabled=idx<=0;
-  $("pm-next").disabled=idx<0||idx>=cur.eps.length-1;
+  var hasPrev = idx > 0;
+  var hasNext = idx >= 0 && idx < cur.eps.length - 1;
+  var btnP = $("pm-prev"); if(btnP) btnP.disabled = !hasPrev;
+  var btnN = $("pm-next"); if(btnN) btnN.disabled = !hasNext;
+  if(window.art && window.art.controls){
+    try{
+      var pBtn = window.art.controls["prev-btn"];
+      if(pBtn) pBtn.style.opacity = hasPrev ? "0.9" : "0.35";
+      var nBtn = window.art.controls["next-btn"];
+      if(nBtn) nBtn.style.opacity = hasNext ? "0.9" : "0.35";
+    }catch(_){}
+  }
 }
 function stepEp(d){
   if($("player-modal").classList.contains("hidden"))return;
@@ -3435,10 +3525,12 @@ function closePlayer(){
 
   if(window.art){
     try{
-      window.art.destroy(false);
+      window.art.destroy(true);
       window.art = null;
     }catch(e){}
   }
+  var artCont = $("artplayer-container");
+  if(artCont) artCont.innerHTML = "";
 
   // Restore placeholder dummy vid if needed for non-playing state
   var stage = document.querySelector(".ambient-stage");
@@ -3496,6 +3588,9 @@ function closePlayer(){
   }
 }
 function playMPV(){
+  if(window.art){
+    try { window.art.pause(); } catch(_){}
+  }
   window.Tatap.playMPV({slug:cur.slug,title:cur.title,ep:cur.ep||1,mode:cur.mode,quality:cur.quality}).then(function(r){
     toast(r.success?("MPV: "+r.data.picked.q):("ERROR: "+r.error));
   });
@@ -3615,8 +3710,6 @@ function setFallback(r,g,b){
 function startAmbient(){
   var cv=$("ambient"),ctx=null;
   try{ctx=cv.getContext("2d",{willReadFrequently:true});}catch(e){ctx=cv.getContext("2d");}
-  var v=$("vid");
-  v.setAttribute("crossorigin","anonymous");
   var tmp=document.createElement("canvas");
   tmp.width=48;tmp.height=27;
   var tctx=null;
@@ -3625,6 +3718,9 @@ function startAmbient(){
     if(document.hidden)return;
     if(document.body.classList.contains("no-ambient"))return;
     if($("player-modal").classList.contains("hidden"))return;
+    var v=(window.art && window.art.template && window.art.template.$video) || $("vid");
+    if(!v)return;
+    if(!v.hasAttribute("crossorigin")) v.setAttribute("crossorigin","anonymous");
     if(v.paused||v.ended||v.readyState<2||v.videoWidth===0)return;
     if(isVideoFullscreen())return;
     try{
@@ -4003,7 +4099,8 @@ function syncSubSize(){
     b.classList.toggle("active",b.getAttribute("data-subsize")===sz);
   });
   if(window.art && window.art.template && window.art.template.$subtitle){
-    var fSize = sz === "s" ? "16px" : (sz === "l" ? "28px" : "22px");
+    var isMobile = /android|iphone|ipad|ipod|windows phone|blackberry|mobile/i.test(navigator.userAgent || "") || window.innerWidth < 768;
+    var fSize = sz === "s" ? (isMobile ? "13px" : "16px") : (sz === "l" ? (isMobile ? "20px" : "28px") : (isMobile ? "16px" : "22px"));
     window.art.template.$subtitle.style.setProperty("--sub-size", fSize);
   }
 }

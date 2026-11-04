@@ -1518,6 +1518,8 @@ body.mobile-native-sub video::cue {
   font-size: var(--sub-size, clamp(16px, 2.2vw, 24px)) !important;
   line-height: 1.35 !important;
   color: #ffffff !important;
+  text-wrap: balance !important;
+  max-width: 85% !important;
   text-shadow:
     0 1px 2px rgba(0, 0, 0, 0.95),
     0 0 6px rgba(0, 0, 0, 0.9),
