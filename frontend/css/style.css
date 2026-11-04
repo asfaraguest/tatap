@@ -1717,7 +1717,7 @@ body.mobile-native-sub video::cue {
    ARTPLAYER.JS INTEGRATION — FULL-BROWSER SCREEN & STANDALONE SUBS
    ============================================================ */
 
-#player-modal {
+#player-modal:not(.hidden) {
   position: fixed !important;
   inset: 0 !important;
   width: 100vw !important;
@@ -1727,6 +1727,13 @@ body.mobile-native-sub video::cue {
   padding: 0 !important;
   margin: 0 !important;
   z-index: 150 !important;
+  display: flex !important;
+}
+
+#player-modal.hidden {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
 }
 
 #player-modal .player-shell {

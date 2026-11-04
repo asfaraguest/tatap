@@ -1350,7 +1350,11 @@ function openPlayer(ep, resumeTime, forceRefresh){
   recordEpisodeWatched(cur.slug, ep);
   closeTitle();
   closeResumeModal();
-  $("player-modal").classList.remove("hidden");
+  var pmModal = $("player-modal");
+  if(pmModal){
+    pmModal.classList.remove("hidden");
+    pmModal.style.display = "flex";
+  }
   if(TvNavigationManager.isTvMode()){
     TvNavigationManager.showPlayerControls($("pm-speed-select") || $("pm-close"));
   } else {
@@ -2342,38 +2346,6 @@ function toggleFullscreen(){
     else stageEl.classList.remove("is-fullscreen");
   }
   syncFullscreenSubtitles();
-}
-      try{v.msRequestFullscreen();}catch(e){}
-    }else if(v.webkitEnterFullscreen){
-      try{v.webkitEnterFullscreen();}catch(e){}
-    }
-  };
-
-  if(stage&&(stage.requestFullscreen||stage.webkitRequestFullscreen||stage.mozRequestFullScreen||stage.msRequestFullscreen)){
-    var p;
-    try{
-      if(stage.requestFullscreen){
-        p=stage.requestFullscreen();
-      }else if(stage.webkitRequestFullscreen){
-        p=stage.webkitRequestFullscreen();
-      }else if(stage.mozRequestFullScreen){
-        p=stage.mozRequestFullScreen();
-      }else if(stage.msRequestFullscreen){
-        p=stage.msRequestFullscreen();
-      }
-      if(p&&p.catch){
-        p.catch(function(err){
-          console.warn("stage.requestFullscreen rejected, falling back to video:",err);
-          enterVideoFs();
-        });
-      }
-    }catch(err){
-      console.warn("stage fullscreen exception, falling back to video:",err);
-      enterVideoFs();
-    }
-  }else{
-    enterVideoFs();
-  }
 }
 function paintCue(){
   var box=$("pm-subs-overlay");
@@ -3867,7 +3839,11 @@ function closePlayer(){
   syncNativeTextTrack("", [], "");
 
   // 3. Hide modal & spinner
-  $("player-modal").classList.add("hidden");
+  var pmModalClose = $("player-modal");
+  if(pmModalClose){
+    pmModalClose.classList.add("hidden");
+    pmModalClose.style.display = "none";
+  }
   $("pm-spinner").classList.add("hidden");
 
   // 4. Exit fullscreen safely if active
