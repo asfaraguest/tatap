@@ -4220,6 +4220,11 @@ function onKeyPlayer(e){
   }
   var v=$("vid");
   if(e.key==="Escape"){
+    var aiM = $("ai-settings-modal");
+    if(aiM && !aiM.classList.contains("hidden")){
+      closeAiSettingsModal();
+      return;
+    }
     var fsEl=document.fullscreenElement||document.webkitFullscreenElement||document.mozFullScreenElement||document.msFullscreenElement;
     if(fsEl){
       // Fullscreen will be closed natively by browser, keep player modal open
@@ -4605,6 +4610,8 @@ function closeUpdateModal(){
 async function openAiSettingsModal(){
   var m = $("ai-settings-modal");
   if(!m) return;
+  m.classList.remove("hidden");
+  m.style.display = "flex";
   if(window.TvNavigationManager) window.TvNavigationManager.setPlayerModalState(true);
   if(window.art){
     try { window.art.pause(); } catch(e){}
@@ -4614,7 +4621,6 @@ async function openAiSettingsModal(){
       try { v.pause(); } catch(e){}
     }
   }
-  m.classList.remove("hidden");
   try{
     var r = await window.Tatap.getSettings();
     var d = (r && r.success && r.data) || {};
@@ -4641,7 +4647,10 @@ async function openAiSettingsModal(){
 
 function closeAiSettingsModal(){
   var m = $("ai-settings-modal");
-  if(m) m.classList.add("hidden");
+  if(m){
+    m.classList.add("hidden");
+    m.style.display = "none";
+  }
   if(window.TvNavigationManager) window.TvNavigationManager.setPlayerModalState(false);
 }
 
