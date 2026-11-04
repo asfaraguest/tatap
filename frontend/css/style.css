@@ -1386,6 +1386,16 @@ body.mobile-native-sub video::cue {
   box-shadow: none !important;
 }
 
+/* Sembunyikan shell bar lama agar Artplayer tampil murni cinema full-window tanpa UI tumpang tindih */
+#player-modal .player-head,
+#player-modal .player-foot,
+#player-modal .player-hint,
+#player-modal #pm-subs-overlay,
+#player-modal #pm-gesture-stage,
+#player-modal #pm-skip-btn {
+  display: none !important;
+}
+
 #player-modal .ambient-stage {
   flex: 1 1 100% !important;
   width: 100% !important;
@@ -1409,8 +1419,69 @@ body.mobile-native-sub video::cue {
   background: #000 !important;
 }
 
+/* Header layer Artplayer terintegrasi */
+.art-header-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 56px;
+  padding: 10px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.88) 0%, rgba(0, 0, 0, 0) 100%);
+  z-index: 25;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+}
+
+.art-header-title {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 14.5px;
+  font-weight: 700;
+  color: #ffffff;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.85);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 80%;
+  letter-spacing: -0.01em;
+}
+
+.art-header-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 50%;
+  color: #ffffff;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  pointer-events: auto;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
+  transition: background 150ms ease, transform 150ms cubic-bezier(0.34, 1.56, 0.64, 1), border-color 150ms ease;
+}
+
+.art-header-close:hover {
+  background: rgba(239, 68, 68, 0.9);
+  border-color: rgba(239, 68, 68, 1);
+  transform: scale(1.1);
+}
+
+.art-header-close:active {
+  transform: scale(0.95);
+}
+
 /* Standalone Subtitles Styling - Anti Windows Closed Caption Overrides */
 .art-video-player .art-subtitle {
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
   bottom: 32px !important;
   left: 5% !important;
   right: 5% !important;
@@ -1419,6 +1490,10 @@ body.mobile-native-sub video::cue {
   pointer-events: none !important;
   transition: bottom 0.25s ease !important;
   z-index: 20 !important;
+}
+
+.art-video-player .art-subtitle:empty {
+  display: none !important;
 }
 
 .art-video-player.art-control-show .art-subtitle {

@@ -60,7 +60,17 @@ Kenaikan digit PATCH diterapkan sesuai kaidah Semantic Versioning 2.0.0 dan Dire
    - Mengimplementasikan pendeteksi celah mikro (micro-gap $\le 0.35$s) pada event `BUFFER_STALLED_ERROR` yang secara otomatis melompati jeda frame tanpa memaksa user scrubbing seekbar secara manual.
 
 ### Fixed
-1. **Modal Stacking & Z-Index Collision di Web & Desktop (`frontend/css/style.css`, `frontend/js/app.js`):**
+1. **Eliminasi UI Tumpang Tindih Pemutar Shell Lama / Player Shell Nyangkut (`frontend/css/style.css`, `frontend/js/app.js`):**
+   - Menyembunyikan bar kontrol luar lama (`.player-head`, `.player-foot`, `.player-hint`, `#pm-subs-overlay`, `#pm-gesture-stage`, `#pm-skip-btn`) saat `#player-modal` terbuka, sehingga Artplayer tampil murni 100% cinema mode tanpa sisa kontrol lama yang bertumpuk.
+   - Menambahkan header layer Artplayer terintegrasi (`.art-header-layer`) yang memuat judul anime/episode di kiri atas dan tombol tutup sleek (`✕`) di kanan atas yang otomatis bersembunyi saat kursor diam bersama kontrol bawaan Artplayer.
+2. **Sinkronisasi Waktu Subtitle & Eliminasi Duplikasi Video ID pada Artplayer (`frontend/js/app.js`, `frontend/css/style.css`):**
+   - Mengatasi masalah subtitle tidak muncul di Artplayer akibat pembacaan waktu `t` di `paintCue()` yang sebelumnya merujuk ke elemen video statis lama (`$("vid").currentTime = 0`), kini membaca waktu aktif secara langsung dari `window.art.currentTime`.
+   - Mengeliminasi duplikasi elemen `id="vid"` di DOM saat inisialisasi Artplayer, menjadikan `<video class="art-video">` sebagai satu-satunya elemen video aktif di dokumen.
+   - Menetapkan `display: flex !important` dan styling layout pada `.art-video-player .art-subtitle` agar container subtitle internal Artplayer selalu aktif dan dirender secara proporsional.
+3. **Penyimpanan Riwayat Tontonan & Penanganan Shortcut Keyboard pada Artplayer (`frontend/js/app.js`):**
+   - Menyelaraskan `recordWatchProgress()` agar mengambil progres waktu dan durasi dari `window.art.currentTime` dan `window.art.duration` sebelum pemutar ditutup (`closePlayer()`).
+   - Menyinkronkan seluruh hotkey pemutar (Space, Mute M, Seek ArrowLeft/Right, Volume ArrowUp/Down, Skip S) ke `window.art`.
+4. **Modal Stacking & Z-Index Collision di Web & Desktop (`frontend/css/style.css`, `frontend/js/app.js`):**
    - Menetapkan z-index eksplisit `#ai-settings-modal.overlay { z-index: 160; background: rgba(0, 0, 0, 0.88); }` sehingga modal setelan AI Fansub selalu muncul di atas layer pemutar video `#player-modal`.
    - Menghentikan pemutaran video secara otomatis (`v.pause()`) saat modal setelan dibuka dari dalam pemutar.
 2. **Dynamic Subtitle Cache Invalidation on Custom Prompt Change (`backend/main.py`, Paritas Chaquopy):**

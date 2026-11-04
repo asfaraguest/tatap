@@ -1133,13 +1133,22 @@ function formatTimeSec(sec){
 
 var _lastProgressSaveTime = 0;
 function recordWatchProgress(force){
-  var v = $("vid");
-  if(!v || !cur.slug || !cur.ep) return;
+  if(!cur.slug || !cur.ep) return;
   var now = Date.now();
   if(!force && (now - _lastProgressSaveTime < 5000)) return;
   _lastProgressSaveTime = now;
-  var curPos = Math.floor(v.currentTime || 0);
-  var dur = Math.floor(v.duration || 0);
+  var curPos = 0;
+  var dur = 0;
+  if(window.art && typeof window.art.currentTime === "number" && !isNaN(window.art.currentTime)){
+    curPos = Math.floor(window.art.currentTime || 0);
+    dur = Math.floor(window.art.duration || 0);
+  } else {
+    var v = $("vid");
+    if(v && !isNaN(v.currentTime)){
+      curPos = Math.floor(v.currentTime || 0);
+      dur = Math.floor(v.duration || 0);
+    }
+  }
   if(curPos <= 0 && !force) return;
   window.Tatap.saveProgress(cur.slug, cur.ep, curPos, dur).then(function(){
     renderContinue();
@@ -1627,6 +1636,12 @@ function syncArtplayerSubtitles(subtitles, activeUrl){
       window.art.setting.update(settingItem);
     } else {
       window.art.setting.add(settingItem);
+    }
+    if(window.art.subtitle){
+      try { window.art.subtitle.show = !!activeUrl; } catch(_){}
+    }
+    if(window.art.template && window.art.template.$player){
+      window.art.template.$player.classList.toggle("art-subtitle-show", !!activeUrl);
     }
   }catch(_){}
 }
@@ -2183,20 +2198,21 @@ function toggleFullscreen(){
 function paintCue(){
   var box=$("pm-subs-overlay");
   var v=$("vid");
-  if(!box||!v)return;
+  if(!box)return;
   var s=box.querySelector("span");
-  if(!s)return;
   if($("player-modal").classList.contains("hidden")){
-    s.innerHTML="";
+    if(s){ s.innerHTML=""; s._last=""; }
     if(window.art && window.art.template && window.art.template.$subtitle){
       window.art.template.$subtitle.innerHTML="";
     }
     return;
   }
-  var t=v.currentTime||0;
+  var t = (window.art && typeof window.art.currentTime === "number" && !isNaN(window.art.currentTime))
+          ? window.art.currentTime
+          : ((v && !isNaN(v.currentTime)) ? v.currentTime : 0);
   var subTime = t - (cur.subDelay || 0.0);
   if(isVideoFullscreen() && !isDesktopEnv()){
-    if(s._last!==""){s.innerHTML="";s._last="";}
+    if(s && s._last!==""){s.innerHTML="";s._last="";}
     box.style.display="none";
   }else{
     box.style.display="";
@@ -2208,7 +2224,7 @@ function paintCue(){
       }
     }
     var html=activeParts.join("<br>");
-    if(s._last!==html){s.innerHTML=html;s._last=html;}
+    if(s && s._last!==html){s.innerHTML=html;s._last=html;}
     if(window.art && window.art.template && window.art.template.$subtitle){
       var artSub = window.art.template.$subtitle;
       if(artSub._last !== html){
@@ -2230,12 +2246,14 @@ function checkSkipTimes(currentTime){
   var intro=cur.intro;
   var outro=cur.outro;
   var isAutoSkip = !!(window.settings && window.settings.autoSkip !== undefined ? window.settings.autoSkip : cur.autoSkip);
+  var t = (typeof currentTime === "number" && !isNaN(currentTime)) ? currentTime : ((window.art && !isNaN(window.art.currentTime)) ? window.art.currentTime : (v ? v.currentTime : 0));
+  var dur = (window.art && !isNaN(window.art.duration)) ? window.art.duration : (v ? v.duration : Infinity);
 
-  var inIntro=(intro && intro.end > intro.start && intro.end > 0 && currentTime >= intro.start && currentTime < (intro.end - 0.5));
-  var inOutro=(outro && outro.end > outro.start && outro.end > 0 && currentTime >= outro.start && currentTime < (outro.end - 0.5));
+  var inIntro=(intro && intro.end > intro.start && intro.end > 0 && t >= intro.start && t < (intro.end - 0.5));
+  var inOutro=(outro && outro.end > outro.start && outro.end > 0 && t >= outro.start && t < (outro.end - 0.5));
 
   if(inIntro){
-    cur.activeSkipTarget = Math.min((v && v.duration) || Infinity, intro.end + 0.5);
+    cur.activeSkipTarget = Math.min(dur, intro.end + 0.5);
     if(isAutoSkip && !cur.hasAutoSkippedIntro){
       cur.hasAutoSkippedIntro = true;
       if(window.art) window.art.currentTime = cur.activeSkipTarget;
@@ -2251,7 +2269,7 @@ function checkSkipTimes(currentTime){
     if(btn) btn.classList.remove("hidden");
     if(artBtn) artBtn.classList.remove("hidden");
   }else if(inOutro){
-    cur.activeSkipTarget = Math.min((v && v.duration) || Infinity, outro.end + 0.5);
+    cur.activeSkipTarget = Math.min(dur, outro.end + 0.5);
     if(isAutoSkip && !cur.hasAutoSkippedOutro){
       cur.hasAutoSkippedOutro = true;
       if(window.art) window.art.currentTime = cur.activeSkipTarget;
@@ -2277,7 +2295,7 @@ function doSkip(){
   if(cur.activeSkipTarget && cur.activeSkipTarget > 0){
     var v=$("vid");
     if(window.art || v){
-      var t = window.art ? window.art.currentTime : (v ? v.currentTime : 0);
+      var t = (window.art && !isNaN(window.art.currentTime)) ? window.art.currentTime : (v ? v.currentTime : 0);
       if(cur.intro && t >= cur.intro.start && t < cur.intro.end){
         cur.hasAutoSkippedIntro = true;
       }
@@ -2875,9 +2893,37 @@ function playUrl(url,referrer,sub,subRef,resumeTime,token){
           html: '<span style="font-weight:700;font-size:11px;background:rgba(56,189,248,0.15);color:#38bdf8;padding:3px 8px;border-radius:4px;border:1px solid #38bdf8;cursor:pointer;" title="Pengaturan AI Fansub (:ai)">AI</span>',
           tooltip: "Pengaturan AI Fansub (:ai)",
           click: function(){ openAiSettingsModal(); }
+        },
+        {
+          name: "close-btn",
+          position: "right",
+          index: 95,
+          html: '<span style="font-weight:700;font-size:13px;padding:3px 8px;cursor:pointer;opacity:0.9;border-radius:4px;border:1px solid rgba(255,255,255,0.2);" title="Tutup Pemutar (Esc)">✕</span>',
+          tooltip: "Tutup Pemutar (Esc)",
+          click: function(){ closePlayer(); }
         }
       ],
       layers: [
+        {
+          name: "header-layer",
+          html: '<div class="art-header-layer" id="art-header-layer">' +
+                  '<div class="art-header-title" id="art-header-title">' + esc(epTitle) + '</div>' +
+                  '<button type="button" class="art-header-close" id="art-header-close" title="Tutup Pemutar Video (Esc)">✕</button>' +
+                '</div>',
+          style: {
+            position: "absolute",
+            top: "0",
+            left: "0",
+            right: "0",
+            zIndex: 25,
+            pointerEvents: "none"
+          },
+          click: function(e){
+            if(e.target && (e.target.id === "art-header-close" || e.target.closest("#art-header-close"))){
+              closePlayer();
+            }
+          }
+        },
         {
           name: "aniskip-layer",
           html: '<button id="art-aniskip-btn" class="art-aniskip-btn hidden" title="Lewati Opening/Ending (Tekan S)">' +
@@ -3065,12 +3111,23 @@ function playUrl(url,referrer,sub,subRef,resumeTime,token){
     window.art = art;
 
     if(art.template && art.template.$video){
+      var oldV = $("vid");
+      if(oldV && oldV !== art.template.$video && oldV.parentNode){
+        try{ oldV.parentNode.removeChild(oldV); }catch(_){}
+      }
       art.template.$video.id = "vid";
       art.template.$video.setAttribute("controlsList", "nodownload nofullscreen noremoteplayback");
       art.template.$video.removeAttribute("disablePictureInPicture");
       art.template.$video.disablePictureInPicture = false;
       v = art.template.$video;
     }
+
+    art.on("control", function(show){
+      var hdr = $("art-header-layer");
+      if(hdr){
+        hdr.style.opacity = show ? "1" : "0";
+      }
+    });
 
     // Default Full-Browser Screen
     art.fullscreenWeb = true;
@@ -3369,6 +3426,8 @@ function closePlayer(){
   TvNavigationManager.hidePlayerControls();
   closeOpenSubtitlesPicker();
 
+  try{ recordWatchProgress(true); }catch(e){}
+
   if(window.art){
     try{
       window.art.destroy(false);
@@ -3376,10 +3435,18 @@ function closePlayer(){
     }catch(e){}
   }
 
+  // Restore placeholder dummy vid if needed for non-playing state
+  var stage = document.querySelector(".ambient-stage");
+  if(stage && !$("vid")){
+    var placeholderVid = document.createElement("video");
+    placeholderVid.id = "vid";
+    placeholderVid.style.display = "none";
+    stage.appendChild(placeholderVid);
+  }
+
   // 2. Safely stop and destroy video & HLS stream
   var v=$("vid");
-  try{recordWatchProgress(true);}catch(e){}
-  if(v){
+  if(v && v.style.display !== "none"){
     try{v.pause();}catch(e){}
     v.removeAttribute("src");
     try{v.load();}catch(e){}
@@ -3741,18 +3808,30 @@ function onKeyPlayer(e){
   var isSpace = e.key===" " || e.key==="Spacebar" || e.code==="Space" || e.keyCode===32;
 
   if(pState === TvNavigationManager.PLAYER_IDLE){
-    if(e.key==="ArrowRight"){e.preventDefault();v.currentTime+=5;return;}
-    if(e.key==="ArrowLeft"){e.preventDefault();v.currentTime-=5;return;}
+    if(e.key==="ArrowRight"){
+      e.preventDefault();
+      if(window.art) window.art.seek = Math.min(window.art.duration || Infinity, window.art.currentTime + 5);
+      else if(v) v.currentTime += 5;
+      return;
+    }
+    if(e.key==="ArrowLeft"){
+      e.preventDefault();
+      if(window.art) window.art.seek = Math.max(0, window.art.currentTime - 5);
+      else if(v) v.currentTime -= 5;
+      return;
+    }
     if(e.key==="Enter"||isSpace){
       e.preventDefault();
       if(document.activeElement && document.activeElement !== document.body && document.activeElement !== v){
         try { document.activeElement.blur(); } catch(_){}
       }
       var skipBtn = $("pm-skip-btn");
-      if(skipBtn && !skipBtn.classList.contains("hidden") && (cur.activeSkipTarget > 0)){
+      var artBtn = $("art-aniskip-btn");
+      if(((skipBtn && !skipBtn.classList.contains("hidden")) || (artBtn && !artBtn.classList.contains("hidden"))) && (cur.activeSkipTarget > 0)){
         doSkip();
       } else {
-        if(v.paused) v.play(); else v.pause();
+        if(window.art) window.art.toggle();
+        else if(v) { if(v.paused) v.play(); else v.pause(); }
       }
       return;
     }
@@ -3762,8 +3841,13 @@ function onKeyPlayer(e){
         TvNavigationManager.showPlayerControls($("pm-speed-select") || $("pm-close"));
         return;
       }
-      v.volume=Math.min(1, Math.round(((v.volume||1)+0.1)*10)/10);
-      toast("Volume: "+Math.round(v.volume*100)+"%", 1200);
+      if(window.art){
+        window.art.volume = Math.min(1, Math.round(((window.art.volume || 1) + 0.1) * 10) / 10);
+        toast("Volume: " + Math.round(window.art.volume * 100) + "%", 1200);
+      } else if(v){
+        v.volume = Math.min(1, Math.round(((v.volume || 1) + 0.1) * 10) / 10);
+        toast("Volume: " + Math.round(v.volume * 100) + "%", 1200);
+      }
       return;
     }
     if(e.key==="ArrowDown"){
@@ -3777,8 +3861,13 @@ function onKeyPlayer(e){
         }
         return;
       }
-      v.volume=Math.max(0, Math.round(((v.volume||1)-0.1)*10)/10);
-      toast("Volume: "+Math.round(v.volume*100)+"%", 1200);
+      if(window.art){
+        window.art.volume = Math.max(0, Math.round(((window.art.volume || 1) - 0.1) * 10) / 10);
+        toast("Volume: " + Math.round(window.art.volume * 100) + "%", 1200);
+      } else if(v){
+        v.volume = Math.max(0, Math.round(((v.volume || 1) - 0.1) * 10) / 10);
+        toast("Volume: " + Math.round(v.volume * 100) + "%", 1200);
+      }
       return;
     }
   }
@@ -3828,10 +3917,12 @@ function onKeyPlayer(e){
       try { document.activeElement.blur(); } catch(_){}
     }
     var skipBtn = $("pm-skip-btn");
-    if(skipBtn && !skipBtn.classList.contains("hidden") && (cur.activeSkipTarget > 0)){
+    var artBtn = $("art-aniskip-btn");
+    if(((skipBtn && !skipBtn.classList.contains("hidden")) || (artBtn && !artBtn.classList.contains("hidden"))) && (cur.activeSkipTarget > 0)){
       doSkip();
     } else {
-      if(v.paused) v.play(); else v.pause();
+      if(window.art) window.art.toggle();
+      else if(v) { if(v.paused) v.play(); else v.pause(); }
     }
     return;
   }
@@ -3850,29 +3941,45 @@ function onKeyPlayer(e){
   else if(e.key==="]"||e.key==="}"){e.preventDefault();adjustPlaySpeed(1);}
   else if(e.key==="m"||e.key==="M"){
     e.preventDefault();
-    v.muted=!v.muted;
-    toast(v.muted ? "Muted" : "Unmuted ("+Math.round((v.volume||1)*100)+"%)", 1200);
+    if(window.art){
+      window.art.muted = !window.art.muted;
+      toast(window.art.muted ? "Muted" : "Unmuted (" + Math.round((window.art.volume || 1) * 100) + "%)", 1200);
+    } else if(v){
+      v.muted = !v.muted;
+      toast(v.muted ? "Muted" : "Unmuted (" + Math.round((v.volume || 1) * 100) + "%)", 1200);
+    }
   }
   else if(e.key==="s"||e.key==="S"){
     e.preventDefault();
     var skipBtn = $("pm-skip-btn");
-    var isSkipActive = skipBtn && !skipBtn.classList.contains("hidden") && cur.activeSkipTarget > 0;
+    var artBtn = $("art-aniskip-btn");
+    var isSkipActive = ((skipBtn && !skipBtn.classList.contains("hidden")) || (artBtn && !artBtn.classList.contains("hidden"))) && cur.activeSkipTarget > 0;
     if(isSkipActive){
       doSkip();
       return;
     }
     switchSource();
   }
-  else if(e.key==="ArrowRight"){e.preventDefault();v.currentTime+=5;}
-  else if(e.key==="ArrowLeft"){e.preventDefault();v.currentTime-=5;}
+  else if(e.key==="ArrowRight"){
+    e.preventDefault();
+    if(window.art) window.art.seek = Math.min(window.art.duration || Infinity, window.art.currentTime + 5);
+    else if(v) v.currentTime += 5;
+  }
+  else if(e.key==="ArrowLeft"){
+    e.preventDefault();
+    if(window.art) window.art.seek = Math.max(0, window.art.currentTime - 5);
+    else if(v) v.currentTime -= 5;
+  }
   else if(e.key==="ArrowUp"){
     e.preventDefault();
     v.volume=Math.min(1, Math.round(((v.volume||1)+0.1)*10)/10);
+    if(window.art) try { window.art.volume = v.volume; } catch(_){}
     toast("Volume: "+Math.round(v.volume*100)+"%", 1200);
   }
   else if(e.key==="ArrowDown"){
     e.preventDefault();
     v.volume=Math.max(0, Math.round(((v.volume||1)-0.1)*10)/10);
+    if(window.art) try { window.art.volume = v.volume; } catch(_){}
     toast("Volume: "+Math.round(v.volume*100)+"%", 1200);
   }
 }
