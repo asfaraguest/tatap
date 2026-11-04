@@ -1648,9 +1648,9 @@ function buildSubtitleControl(subtitles, activeUrl){
   return {
     name: "sub-control",
     position: "right",
-    index: 17,
+    index: 12,
     style: { marginRight: "4px" },
-    html: '<span class="art-sub-control-btn" title="Pilih Subtitle"><svg style="width:14px;height:14px;vertical-align:middle;margin-right:2px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="2" y="4" width="20" height="16" rx="3"></rect><path d="M7 15h3M14 15h3M7 11h10"></path></svg>SUB</span>',
+    html: '<span class="art-ctrl-btn art-ctrl-sub-btn" title="Pilih Subtitle"><svg class="art-ctrl-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="3"></rect><path d="M7 15h3M14 15h3M7 11h10"></path></svg><span>SUB</span></span>',
     tooltip: "Pilih Subtitle",
     selector: trackList,
     onSelect: function(item){
@@ -1662,7 +1662,7 @@ function buildSubtitleControl(subtitles, activeUrl){
         switchSubtitleTrack(item.value);
       }
       if(window.art && window.art.notice) window.art.notice.show = "Subtitle: " + item.html;
-      return '<span class="art-sub-control-btn" title="Pilih Subtitle"><svg style="width:14px;height:14px;vertical-align:middle;margin-right:2px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="2" y="4" width="20" height="16" rx="3"></rect><path d="M7 15h3M14 15h3M7 11h10"></path></svg>SUB</span>';
+      return '<span class="art-ctrl-btn art-ctrl-sub-btn" title="Pilih Subtitle"><svg class="art-ctrl-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="3"></rect><path d="M7 15h3M14 15h3M7 11h10"></path></svg><span>SUB</span></span>';
     },
     mounted: function($control){
       $control.addEventListener("click", function(e){
@@ -1761,15 +1761,15 @@ function buildQualityControl(levels, activeQ){
   return {
     name: "quality",
     position: "right",
-    index: 18,
+    index: 10,
     style: { marginRight: "4px" },
-    html: '<span class="art-quality-label">' + activeQ.toUpperCase() + '</span>',
+    html: '<span class="art-ctrl-btn art-ctrl-quality-btn" id="art-quality-label" title="Pilih Resolusi Video"><svg class="art-ctrl-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg><span class="art-quality-text">' + activeQ.toUpperCase() + '</span></span>',
     tooltip: "Pilih Resolusi Video",
     selector: selList,
     onSelect: function(item){
       switchQ(item.html);
       if(window.art && window.art.notice) window.art.notice.show = "Resolusi: " + item.html;
-      return '<span class="art-quality-label">' + item.html.toUpperCase() + '</span>';
+      return '<span class="art-ctrl-btn art-ctrl-quality-btn" id="art-quality-label" title="Pilih Resolusi Video"><svg class="art-ctrl-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg><span class="art-quality-text">' + item.html.toUpperCase() + '</span></span>';
     },
     mounted: function($control){
       $control.addEventListener("click", function(e){
@@ -1839,9 +1839,9 @@ function syncTranslateBtn(){
   var trControl = {
     name: "tr-btn",
     position: "right",
-    index: 19,
+    index: 14,
     style: { marginRight: "4px" },
-    html: '<span class="art-tr-btn' + (cur.translate ? ' active' : '') + '" title="Terjemahan Bahasa Indonesia (ID)">TR-ID</span>',
+    html: '<span class="art-ctrl-btn art-ctrl-tr-btn' + (cur.translate ? ' active' : '') + '" title="Terjemahan Bahasa Indonesia (ID)"><svg class="art-ctrl-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg><span>TR-ID</span></span>',
     tooltip: cur.translate ? "Terjemahan Indonesia: Aktif" : "Terjemahan Indonesia: Nonaktif",
     click: function(){
       setTranslate(!cur.translate);
@@ -3083,51 +3083,63 @@ function playUrl(url,referrer,sub,subRef,resumeTime,token){
         {
           name: "prev-btn",
           position: "left",
-          index: 10,
-          html: '<span style="font-weight:700;font-size:12px;padding:2px 8px;cursor:pointer;opacity:0.9;" title="Episode Sebelumnya (p)">⏮ PREV</span>',
+          index: 11,
+          html: '<span class="art-ctrl-btn art-ctrl-ep-btn" id="art-ctrl-prev" title="Episode Sebelumnya (p)"><svg class="art-ctrl-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="19 20 9 12 19 4 19 20"></polygon><line x1="5" y1="19" x2="5" y2="5"></line></svg><span>PREV</span></span>',
           tooltip: "Episode Sebelumnya (p)",
           click: function(){ stepEp(-1); }
         },
         {
           name: "next-btn",
           position: "left",
-          index: 11,
-          html: '<span style="font-weight:700;font-size:12px;padding:2px 8px;cursor:pointer;opacity:0.9;" title="Episode Berikutnya (n)">NEXT ⏭</span>',
+          index: 12,
+          html: '<span class="art-ctrl-btn art-ctrl-ep-btn" id="art-ctrl-next" title="Episode Berikutnya (n)"><span>NEXT</span><svg class="art-ctrl-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 4 15 12 5 20 5 4"></polygon><line x1="19" y1="5" x2="19" y2="19"></line></svg></span>',
           tooltip: "Episode Berikutnya (n)",
           click: function(){ stepEp(1); }
         },
-        initialSubCtrl,
         initialQualityCtrl,
+        initialSubCtrl,
         {
           name: "tr-btn",
           position: "right",
-          index: 19,
+          index: 14,
           style: { marginRight: "4px" },
-          html: '<span class="art-tr-btn' + (cur.translate ? ' active' : '') + '" title="Terjemahan Bahasa Indonesia (ID)">TR-ID</span>',
+          html: '<span class="art-ctrl-btn art-ctrl-tr-btn' + (cur.translate ? ' active' : '') + '" title="Terjemahan Bahasa Indonesia (ID)"><svg class="art-ctrl-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg><span>TR-ID</span></span>',
           tooltip: cur.translate ? "Terjemahan Indonesia: Aktif" : "Terjemahan Indonesia: Nonaktif",
           click: function(){ setTranslate(!cur.translate); }
         },
         {
-          name: "mpv-btn",
+          name: "sep-1",
           position: "right",
-          index: 20,
-          html: '<span style="font-weight:700;font-size:11px;background:rgba(255,255,255,0.12);padding:3px 8px;border-radius:4px;border:1px solid rgba(255,255,255,0.2);cursor:pointer;" title="Putar di MPV Eksternal">MPV</span>',
-          tooltip: "Putar di MPV Eksternal",
-          click: function(){ playMPV(); }
+          index: 15,
+          html: '<span class="art-ctrl-divider"></span>'
         },
         {
           name: "ai-btn",
           position: "right",
-          index: 21,
-          html: '<span style="font-weight:700;font-size:11px;background:rgba(56,189,248,0.15);color:#38bdf8;padding:3px 8px;border-radius:4px;border:1px solid #38bdf8;cursor:pointer;" title="Pengaturan AI Fansub (:ai)">AI</span>',
+          index: 20,
+          html: '<span class="art-ctrl-btn art-ctrl-ai-btn" title="Pengaturan AI Fansub (:ai)"><svg class="art-ctrl-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"></rect><rect x="9" y="9" width="6" height="6"></rect><line x1="9" y1="1" x2="9" y2="4"></line><line x1="15" y1="1" x2="15" y2="4"></line><line x1="9" y1="20" x2="9" y2="23"></line><line x1="15" y1="20" x2="15" y2="23"></line><line x1="20" y1="9" x2="23" y2="9"></line><line x1="20" y1="14" x2="23" y2="14"></line><line x1="1" y1="9" x2="4" y2="9"></line><line x1="1" y1="14" x2="4" y2="14"></line></svg><span>AI</span></span>',
           tooltip: "Pengaturan AI Fansub (:ai)",
           click: function(){ openAiSettingsModal(); }
+        },
+        {
+          name: "mpv-btn",
+          position: "right",
+          index: 22,
+          html: '<span class="art-ctrl-btn art-ctrl-mpv-btn" title="Putar di MPV Eksternal"><svg class="art-ctrl-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg><span>MPV</span></span>',
+          tooltip: "Putar di MPV Eksternal",
+          click: function(){ playMPV(); }
+        },
+        {
+          name: "sep-2",
+          position: "right",
+          index: 25,
+          html: '<span class="art-ctrl-divider"></span>'
         },
         {
           name: "close-btn",
           position: "right",
           index: 95,
-          html: '<span style="font-weight:700;font-size:13px;padding:3px 8px;cursor:pointer;opacity:0.9;border-radius:4px;border:1px solid rgba(255,255,255,0.2);" title="Tutup Pemutar (Esc)">✕</span>',
+          html: '<span class="art-ctrl-btn art-ctrl-close-btn" title="Tutup Pemutar (Esc)"><svg class="art-ctrl-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></span>',
           tooltip: "Tutup Pemutar (Esc)",
           click: function(){ closePlayer(); }
         }
@@ -3714,9 +3726,17 @@ function updatePrevNext(){
   if(window.art && window.art.controls){
     try{
       var pBtn = window.art.controls["prev-btn"];
-      if(pBtn) pBtn.style.opacity = hasPrev ? "0.9" : "0.35";
+      if(pBtn){
+        pBtn.style.opacity = hasPrev ? "1" : "0.35";
+        pBtn.style.pointerEvents = hasPrev ? "auto" : "none";
+        pBtn.classList.toggle("disabled", !hasPrev);
+      }
       var nBtn = window.art.controls["next-btn"];
-      if(nBtn) nBtn.style.opacity = hasNext ? "0.9" : "0.35";
+      if(nBtn){
+        nBtn.style.opacity = hasNext ? "1" : "0.35";
+        nBtn.style.pointerEvents = hasNext ? "auto" : "none";
+        nBtn.classList.toggle("disabled", !hasNext);
+      }
     }catch(_){}
   }
 }
@@ -3728,9 +3748,12 @@ function stepEp(d){
   if(nxt){
     cur.ep=nxt.ep;
     updatePrevNext();
+    var epLabel = nxt.ep ? ("Episode " + nxt.ep) : "";
+    var dirLabel = d > 0 ? "Memuat episode berikutnya" : "Memuat episode sebelumnya";
+    toast("⏳ " + dirLabel + (epLabel ? " (" + epLabel + ")" : "") + "...", 2000);
     openPlayer(nxt.ep);
   }
-  else toast(d>0?"Sudah episode terakhir":"Sudah episode pertama");
+  else toast(d>0 ? "Sudah berada di episode terakhir" : "Sudah berada di episode pertama", 1500);
 }
 function closePlayer(){
   // 1. Invalidate all pending async playback tokens immediately

@@ -105,6 +105,15 @@ Kenaikan digit PATCH diterapkan sesuai kaidah Semantic Versioning 2.0.0 dan Dire
    - Menghilangkan total efek vignette / gradien hitam di bagian bawah video (`.art-bottom`, `.art-bottom-gradient`) agar subtitle 100% jernih, kontras, dan tidak tertutupi bayangan hitam.
    - Menghadirkan tombol opsi resolusi (`quality`) interaktif pada bar kontrol dan menu Setting Artplayer lengkap dengan pop-up selector (Auto, 1080p, 720p, 480p, 360p) yang langsung terhubung ke multi-level HLS.js dan varian stream.
    - Memigrasikan seluruh fitur player bawaan ke kontrol native Artplayer: pemilih track subtitle cepat (CC dropdown), toggle terjemahan ID (TR-ID), kustomisasi delay dan ukuran subtitle, seleksi trek audio ganda (Sub vs Dub), penangkapan tangkapan layar (screenshot native), rasio aspek, flip, mini progress bar, dan tombol MPV/AI Fansub.
+9. **Desain Ulang Kontrol Artplayer.js Flat Translucent Glass, Pengelompokan Logis, & Toast Navigasi Episode (`frontend/js/app.js`, `frontend/css/style.css`):**
+   - **Modern Flat Translucent Control Bar:** Mempercantik control bar Artplayer dengan estetika modern flat translucent glassmorphism (`rgba(10, 14, 22, 0.72)` + `backdrop-filter: blur(20px)` + subtle border + soft drop shadow), sudut melengkung halus, dan tata letak padat tanpa gradien gelap yang mengganggu.
+   - **Penataan & Pengelompokan Logis Kontrol:** Menata ulang seluruh tombol kontrol ke dalam kelompok terstruktur rapi:
+     - *Kelompok Kiri (Playback & Waktu):* Tombol Play/Pause, navigasi episode Sebelumnya (Prev `⏮`) dan Berikutnya (Next `⏭`), volume slider, dan indikator waktu video (`00:00 / 00:00`).
+     - *Kelompok Kanan 1 (Stream & Subtitle):* Selector Kualitas Resolusi (`1080p`, `720p`, dll.), Selector Subtitle (CC), Toggle Terjemahan ID (`TR-ID`), dan garis pemisah vertikal transparan (`art-ctrl-divider`).
+     - *Kelompok Kanan 2 (Enhancement Eksternal):* Tombol Pintasan Pengaturan AI Fansub (`AI`), Tombol Luncurkan MPV Eksternal (`MPV`), dan garis pemisah vertikal.
+     - *Kelompok Kanan 3 (Utility & Tampilan):* Cuplikan Layar (`Screenshot`), Menu Pengaturan Video (`Settings`), Picture-in-Picture (`PiP`), Layar Penuh Jendela (`WebFS`), Layar Penuh Monitor (`Fullscreen`), dan Tombol Tutup Player (`✕`).
+   - **Percantik Ikon & Tipografi Tombol:** Seluruh tombol fungsi kini menggunakan styling seragam (`.art-ctrl-btn`) dengan ikon SVG tajam dan modern, micro-interaction hover lembut, state aktif bercahaya biru aksen (`#38bdf8`), serta state nonaktif (`disabled`) pada episode batas dengan visual transparan 32% dan pointer events nonaktif.
+   - **Indikator Toast Navigasi Episode:** Menambahkan notifikasi toast interaktif seketika saat tombol Prev/Next diklik atau dipicu via shortcut keyboard (`⏳ Memuat episode berikutnya (Ep X)...` / `⏳ Memuat episode sebelumnya (Ep X)...`), serta pemberitahuan toast jika sudah berada di episode awal atau akhir.
 
 ### Tests
 - Menambahkan test suite `tests/test_custom_prompt.py` untuk menguji pembuatan system prompt dengan instruksi khusus pengguna, prioritas prompt, dan persistensi database settings.
