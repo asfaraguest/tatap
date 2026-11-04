@@ -211,7 +211,7 @@ body.no-crt #crt{display:none}
 .update-btn:hover{opacity:.88}
 
 /* ---- AI SETTINGS MODAL STYLING ---- */
-#ai-settings-modal.overlay{z-index:160;background:rgba(0,0,0,0.88)}
+#ai-settings-modal.overlay{z-index:99999 !important;background:rgba(0,0,0,0.88)}
 .ai-settings-sheet{width:min(600px,94vw);max-height:88vh;display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-card);padding:18px 20px;gap:14px;box-shadow:0 16px 48px rgba(0,0,0,0.7)}
 .ai-settings-body{display:flex;flex-direction:column;gap:12px;overflow-y:auto;padding-right:2px}
 .ai-status-card{display:flex;justify-content:space-between;background:var(--surface-hover);border:1px solid var(--border);border-radius:var(--r);padding:10px 14px;gap:8px;flex-wrap:wrap}
@@ -237,7 +237,7 @@ body.no-crt #crt{display:none}
 .sub-ai-btn:hover{border-color:var(--accent);color:var(--accent)}
 
 /* ---- RESUME MODAL STYLING ---- */
-#resume-modal.overlay{z-index:160;background:rgba(0,0,0,0.88)}
+#resume-modal.overlay{z-index:99999 !important;background:rgba(0,0,0,0.88)}
 .resume-sheet{width:min(490px,94vw);max-height:86vh;display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-card);padding:20px;gap:14px;box-shadow:0 16px 40px rgba(0,0,0,0.8)}
 .rm-anime-title{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:380px;margin:2px 0 4px}
 .rm-badge-ep{display:inline-block;font-size:10px;font-weight:700;color:var(--accent);background:var(--accent-soft);border:1px solid rgba(56,189,248,0.3);padding:1px 6px;border-radius:4px;margin-right:6px;vertical-align:middle}
@@ -935,7 +935,7 @@ body.mobile-native-sub video::cue {
 .player-foot>.variants{flex:0 1 auto;max-width:55%}
 .player-foot>.sub-picker{flex:0 0 auto}
 .player-hint{margin-top:8px;text-align:center;font-size:clamp(10px,0.3vw + 0.55rem,11px)}
-.toast{position:fixed;bottom:calc(var(--status-h) + 60px);left:50%;transform:translateX(-50%);z-index:200;background:var(--panel);border:1px solid var(--acc);color:var(--txt);padding:9px 16px;border-radius:var(--r);font-size:12px;max-width:92vw;text-align:center}
+.toast{position:fixed;bottom:calc(var(--status-h) + 60px);left:50%;transform:translateX(-50%);z-index:999999 !important;background:rgba(15, 23, 42, 0.95) !important;backdrop-filter:blur(16px) !important;border:1px solid rgba(56, 189, 248, 0.45) !important;color:#f1f5f9 !important;box-shadow:0 10px 30px rgba(0,0,0,0.7), 0 0 16px rgba(56,189,248,0.25) !important;padding:9px 18px;border-radius:var(--r);font-size:12.5px;font-weight:600;max-width:92vw;text-align:center}
 .toast.hidden{display:none}
 
 /* ==================== BREAKPOINTS ==================== */
@@ -1809,6 +1809,24 @@ body.mobile-native-sub video::cue {
   background: #ffffff !important;
   border: 2px solid var(--accent, #38bdf8) !important;
   box-shadow: 0 0 10px var(--accent, #38bdf8) !important;
+}
+
+/* Artplayer In-Player Notification Notice (Toast inside video stage) */
+.art-video-player .art-notice {
+  z-index: 120 !important;
+}
+.art-video-player .art-notice-inner {
+  background: rgba(10, 14, 22, 0.90) !important;
+  backdrop-filter: blur(18px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(18px) saturate(180%) !important;
+  border: 1px solid rgba(56, 189, 248, 0.45) !important;
+  border-radius: 9px !important;
+  color: #f8fafc !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Inter", sans-serif !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  padding: 8px 18px !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.65), 0 0 16px rgba(56, 189, 248, 0.25) !important;
 }
 
 /* Suppress all native HTML5 video player shadow DOM controls */

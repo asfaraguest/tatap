@@ -92,10 +92,19 @@ function adjustPlaySpeed(dir){
 function $(id){return document.getElementById(id);}
 function esc(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");}
 function toast(msg,ms){
-  $("toast-msg").textContent=msg;
-  $("toast").classList.remove("hidden");
-  clearTimeout(window._toastT);
-  window._toastT=setTimeout(function(){$("toast").classList.add("hidden");},ms||2200);
+  try {
+    if(window.art && window.art.notice && typeof window.art.notice.show !== "undefined"){
+      window.art.notice.show = msg;
+    }
+  } catch(_){}
+  var tMsg = $("toast-msg");
+  var tBox = $("toast");
+  if(tMsg && tBox){
+    tMsg.textContent=msg;
+    tBox.classList.remove("hidden");
+    clearTimeout(window._toastT);
+    window._toastT=setTimeout(function(){tBox.classList.add("hidden");},ms||2200);
+  }
 }
 
 /* =====================================================================
@@ -2940,13 +2949,26 @@ function playUrl(url,referrer,sub,subRef,resumeTime,token){
   if(v) v.addEventListener("canplay",onCan,{once:true});
   var cleanPath = (url || "").split("?")[0].toLowerCase();
   var isSeg = cleanPath.endsWith(".ts") || cleanPath.endsWith(".ts.jpg") || cleanPath.endsWith(".mp4") || cleanPath.endsWith(".aac");
-  var isHls = !isSeg && ((url.indexOf(".m3u8") >= 0) || (url.indexOf("format=m3u8") >= 0) || (url.indexOf("/api/hls") >= 0) || (url.indexOf("/hls/playlist") >= 0));
+  var isHls = !isSeg && ((url.indexOf(".m3u8") >= 0) || (url.indexOf("format=m3u8") >= 0) || (url.indexOf("/api/hls") >= 0) || (url.indexOf("/hls/playlist") >= 0) || (url.indexOf("/api/player/video") >= 0) || (url.indexOf("master") >= 0) || (url.indexOf("playlist") >= 0) || (cur.res && cur.res.variants && cur.res.variants.length > 0));
 
   var artContainer = $("artplayer-container");
   if(typeof Artplayer !== "undefined" && artContainer){
+    Artplayer.FULLSCREEN_WEB_IN_BODY = false;
     if(window.art){
-      try{ window.art.destroy(true); window.art = null; }catch(_){}
+      try{
+        if(window.art.fullscreenWeb) window.art.fullscreenWeb = false;
+        if(window.art.fullscreen) window.art.fullscreen = false;
+        if(window.art.template && window.art.template.$player && window.art.template.$player.parentNode){
+          window.art.template.$player.parentNode.removeChild(window.art.template.$player);
+        }
+        window.art.destroy(true);
+        window.art = null;
+      }catch(_){}
     }
+    document.querySelectorAll("body > .art-video-player").forEach(function(el){
+      try{ el.parentNode.removeChild(el); }catch(_){}
+    });
+    document.body.classList.remove("art-fullscreen-web");
     artContainer.innerHTML = "";
     var epTitle = (cur.title || "") + (cur.ep ? (" - Episode " + cur.ep) : "");
     var initialSubCtrl = buildSubtitleControl((cur.res && cur.res.subtitles) || [], validSub);
@@ -3119,7 +3141,13 @@ function playUrl(url,referrer,sub,subRef,resumeTime,token){
           index: 20,
           html: '<span class="art-ctrl-btn art-ctrl-ai-btn" title="Pengaturan AI Fansub (:ai)"><svg class="art-ctrl-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"></rect><rect x="9" y="9" width="6" height="6"></rect><line x1="9" y1="1" x2="9" y2="4"></line><line x1="15" y1="1" x2="15" y2="4"></line><line x1="9" y1="20" x2="9" y2="23"></line><line x1="15" y1="20" x2="15" y2="23"></line><line x1="20" y1="9" x2="23" y2="9"></line><line x1="20" y1="14" x2="23" y2="14"></line><line x1="1" y1="9" x2="4" y2="9"></line><line x1="1" y1="14" x2="4" y2="14"></line></svg><span>AI</span></span>',
           tooltip: "Pengaturan AI Fansub (:ai)",
-          click: function(){ openAiSettingsModal(); }
+          click: function(){ openAiSettingsModal(); },
+          mounted: function($control){
+            $control.addEventListener("click", function(e){
+              e.stopPropagation();
+              openAiSettingsModal();
+            });
+          }
         },
         {
           name: "mpv-btn",
@@ -3127,7 +3155,13 @@ function playUrl(url,referrer,sub,subRef,resumeTime,token){
           index: 22,
           html: '<span class="art-ctrl-btn art-ctrl-mpv-btn" title="Putar di MPV Eksternal"><svg class="art-ctrl-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg><span>MPV</span></span>',
           tooltip: "Putar di MPV Eksternal",
-          click: function(){ playMPV(); }
+          click: function(){ playMPV(); },
+          mounted: function($control){
+            $control.addEventListener("click", function(e){
+              e.stopPropagation();
+              playMPV();
+            });
+          }
         },
         {
           name: "sep-2",
@@ -3141,7 +3175,13 @@ function playUrl(url,referrer,sub,subRef,resumeTime,token){
           index: 95,
           html: '<span class="art-ctrl-btn art-ctrl-close-btn" title="Tutup Pemutar (Esc)"><svg class="art-ctrl-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></span>',
           tooltip: "Tutup Pemutar (Esc)",
-          click: function(){ closePlayer(); }
+          click: function(){ closePlayer(); },
+          mounted: function($control){
+            $control.addEventListener("click", function(e){
+              e.stopPropagation();
+              closePlayer();
+            });
+          }
         }
       ],
       layers: [
@@ -3413,9 +3453,6 @@ function playUrl(url,referrer,sub,subRef,resumeTime,token){
       }
     });
 
-    // Default Full-Browser Screen
-    art.fullscreenWeb = true;
-
     // Monitor Fullscreen Handler terintegrasi dengan launcher Windows Portable (1 Monitor)
     art.on("fullscreen", function(state){
       if(typeof window.tatap_set_fullscreen === "function"){
@@ -3455,13 +3492,20 @@ function playUrl(url,referrer,sub,subRef,resumeTime,token){
     syncArtplayerQuality();
     syncTranslateBtn();
 
+    var hideSpinner = function(){
+      var sp = $("pm-spinner");
+      if(sp) sp.classList.add("hidden");
+    };
     art.once("video:canplay", function(){
-      $("pm-spinner").classList.add("hidden");
+      hideSpinner();
       if(resumeTime && resumeTime > 0){
         try{ art.currentTime = resumeTime; }catch(e){}
         resumeTime = 0;
       }
     });
+    art.once("video:playing", hideSpinner);
+    art.once("video:loadeddata", hideSpinner);
+    art.once("video:loadedmetadata", hideSpinner);
 
     art.on("video:timeupdate", function(){
       paintCue();
@@ -3765,10 +3809,19 @@ function closePlayer(){
 
   if(window.art){
     try{
+      if(window.art.fullscreenWeb) window.art.fullscreenWeb = false;
+      if(window.art.fullscreen) window.art.fullscreen = false;
+      if(window.art.template && window.art.template.$player && window.art.template.$player.parentNode){
+        window.art.template.$player.parentNode.removeChild(window.art.template.$player);
+      }
       window.art.destroy(true);
       window.art = null;
     }catch(e){}
   }
+  document.querySelectorAll("body > .art-video-player").forEach(function(el){
+    try{ el.parentNode.removeChild(el); }catch(_){}
+  });
+  document.body.classList.remove("art-fullscreen-web");
   var artCont = $("artplayer-container");
   if(artCont) artCont.innerHTML = "";
 
@@ -3808,7 +3861,10 @@ function closePlayer(){
     }catch(e){}
   }
   var stageEl = document.querySelector(".ambient-stage");
-  if(stageEl) stageEl.classList.remove("is-fullscreen");
+  if(stageEl){
+    stageEl.classList.remove("is-fullscreen");
+    stageEl.classList.remove("is-fullscreen-web");
+  }
   if(typeof window.tatap_set_fullscreen === "function"){
     try{ window.tatap_set_fullscreen(false); }catch(e){}
   }
@@ -3818,7 +3874,15 @@ function closePlayer(){
   if(savedSlug){
     var tm = $("title-modal");
     if(cur.eps && cur.eps.length > 0){
-      if(tm) tm.classList.remove("hidden");
+      if(tm){
+        tm.classList.remove("hidden");
+        var titleEl = $("tm-title");
+        if(titleEl && cur.title) titleEl.textContent = cur.title;
+        var subEl = $("tm-sub");
+        if(subEl && cur.slug) subEl.textContent = cur.slug;
+        var countEl = $("tm-count");
+        if(countEl && cur.eps) countEl.textContent = cur.eps.length + " episode · " + (cur.mode||"SUB").toUpperCase();
+      }
       renderEpRanges();
       renderEpGrid();
       TvNavigationManager.restoreFocusState(".ep.last-watch");
@@ -4498,9 +4562,13 @@ async function openAiSettingsModal(){
   var m = $("ai-settings-modal");
   if(!m) return;
   if(window.TvNavigationManager) window.TvNavigationManager.setPlayerModalState(true);
-  var v = $("vid");
-  if(v && !v.paused){
-    try { v.pause(); } catch(e){}
+  if(window.art){
+    try { window.art.pause(); } catch(e){}
+  } else {
+    var v = $("vid");
+    if(v && !v.paused){
+      try { v.pause(); } catch(e){}
+    }
   }
   m.classList.remove("hidden");
   try{
