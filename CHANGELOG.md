@@ -86,6 +86,10 @@ Kenaikan digit PATCH diterapkan sesuai kaidah Semantic Versioning 2.0.0 dan Dire
 5. **Pemulihan Fokus Remote D-Pad pada Dialog AI di Android TV (`TvFocusHelper.java`, `PlayerActivity.java`, `MainActivity.java`):**
    - Menambahkan `dialog.setOnDismissListener(d -> restoreSubPickerTvFocus())` pada dialog pengaturan AI di `PlayerActivity.java`, mengeliminasi total masalah hilangnya kursor remote D-Pad (*dead cursor*) saat dialog ditutup di Android TV.
    - Menyediakan metode `TvFocusHelper.applyCustomDialogTvFocus(Dialog)` untuk memfokuskan tombol navigasi awal secara otomatis saat dialog dibuka.
+6. **Eliminasi Total Layer Pemutar Bawaan HTML5 di Bawah Artplayer (`frontend/index.html`, `frontend/css/style.css`, `frontend/js/app.js`):**
+   - Menghapus atribut `controls` bawaan browser pada elemen `<video id="vid">` statis di `frontend/index.html` dan menambahkan `style="display:none !important"`.
+   - Mengeliminasi seluruh panggilan injeksi `v.setAttribute("controls", "")` pada `armAutohide()` di `frontend/js/app.js` yang sebelumnya memicu browser engine (Chromium, Firefox, Webview) merender kontrol media HTML5 native di dalam video Artplayer setiap kali kursor digerakkan atau video dijeda.
+   - Menggantinya dengan penegakan eksplisit `v.removeAttribute("controls")` dan menambahkan aturan CSS global untuk mensupresi total shadow DOM media controls browser (`video::-webkit-media-controls* { display: none !important; }`), serta menyembunyikan video non-Artplayer di dalam stage (`.ambient-stage > video:not(.art-video) { display: none !important; }`).
 
 ### Tests
 - Menambahkan test suite `tests/test_custom_prompt.py` untuk menguji pembuatan system prompt dengan instruksi khusus pengguna, prioritas prompt, dan persistensi database settings.

@@ -2702,19 +2702,23 @@ function armAutohide(){
     TvNavigationManager.showPlayerControls();
   };
   var wake=function(){
-    if(!v.hasAttribute("controls"))v.setAttribute("controls","");
+    var vid = $("vid");
+    if(vid && vid.hasAttribute("controls")) vid.removeAttribute("controls");
     show();
   };
   ["mousemove","touchstart","click"].forEach(function(ev){stage.addEventListener(ev,wake,{passive:true});});
-  v.addEventListener("play",show);
-  v.addEventListener("pause",function(){
-    clearTimeout(TvNavigationManager.getHudTimer && TvNavigationManager.getHudTimer());
-    v.setAttribute("controls","");
-    if(stage) stage.classList.remove("idle");
-    if(shell) shell.classList.remove("idle");
-    TvNavigationManager.setPlayerState(TvNavigationManager.PLAYER_HUD_ACTIVE);
-  });
-  v.addEventListener("seeking",show);
+  if(v){
+    v.removeAttribute("controls");
+    v.addEventListener("play",show);
+    v.addEventListener("pause",function(){
+      clearTimeout(TvNavigationManager.getHudTimer && TvNavigationManager.getHudTimer());
+      v.removeAttribute("controls");
+      if(stage) stage.classList.remove("idle");
+      if(shell) shell.classList.remove("idle");
+      TvNavigationManager.setPlayerState(TvNavigationManager.PLAYER_HUD_ACTIVE);
+    });
+    v.addEventListener("seeking",show);
+  }
   show();
 }
 function playUrl(url,referrer,sub,subRef,resumeTime,token){
@@ -3116,6 +3120,7 @@ function playUrl(url,referrer,sub,subRef,resumeTime,token){
         try{ oldV.parentNode.removeChild(oldV); }catch(_){}
       }
       art.template.$video.id = "vid";
+      art.template.$video.removeAttribute("controls");
       art.template.$video.setAttribute("controlsList", "nodownload nofullscreen noremoteplayback");
       art.template.$video.removeAttribute("disablePictureInPicture");
       art.template.$video.disablePictureInPicture = false;
@@ -3440,7 +3445,10 @@ function closePlayer(){
   if(stage && !$("vid")){
     var placeholderVid = document.createElement("video");
     placeholderVid.id = "vid";
-    placeholderVid.style.display = "none";
+    placeholderVid.removeAttribute("controls");
+    placeholderVid.setAttribute("controlsList", "nodownload nofullscreen noremoteplayback");
+    placeholderVid.setAttribute("disablePictureInPicture", "");
+    placeholderVid.style.cssText = "display:none !important; width:0; height:0;";
     stage.appendChild(placeholderVid);
   }
 
