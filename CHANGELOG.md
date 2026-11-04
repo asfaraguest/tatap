@@ -19,12 +19,20 @@ Format versi menggunakan skema `MAJOR.MINOR.PATCH`:
 Kenaikan digit PATCH diterapkan sesuai kaidah Semantic Versioning 2.0.0 dan Direktif #3 [`AGENTS.md`](AGENTS.md) untuk optimasi performa resolving stream anime dan pemutaran buffering video di platform Web dan Desktop (eliminasi jeda sinkron AniSkip, master m3u8 pre-seeding dari scraper, in-memory segment ring cache, predictive next-episode pre-resolving, dan HLS.js micro-gap auto-recovery) tanpa perombakan skema database maupun modifikasi antarmuka eksternal yang tidak kompatibel.
 
 ### Added
-1. **Penggantian 100% Video Player Web & Desktop dengan Artplayer.js (`frontend/`):**
+1. **Migrasi Maksimal Seluruh Fungsi Video Player ke Native Artplayer.js (`frontend/`):**
    - Mengganti arsitektur video player bawaan secara utuh dengan engine modern **Artplayer.js (v5.4.0)** mandiri tanpa dependensi CDN runtime eksternal.
    - **Full-Browser Screen (Web Fullscreen):** Saat video diputar, pemutar secara otomatis menduduki 100% jendela browser/webview (`100vw` $\times$ `100vh`) borderless cinema mode dengan floating cyber HUD controls yang otomatis bersembunyi saat kursor diam (*idle*).
    - **True 1-Monitor Fullscreen:** Mengisi 100% layar monitor fisik secara penuh tanpa border, taskbar, atau title bar, terintegrasi dengan bridge Win32 `tatap_set_fullscreen` (`WS_POPUP`) pada launcher Go Windows Portable serta HTML5 Fullscreen pada Linux & Web.
-   - **Mekanisme Subtitle Mandiri (Anti-Hijack Windows Closed Captions):** Subtitle diparsing dan dirender 100% mandiri melalui elemen DOM Artplayer (`.art-subtitle`, `.art-subtitle-inner`) dengan styling khas fansub anime (kontras tinggi, outline text-shadow hitam pekat, latar belakang kapsul gelap translucent, delay sync real-time `,` / `.`). Native track cues disupresi total (`video::cue { display: none !important; font-size: 0px !important; }`), menjamin fitur Closed Captions bawaan Windows Ease of Access (`ms-settings:easeofaccess-closedcaptioning`) tidak akan pernah membajak, mendistorsi, atau merusak estetika subtitle Tatap.
-   - **Kontrol Terintegrasi Lengkap:** Tombol Prev/Next episode, selector multi-resolusi HLS (1080p, 720p, 480p, Auto), selector subtitle multi-tier, floating AniSkip OP/ED button, shortcut pengaturan AI prompt fansub (`:ai`), dan peluncur MPV lokal eksternal.
+   - **Dukungan Penuh Native Picture-in-Picture (PiP):** Tombol PiP resmi Artplayer aktif di bar kontrol utama, memungkinkan video diputar mengambang (*floating window*) di atas aplikasi lain.
+   - **Integrasi Subtitle Engine ke Native Artplayer:**
+     - Subtitle dirender langsung ke elemen subtitle Artplayer (`.art-subtitle`, `.art-subtitle-inner`) dengan tipografi fansub anime berkontras tinggi, outline text-shadow tebal, latar belakang kapsul gelap, dan penyesuaian ukuran font dinamis (`--sub-size`).
+     - Menu Setting Artplayer kini memuat pengaturan subtitle lengkap: *Pilih Subtitle* (termasuk Indonesian Smart Fansub & Merge, AI Fansub, dan OpenSubtitles), *Ukuran Subtitle (S/M/L)*, *Sinkronisasi Delay* (-0.5s, -0.25s, 0.0s, +0.25s, +0.5s), *Toggle Terjemahan ID*, dan *Muat File Subtitle Lokal*.
+     - Native track disupresi total (`video::cue { display: none !important; font-size: 0px !important; }`), mencegah fitur Windows Closed Captions mendistorsi tampilan subtitle Tatap.
+   - **Integrasi Video Settings Native:**
+     - Pemilih kualitas video HLS adaptive (Auto, 1080p, 720p, 480p, dsb.) langsung dari bar kontrol dan panel setting Artplayer.
+     - Pengaturan rasio aspek (Default, 16:9, 4:3), flip video horizontal/vertikal, dan kecepatan putar (0.5x – 2.0x).
+     - Tombol navigasi episode (Prev `⏮` / Next `⏭`), launcher MPV eksternal, dan tombol shortcut Pengaturan AI Fansub (`:ai`).
+     - Layer tombol mengambang AniSkip OP/ED terintegrasi langsung di dalam viewport Artplayer.
 2. **Custom Prompt AI Fansub & Translate di Seluruh Platform (`backend/api/translate.py`, `frontend/`, `android/`):**
    - Mendukung instruksi persona dan gaya terjemahan khusus pengguna (`translate_custom_prompt`) yang diinjeksi dengan prioritas tinggi ke system prompt LLM AI Fansub.
    - Tetap menjaga integritas format baris keluaran ber-ID `N|terjemahan` dan token `<br>` secara ketat sehingga parser subtitle Tatap tidak terganggu.

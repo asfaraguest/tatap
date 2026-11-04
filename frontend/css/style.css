@@ -1431,7 +1431,7 @@ body.mobile-native-sub video::cue {
   display: inline-block !important;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
   font-weight: 700 !important;
-  font-size: clamp(16px, 2.2vw, 24px) !important;
+  font-size: var(--sub-size, clamp(16px, 2.2vw, 24px)) !important;
   line-height: 1.35 !important;
   color: #ffffff !important;
   text-shadow:
@@ -1446,11 +1446,52 @@ body.mobile-native-sub video::cue {
     0 -2px 0 #000000,
     2px 0 0 #000000,
     -2px 0 0 #000000 !important;
-  background: rgba(0, 0, 0, 0.45) !important;
-  padding: 4px 14px !important;
-  border-radius: 6px !important;
+  background: rgba(0, 0, 0, 0.5) !important;
+  padding: 4px 16px !important;
+  border-radius: 8px !important;
   box-decoration-break: clone !important;
   -webkit-box-decoration-break: clone !important;
+}
+
+/* Floating Native AniSkip Button inside Artplayer layer */
+.art-aniskip-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: linear-gradient(135deg, rgba(56, 189, 248, 0.95) 0%, rgba(2, 132, 199, 0.95) 100%);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 999px;
+  padding: 7px 16px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(56, 189, 248, 0.4), 0 2px 8px rgba(0, 0, 0, 0.5);
+  transition: transform 150ms cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 150ms ease, background 150ms ease;
+  pointer-events: auto;
+}
+.art-aniskip-btn:hover {
+  transform: scale(1.05);
+  box-shadow: 0 6px 20px rgba(56, 189, 248, 0.6), 0 4px 12px rgba(0, 0, 0, 0.6);
+}
+.art-aniskip-btn:active {
+  transform: scale(0.96);
+}
+.art-aniskip-btn.hidden {
+  display: none !important;
+}
+
+/* Artplayer Settings Panel Theme Polish */
+.art-video-player .art-settings {
+  background: rgba(14, 17, 24, 0.96) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.8) !important;
+  color: #ffffff !important;
+}
+.art-video-player .art-setting-item:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
 }
 
 /* Cyber Theme for Artplayer controls */

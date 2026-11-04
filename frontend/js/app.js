@@ -31,6 +31,10 @@ function setSubDelay(sec, notify){
     el.classList.toggle("active", Math.abs(val) > 0.01);
   }
   paintCue();
+  if(window.art && window.art.notice && notify){
+    var signStr = val > 0 ? "+" : "";
+    window.art.notice.show = "Offset Subtitle: " + signStr + val.toFixed(2) + "s";
+  }
   if(notify){
     var signStr = val > 0 ? "+" : "";
     toast("Sinkronisasi Subtitle: " + signStr + val.toFixed(2) + " detik", 1500);
@@ -46,7 +50,9 @@ function setPlaySpeed(spd, notify){
   if(isNaN(num) || num <= 0) num = 1.0;
   currentPlaybackSpeed = num;
   var v = $("vid");
-  if(v){
+  if(window.art){
+    try { window.art.playbackRate = currentPlaybackSpeed; } catch(e){}
+  } else if(v){
     try {
       v.playbackRate = currentPlaybackSpeed;
     } catch(e){}
@@ -54,6 +60,9 @@ function setPlaySpeed(spd, notify){
   var sel = $("pm-speed-select");
   if(sel){
     sel.value = String(currentPlaybackSpeed);
+  }
+  if(window.art && window.art.notice && notify){
+    window.art.notice.show = "Kecepatan: " + currentPlaybackSpeed + "x";
   }
   if(notify){
     toast("Kecepatan: " + currentPlaybackSpeed + "x");
@@ -1440,6 +1449,7 @@ function renderVariants(){
       sel.classList.remove("hidden");
     }
   }
+  syncArtplayerQuality();
 }
 
 
@@ -1545,6 +1555,139 @@ function isExactEnglishSubTrack(s){
   if(!s)return false;
   var lab=((s.label||"")+"").toLowerCase().trim();
   return isPureEnglishSubTrack(s)&&(lab==="english"||lab==="english [full]"||lab==="eng");
+}
+
+function syncArtplayerSubtitles(subtitles, activeUrl){
+  if(!window.art || !window.art.setting) return;
+  subtitles = subtitles || (cur.res && cur.res.subtitles) || [];
+  var trackList = [
+    { name: "sub-off", html: "Off (Matikan Subtitle)", value: "", default: !activeUrl }
+  ];
+  var exactEn = null, anyEn = null;
+  for(var i=0; i<subtitles.length; i++){
+    var s = subtitles[i];
+    if(!exactEn && isExactEnglishSubTrack(s)) exactEn = s;
+    else if(!anyEn && isPureEnglishSubTrack(s)) anyEn = s;
+    trackList.push({
+      name: "sub-track-" + i,
+      html: s.label || ("Subtitle " + (i+1)) + (s.default ? " (Default)" : ""),
+      value: s.url || "",
+      default: s.url === activeUrl
+    });
+  }
+  var en = exactEn || anyEn;
+  if(en && en.url){
+    trackList.push({
+      name: "sub-os-merge",
+      html: "🇮🇩 Indonesian (Smart Fansub & Merge)",
+      value: "os_merge:" + en.url,
+      default: !!(activeUrl && (activeUrl.indexOf("os_merge:") === 0 || activeUrl.indexOf("gtx+:") === 0 || activeUrl.indexOf("gtx:") === 0))
+    });
+    trackList.push({
+      name: "sub-ai",
+      html: "🤖 Indonesian (AI Fansub)",
+      value: "ai:" + en.url,
+      default: !!(activeUrl && activeUrl.indexOf("ai:") === 0)
+    });
+  }
+  trackList.push({
+    name: "sub-search-os",
+    html: "🔍 [+] Cari Subtitle Indonesia (OpenSubtitles)",
+    value: "__opensubtitles_search__",
+    default: false
+  });
+  trackList.push({
+    name: "sub-load-file",
+    html: "📁 [+] Muat File Subtitle (.srt / .vtt)",
+    value: "__custom_file__",
+    default: false
+  });
+
+  var curActive = trackList.find(function(t){ return t.default; }) || trackList[0];
+  var settingItem = {
+    name: "subtitle-track",
+    width: 290,
+    html: "Pilih Subtitle",
+    tooltip: curActive.html,
+    selector: trackList,
+    onSelect: function(item){
+      var sel = $("pm-subs");
+      if(sel){
+        sel.value = item.value;
+        if(typeof sel.onchange === "function") sel.onchange();
+      } else {
+        switchSubtitleTrack(item.value);
+      }
+      if(window.art && window.art.notice) window.art.notice.show = "Subtitle: " + item.html;
+      return item.html;
+    }
+  };
+  try{
+    if(window.art.setting.cache && window.art.setting.cache.has("subtitle-track")){
+      window.art.setting.update(settingItem);
+    } else {
+      window.art.setting.add(settingItem);
+    }
+  }catch(_){}
+}
+
+function syncArtplayerQuality(levels){
+  if(!window.art) return;
+  levels = levels || (cur.res && cur.res.hlsLevels) || [];
+  if(!levels.length) return;
+  var activeQ = "Auto";
+  if(window._hls && (window._hls.autoLevelEnabled || window._hls.currentLevel === -1)){
+    activeQ = "Auto";
+  } else if(window._hls && window._hls.currentLevel >= 0){
+    for(var i=0; i<levels.length; i++){
+      if(levels[i].levelIdx === window._hls.currentLevel){
+        activeQ = levels[i].q; break;
+      }
+    }
+  }
+  var selList = levels.map(function(l){
+    return {
+      html: l.q,
+      levelIdx: l.levelIdx,
+      default: l.q.toLowerCase() === activeQ.toLowerCase()
+    };
+  });
+
+  try{
+    window.art.controls.update({
+      name: "quality",
+      position: "right",
+      index: 18,
+      style: { marginRight: "6px" },
+      html: '<span style="font-weight:700;font-size:11px;background:rgba(255,255,255,0.12);padding:2px 8px;border-radius:4px;border:1px solid rgba(255,255,255,0.2);cursor:pointer;" title="Pilih Resolusi Video">' + activeQ.toUpperCase() + '</span>',
+      selector: selList,
+      onSelect: function(item){
+        switchQ(item.html);
+        if(window.art && window.art.notice) window.art.notice.show = "Kualitas: " + item.html;
+        return item.html;
+      }
+    });
+  }catch(_){}
+
+  try{
+    var qualitySetting = {
+      name: "video-quality",
+      width: 220,
+      html: "Kualitas Video",
+      tooltip: activeQ.toUpperCase(),
+      selector: selList,
+      onSelect: function(item){
+        switchQ(item.html);
+        if(window.art && window.art.notice) window.art.notice.show = "Kualitas: " + item.html;
+        return item.html;
+      }
+    };
+    if(window.art.setting && window.art.setting.cache && window.art.setting.cache.has("video-quality")){
+      window.art.setting.update(qualitySetting);
+    } else if(window.art.setting){
+      window.art.setting.add(qualitySetting);
+    }
+  }catch(_){}
 }
 
 function renderSubtitles(subtitles, activeUrl){
@@ -1728,6 +1871,7 @@ function renderSubtitles(subtitles, activeUrl){
       toast("Subtitle: Off");
     }
   };
+  syncArtplayerSubtitles(subtitles, activeUrl);
 }
 
 function closeOpenSubtitlesPicker(){
@@ -2079,7 +2223,9 @@ function paintCue(){
 function checkSkipTimes(currentTime){
   var btn=$("pm-skip-btn");
   var label=$("pm-skip-label");
-  if(!btn){return;}
+  var artBtn=$("art-aniskip-btn");
+  var artLabel=$("art-aniskip-text");
+  if(!btn && !artBtn){return;}
   var v=$("vid");
   var intro=cur.intro;
   var outro=cur.outro;
@@ -2092,51 +2238,59 @@ function checkSkipTimes(currentTime){
     cur.activeSkipTarget = Math.min((v && v.duration) || Infinity, intro.end + 0.5);
     if(isAutoSkip && !cur.hasAutoSkippedIntro){
       cur.hasAutoSkippedIntro = true;
-      if(v){
-        v.currentTime = cur.activeSkipTarget;
-        btn.classList.add("hidden");
-        cur.activeSkipTarget = 0;
-        toast("⏩ Lewati Opening otomatis", 1500);
-        return;
-      }
+      if(window.art) window.art.currentTime = cur.activeSkipTarget;
+      else if(v) v.currentTime = cur.activeSkipTarget;
+      if(btn) btn.classList.add("hidden");
+      if(artBtn) artBtn.classList.add("hidden");
+      cur.activeSkipTarget = 0;
+      toast("⏩ Lewati Opening otomatis", 1500);
+      return;
     }
     if(label) label.textContent = "Lewati Opening (S)";
-    btn.classList.remove("hidden");
+    if(artLabel) artLabel.textContent = "Lewati Opening (S)";
+    if(btn) btn.classList.remove("hidden");
+    if(artBtn) artBtn.classList.remove("hidden");
   }else if(inOutro){
     cur.activeSkipTarget = Math.min((v && v.duration) || Infinity, outro.end + 0.5);
     if(isAutoSkip && !cur.hasAutoSkippedOutro){
       cur.hasAutoSkippedOutro = true;
-      if(v){
-        v.currentTime = cur.activeSkipTarget;
-        btn.classList.add("hidden");
-        cur.activeSkipTarget = 0;
-        toast("⏩ Lewati Ending otomatis", 1500);
-        return;
-      }
+      if(window.art) window.art.currentTime = cur.activeSkipTarget;
+      else if(v) v.currentTime = cur.activeSkipTarget;
+      if(btn) btn.classList.add("hidden");
+      if(artBtn) artBtn.classList.add("hidden");
+      cur.activeSkipTarget = 0;
+      toast("⏩ Lewati Ending otomatis", 1500);
+      return;
     }
     if(label) label.textContent = "Lewati Ending (S)";
-    btn.classList.remove("hidden");
+    if(artLabel) artLabel.textContent = "Lewati Ending (S)";
+    if(btn) btn.classList.remove("hidden");
+    if(artBtn) artBtn.classList.remove("hidden");
   }else{
     cur.activeSkipTarget = 0;
-    btn.classList.add("hidden");
+    if(btn) btn.classList.add("hidden");
+    if(artBtn) artBtn.classList.add("hidden");
   }
 }
 
 function doSkip(){
   if(cur.activeSkipTarget && cur.activeSkipTarget > 0){
     var v=$("vid");
-    if(v){
-      var t = v.currentTime;
+    if(window.art || v){
+      var t = window.art ? window.art.currentTime : (v ? v.currentTime : 0);
       if(cur.intro && t >= cur.intro.start && t < cur.intro.end){
         cur.hasAutoSkippedIntro = true;
       }
       if(cur.outro && t >= cur.outro.start && t < cur.outro.end){
         cur.hasAutoSkippedOutro = true;
       }
-      v.currentTime = cur.activeSkipTarget;
+      if(window.art) window.art.currentTime = cur.activeSkipTarget;
+      else if(v) v.currentTime = cur.activeSkipTarget;
       var btn=$("pm-skip-btn");
       if(btn) btn.classList.add("hidden");
-      toast("⏩ Melompat ke "+formatTime(v.currentTime), 1500);
+      var artBtn=$("art-aniskip-btn");
+      if(artBtn) artBtn.classList.add("hidden");
+      toast("⏩ Melompat ke "+formatTime(cur.activeSkipTarget), 1500);
       cur.activeSkipTarget = 0;
       return true;
     }
@@ -2585,11 +2739,15 @@ function playUrl(url,referrer,sub,subRef,resumeTime,token){
 
   var artContainer = $("artplayer-container");
   if(typeof Artplayer !== "undefined" && artContainer){
+    if(window.art){
+      try{ window.art.destroy(false); window.art = null; }catch(_){}
+    }
+    var epTitle = (cur.title || "") + (cur.ep ? (" - Episode " + cur.ep) : "");
     var art = new Artplayer({
       container: artContainer,
       url: prox,
       type: isHls ? "m3u8" : "mp4",
-      title: cur.title || "",
+      title: epTitle,
       poster: cur.poster || "",
       volume: (v && v.volume !== undefined) ? v.volume : 1.0,
       isLive: false,
@@ -2603,6 +2761,8 @@ function playUrl(url,referrer,sub,subRef,resumeTime,token){
       flip: true,
       playbackRate: true,
       aspectRatio: true,
+      hotkey: true,
+      pip: true,
       fullscreen: true,
       fullscreenWeb: true,
       miniProgressBar: true,
@@ -2612,6 +2772,130 @@ function playUrl(url,referrer,sub,subRef,resumeTime,token){
       autoPlayback: true,
       theme: "#38bdf8",
       lang: "id",
+      settings: [
+        {
+          name: "subtitle-size",
+          width: 220,
+          html: "Ukuran Subtitle",
+          tooltip: (cur.subSize || "m").toUpperCase(),
+          selector: [
+            { name: "sub-sz-s", html: "Kecil (S)", value: "s", default: cur.subSize === "s" },
+            { name: "sub-sz-m", html: "Sedang (M)", value: "m", default: !cur.subSize || cur.subSize === "m" },
+            { name: "sub-sz-l", html: "Besar (L)", value: "l", default: cur.subSize === "l" }
+          ],
+          onSelect: function(item){
+            setSubSize(item.value);
+            return item.html;
+          }
+        },
+        {
+          name: "subtitle-delay",
+          width: 240,
+          html: "Sinkronisasi Delay",
+          tooltip: (cur.subDelay || 0).toFixed(2) + "s",
+          selector: [
+            { html: "-0.50 detik", value: -0.5 },
+            { html: "-0.25 detik (Pintasan: ,)", value: -0.25 },
+            { html: "0.0s (Reset Sinkron)", value: 0, default: true },
+            { html: "+0.25 detik (Pintasan: .)", value: 0.25 },
+            { html: "+0.50 detik", value: 0.5 }
+          ],
+          onSelect: function(item){
+            if(item.value === 0) setSubDelay(0.0, true);
+            else adjustSubDelay(item.value);
+            return (cur.subDelay > 0 ? "+" : "") + (cur.subDelay || 0).toFixed(2) + "s";
+          }
+        },
+        {
+          name: "subtitle-translate",
+          width: 240,
+          html: "Terjemahan ID",
+          tooltip: cur.translate ? "Aktif" : "Nonaktif",
+          switch: !!cur.translate,
+          onSwitch: function(state){
+            setTranslate(state);
+            return state;
+          }
+        },
+        {
+          name: "custom-sub-file",
+          width: 260,
+          html: "📁 Muat Subtitle Lokal (.srt/.vtt)",
+          click: function(){
+            var fi = $("pm-custom-sub-file");
+            if(fi) fi.click();
+          }
+        },
+        {
+          name: "ai-settings-modal",
+          width: 260,
+          html: "🤖 Pengaturan AI Fansub (:ai)",
+          click: function(){
+            openAiSettingsModal();
+          }
+        },
+        {
+          name: "launch-mpv",
+          width: 240,
+          html: "🚀 Putar di MPV Eksternal",
+          click: function(){
+            playMPV();
+          }
+        }
+      ],
+      controls: [
+        {
+          name: "prev-btn",
+          position: "left",
+          index: 10,
+          html: '<span style="font-weight:700;font-size:12px;padding:2px 8px;cursor:pointer;opacity:0.9;" title="Episode Sebelumnya (p)">⏮ PREV</span>',
+          tooltip: "Episode Sebelumnya (p)",
+          click: function(){ stepEp(-1); }
+        },
+        {
+          name: "next-btn",
+          position: "left",
+          index: 11,
+          html: '<span style="font-weight:700;font-size:12px;padding:2px 8px;cursor:pointer;opacity:0.9;" title="Episode Berikutnya (n)">NEXT ⏭</span>',
+          tooltip: "Episode Berikutnya (n)",
+          click: function(){ stepEp(1); }
+        },
+        {
+          name: "mpv-btn",
+          position: "right",
+          index: 20,
+          html: '<span style="font-weight:700;font-size:11px;background:rgba(255,255,255,0.12);padding:3px 8px;border-radius:4px;border:1px solid rgba(255,255,255,0.2);cursor:pointer;" title="Putar di MPV Eksternal">MPV</span>',
+          tooltip: "Putar di MPV Eksternal",
+          click: function(){ playMPV(); }
+        },
+        {
+          name: "ai-btn",
+          position: "right",
+          index: 21,
+          html: '<span style="font-weight:700;font-size:11px;background:rgba(56,189,248,0.15);color:#38bdf8;padding:3px 8px;border-radius:4px;border:1px solid #38bdf8;cursor:pointer;" title="Pengaturan AI Fansub (:ai)">AI</span>',
+          tooltip: "Pengaturan AI Fansub (:ai)",
+          click: function(){ openAiSettingsModal(); }
+        }
+      ],
+      layers: [
+        {
+          name: "aniskip-layer",
+          html: '<button id="art-aniskip-btn" class="art-aniskip-btn hidden" title="Lewati Opening/Ending (Tekan S)">' +
+                '<svg style="width:14px;height:14px;vertical-align:middle;margin-right:6px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 4 15 12 5 20 5 4"></polygon><line x1="19" y1="5" x2="19" y2="19"></line></svg>' +
+                '<span id="art-aniskip-text">Lewati Opening (S)</span>' +
+                '</button>',
+          style: {
+            position: "absolute",
+            bottom: "76px",
+            right: "24px",
+            zIndex: 25,
+            pointerEvents: "auto"
+          },
+          click: function(){
+            doSkip();
+          }
+        }
+      ],
       customType: {
         m3u8: function(video, playUrl, artInstance){
           if(window.Hls && window.Hls.isSupported()){
@@ -2692,6 +2976,7 @@ function playUrl(url,referrer,sub,subRef,resumeTime,token){
                 cur.res = cur.res || {};
                 cur.res.hlsLevels = hlsVars;
                 renderVariants();
+                syncArtplayerQuality(hlsVars);
                 if(cur.quality && cur.quality.toLowerCase() !== "auto" && cur.quality.toLowerCase() !== "best"){
                   var targetQ = cur.quality.toLowerCase();
                   for(var qk=0; qk<hlsVars.length; qk++){
@@ -2722,6 +3007,7 @@ function playUrl(url,referrer,sub,subRef,resumeTime,token){
                 if(sel && !sel.classList.contains("user-interacting")){
                   sel.value = autoMode ? "Auto" : activeLabel.toLowerCase();
                 }
+                syncArtplayerQuality();
               }
             });
             h.loadSource(playUrl);
@@ -2773,41 +3059,7 @@ function playUrl(url,referrer,sub,subRef,resumeTime,token){
             video.src = playUrl;
           }
         }
-      },
-      controls: [
-        {
-          name: "prev-btn",
-          position: "left",
-          index: 10,
-          html: '<span style="font-weight:700;font-size:12px;padding:2px 8px;cursor:pointer;opacity:0.9;" title="Episode Sebelumnya (p)">⏮ PREV</span>',
-          tooltip: "Episode Sebelumnya (p)",
-          click: function(){ stepEp(-1); }
-        },
-        {
-          name: "next-btn",
-          position: "left",
-          index: 11,
-          html: '<span style="font-weight:700;font-size:12px;padding:2px 8px;cursor:pointer;opacity:0.9;" title="Episode Berikutnya (n)">NEXT ⏭</span>',
-          tooltip: "Episode Berikutnya (n)",
-          click: function(){ stepEp(1); }
-        },
-        {
-          name: "mpv-btn",
-          position: "right",
-          index: 20,
-          html: '<span style="font-weight:700;font-size:11px;background:rgba(255,255,255,0.12);padding:3px 8px;border-radius:4px;border:1px solid rgba(255,255,255,0.2);cursor:pointer;" title="Putar di MPV Eksternal">MPV</span>',
-          tooltip: "Putar di MPV Eksternal",
-          click: function(){ playMPV(); }
-        },
-        {
-          name: "ai-btn",
-          position: "right",
-          index: 21,
-          html: '<span style="font-weight:700;font-size:11px;background:rgba(56,189,248,0.15);color:#38bdf8;padding:3px 8px;border-radius:4px;border:1px solid #38bdf8;cursor:pointer;" title="Pengaturan AI Fansub (:ai)">AI</span>',
-          tooltip: "Pengaturan AI Fansub (:ai)",
-          click: function(){ openAiSettingsModal(); }
-        }
-      ]
+      }
     });
 
     window.art = art;
@@ -2815,7 +3067,8 @@ function playUrl(url,referrer,sub,subRef,resumeTime,token){
     if(art.template && art.template.$video){
       art.template.$video.id = "vid";
       art.template.$video.setAttribute("controlsList", "nodownload nofullscreen noremoteplayback");
-      art.template.$video.setAttribute("disablePictureInPicture", "");
+      art.template.$video.removeAttribute("disablePictureInPicture");
+      art.template.$video.disablePictureInPicture = false;
       v = art.template.$video;
     }
 
@@ -2834,6 +3087,19 @@ function playUrl(url,referrer,sub,subRef,resumeTime,token){
       }
       syncFullscreenSubtitles();
     });
+
+    art.on("pip", function(state){
+      toast(state ? "Masuk ke mode Picture-in-Picture (PiP)" : "Keluar dari mode Picture-in-Picture", 1500);
+    });
+
+    art.on("video:ratechange", function(){
+      var sel = $("pm-speed-select");
+      if(sel && art.playbackRate){
+        sel.value = art.playbackRate.toString();
+      }
+    });
+
+    syncArtplayerSubtitles((cur.res && cur.res.subtitles) || [], cur.activeSub);
 
     art.on("video:canplay", function(){
       $("pm-spinner").classList.add("hidden");
@@ -3612,14 +3878,19 @@ function onKeyPlayer(e){
 }
 
 function syncSubSize(){
+  var sz = cur.subSize || "m";
   var box=$("pm-subs-overlay");
   if(box){
     box.classList.remove("sz-s","sz-m","sz-l");
-    box.classList.add("sz-"+(cur.subSize||"m"));
+    box.classList.add("sz-"+sz);
   }
   document.querySelectorAll(".sub-size button").forEach(function(b){
-    b.classList.toggle("active",b.getAttribute("data-subsize")===(cur.subSize||"m"));
+    b.classList.toggle("active",b.getAttribute("data-subsize")===sz);
   });
+  if(window.art && window.art.template && window.art.template.$subtitle){
+    var fSize = sz === "s" ? "16px" : (sz === "l" ? "28px" : "22px");
+    window.art.template.$subtitle.style.setProperty("--sub-size", fSize);
+  }
 }
 function setSubSize(sz){
   if(sz!=="s"&&sz!=="m"&&sz!=="l")return;
