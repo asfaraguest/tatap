@@ -180,3 +180,25 @@ async def test_opensubtitles_merge_job_mismatch_fallback_to_gtx(monkeypatch):
     # Should reject Boruto and cleanly fallback to Smart GTX+
     assert tier["level"] == "os_fallback_gtx+"
     assert "Halo, dunia!" in new_text
+
+
+@pytest.mark.asyncio
+async def test_subtitle_endpoint_accepts_seasonal_string_without_422(monkeypatch):
+    from httpx import AsyncClient, ASGITransport
+    import main
+
+    async def mock_fetch(url, ref):
+        return "WEBVTT\n\n00:00:01.000 --> 00:00:03.000\nHello!\n"
+    monkeypatch.setattr(main, "_fetch_sub_text", mock_fetch)
+
+    transport = ASGITransport(app=main.app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        # Test endpoint with non-numeric season string like "Spring 2019"
+        res = await client.get("/api/subtitles/opensubtitles?title=Demon%20Slayer&ep=1&season=Spring%202019")
+        assert res.status_code == 200
+        data = res.json()
+        assert data["success"] is True
+
+        res_sub = await client.get("/api/player/sub?url=http://example.com/sub.vtt&referer=http://example.com&lang=id&mode=os_merge&title=Demon%20Slayer&ep=1&season=Spring%202019")
+        # Must not be 422 Unprocessable Entity
+        assert res_sub.status_code != 422

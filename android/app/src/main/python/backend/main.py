@@ -2651,14 +2651,14 @@ async def favicon():
 @app.get("/api/player/sub")
 async def proxy_sub(url: str = Query(""),
                    referer: str = Query(""),
-                   lang: str = Query("", pattern="^(en|id|ja|es|fr|de|pt|ko|zh)$|^$"),
-                   src: str = Query("en", pattern="^(en|ja|es|fr|de|pt|ko|zh)$"),
-                   mode: str = Query("", pattern="^(gtx|gtx\\+|gtx\\+_dual|aigtx|ai|os_merge|os_dual|smart_merge|)$"),
+                   lang: str = Query(""),
+                   src: str = Query("en"),
+                   mode: str = Query(""),
                    dual: bool = Query(False),
                    title: str = Query(""),
                    slug: str = Query(""),
-                   ep: int = Query(1),
-                   season: int = Query(0),
+                   ep: str = Query("1"),
+                   season: str = Query(""),
                    alt_title: str = Query(""),
                    os_file_id: str = Query(""),
                    refresh: bool = Query(False)):
@@ -2681,6 +2681,28 @@ async def proxy_sub(url: str = Query(""),
         except Exception as e:
             raise HTTPException(status_code=502, detail=f"gagal mengambil subtitle: {e}")
 
+    safe_ep = 1
+    try:
+        clean_ep_str = re.sub(r"[^\d]", "", str(ep or "1"))
+        safe_ep = int(clean_ep_str) if clean_ep_str else 1
+    except Exception:
+        safe_ep = 1
+
+    safe_season = 0
+    try:
+        s_str = str(season or "").strip()
+        if s_str.isdigit():
+            safe_season = int(s_str)
+        else:
+            m_s = re.search(r"\b(?:season\s*(\d+)|\b(\d+)(?:nd|rd|th|st)\s*season|s(\d+))\b", s_str, re.I)
+            if m_s:
+                for g in m_s.groups():
+                    if g and g.isdigit():
+                        safe_season = int(g)
+                        break
+    except Exception:
+        safe_season = 0
+
     import hashlib
     base_hash = hashlib.sha1(
         (url + "|" + (referer or "") + "|" + (lang or "id")).encode("utf-8")
@@ -2688,10 +2710,10 @@ async def proxy_sub(url: str = Query(""),
 
     from api.opensubtitles import clean_title_And_season
     inferred_s = clean_title_And_season(title or alt_title, slug)[1]
-    actual_season = season if season > 0 else inferred_s
+    actual_season = safe_season if safe_season > 0 else inferred_s
 
     os_ctx_hash = hashlib.sha1(
-        f"{url}|{slug}|{title}|s{actual_season}|e{ep}|{os_file_id}|{lang or 'id'}".encode("utf-8")
+        f"{url}|{slug}|{title}|s{actual_season}|e{safe_ep}|{os_file_id}|{lang or 'id'}".encode("utf-8")
     ).hexdigest()
     key_gtxplus = "sub2|gtx+|" + base_hash
     key_aigtx = "sub2|aigtx|" + base_hash
@@ -2729,7 +2751,7 @@ async def proxy_sub(url: str = Query(""),
                     lang=lang or "id",
                     title=title,
                     slug=slug,
-                    ep=ep,
+                    ep=safe_ep,
                     os_file_id=os_file_id,
                     is_dual=False,
                     cache_key=target_os_key,
@@ -3195,8 +3217,8 @@ async def _opensubtitles_merge_sub_job(
 async def api_search_external_subtitles(
     title: str = Query(""),
     slug: str = Query(""),
-    ep: int = Query(1),
-    season: int = Query(0),
+    ep: str = Query("1"),
+    season: str = Query(""),
     alt_title: str = Query(""),
     lang: str = Query("id"),
 ):
@@ -3206,11 +3228,33 @@ async def api_search_external_subtitles(
         from api.opensubtitles import search_opensubtitles, is_accurate_sub_title_match, clean_title_And_season
         loop = asyncio.get_running_loop()
 
-        inferred_s = clean_title_And_season(title or alt_title, slug)[1]
-        actual_season = max(1, int(season if season > 0 else inferred_s))
+        safe_ep = 1
+        try:
+            clean_ep_str = re.sub(r"[^\d]", "", str(ep or "1"))
+            safe_ep = int(clean_ep_str) if clean_ep_str else 1
+        except Exception:
+            safe_ep = 1
 
-        at_task = loop.run_in_executor(None, lambda: search_animetosho_indonesian(title=title or alt_title, slug=slug, ep=ep, season=actual_season))
-        os_task = loop.run_in_executor(None, lambda: search_opensubtitles(title=title or alt_title, slug=slug, ep=ep, season=actual_season, lang="id"))
+        safe_season = 0
+        try:
+            s_str = str(season or "").strip()
+            if s_str.isdigit():
+                safe_season = int(s_str)
+            else:
+                m_s = re.search(r"\b(?:season\s*(\d+)|\b(\d+)(?:nd|rd|th|st)\s*season|s(\d+))\b", s_str, re.I)
+                if m_s:
+                    for g in m_s.groups():
+                        if g and g.isdigit():
+                            safe_season = int(g)
+                            break
+        except Exception:
+            safe_season = 0
+
+        inferred_s = clean_title_And_season(title or alt_title, slug)[1]
+        actual_season = max(1, int(safe_season if safe_season > 0 else inferred_s))
+
+        at_task = loop.run_in_executor(None, lambda: search_animetosho_indonesian(title=title or alt_title, slug=slug, ep=safe_ep, season=actual_season))
+        os_task = loop.run_in_executor(None, lambda: search_opensubtitles(title=title or alt_title, slug=slug, ep=safe_ep, season=actual_season, lang="id"))
         at_items, os_items = await asyncio.gather(at_task, os_task, return_exceptions=True)
 
         items = []
@@ -3220,11 +3264,11 @@ async def api_search_external_subtitles(
             for it in os_items:
                 if (it.get("lang") or "id").lower() in ("id", "ind", "indonesian"):
                     cand_name = it.get("filename", "")
-                    if not title or is_accurate_sub_title_match(title or alt_title or slug, cand_name, target_season=actual_season, target_ep=ep):
+                    if not title or is_accurate_sub_title_match(title or alt_title or slug, cand_name, target_season=actual_season, target_ep=safe_ep):
                         it["source"] = "OpenSubtitles"
                         items.append(it)
 
-        return ok({"items": items, "count": len(items), "title": title, "slug": slug, "ep": ep, "season": actual_season})
+        return ok({"items": items, "count": len(items), "title": title, "slug": slug, "ep": safe_ep, "season": actual_season})
     except Exception as e:
         return fail(f"Gagal mencari subtitle eksternal: {e}")
 

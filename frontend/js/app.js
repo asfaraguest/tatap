@@ -2086,7 +2086,12 @@ function openOpenSubtitlesPicker(subtitles, baseSubUrl){
   });
   var token=cur.playToken;
   var altTitle=(cur.meta&&(cur.meta.title_romaji||cur.meta.title_english))||"";
-  var seasonNum=(cur.meta&&cur.meta.season)||0;
+  var seasonNum=0;
+  if(cur.meta){
+    if(typeof cur.meta.season_number==="number") seasonNum=cur.meta.season_number;
+    else if(typeof cur.meta.season==="number") seasonNum=cur.meta.season;
+    else if(typeof cur.meta.season==="string" && /^\d+$/.test(cur.meta.season.trim())) seasonNum=parseInt(cur.meta.season.trim(),10);
+  }
   window.Tatap.searchOpenSubtitles(cur.title, cur.slug, cur.ep, "id", seasonNum, altTitle).then(function(res){
     if(cur.playToken!==token||!document.getElementById("os-picker"))return;
     var items=(res&&res.success&&res.data&&res.data.items)||[];
@@ -2528,7 +2533,12 @@ function prefetchSubtitleTrack(url, ref, langCode){
   if(isOs){
     // Konteks judul & episode agar backend dapat mencari rilis yang cocok di OpenSubtitles
     var altTitle=(cur.meta&&(cur.meta.title_romaji||cur.meta.title_english))||"";
-    var seasonNum=(cur.meta&&cur.meta.season)||0;
+    var seasonNum=0;
+    if(cur.meta){
+      if(typeof cur.meta.season_number==="number") seasonNum=cur.meta.season_number;
+      else if(typeof cur.meta.season==="number") seasonNum=cur.meta.season;
+      else if(typeof cur.meta.season==="string" && /^\d+$/.test(cur.meta.season.trim())) seasonNum=parseInt(cur.meta.season.trim(),10);
+    }
     qs += "&title=" + encodeURIComponent(cur.title || "") + "&slug=" + encodeURIComponent(cur.slug || "") + "&ep=" + encodeURIComponent(cur.ep || 1);
     if(seasonNum) qs += "&season=" + encodeURIComponent(seasonNum);
     if(altTitle) qs += "&alt_title=" + encodeURIComponent(altTitle);
