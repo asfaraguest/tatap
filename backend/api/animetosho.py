@@ -78,10 +78,13 @@ def _http_get_raw(url: str, headers: dict = None, timeout: float = 8.0) -> bytes
 
 
 def _is_indonesian_subtitle_label(label: str) -> bool:
-    """True jika label track subtitle mengindikasikan Bahasa Indonesia."""
+    """True jika label track subtitle mengindikasikan Bahasa Indonesia.
+    Mengecualikan Bahasa Melayu / Malaysia ([may, malay) agar tidak tertukar."""
     if not label:
         return False
     low = label.lower()
+    if any(m in low for m in ("[may,", "malay", "(may)", "(ms)", "[ms,")):
+        return False
     return any(k in low for k in (
         "[ind,",
         "[ind ",
@@ -90,8 +93,6 @@ def _is_indonesian_subtitle_label(label: str) -> bool:
         "bahasa indonesia",
         "cr [ind",
         "cr (ind",
-        "[may,",
-        "malay",
     ))
 
 

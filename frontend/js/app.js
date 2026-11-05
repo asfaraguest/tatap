@@ -2996,7 +2996,7 @@ function playUrl(url,referrer,sub,subRef,resumeTime,token){
       pip: true,
       fullscreen: true,
       fullscreenWeb: true,
-      miniProgressBar: true,
+      miniProgressBar: false,
       mutex: true,
       backdrop: true,
       playsInline: true,
@@ -3104,7 +3104,7 @@ function playUrl(url,referrer,sub,subRef,resumeTime,token){
         {
           name: "prev-btn",
           position: "left",
-          index: 11,
+          index: 8,
           html: '<span class="art-ctrl-btn art-ctrl-ep-btn" id="art-ctrl-prev" title="Episode Sebelumnya (p)"><svg class="art-ctrl-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="19 20 9 12 19 4 19 20"></polygon><line x1="5" y1="19" x2="5" y2="5"></line></svg><span>PREV</span></span>',
           tooltip: "Episode Sebelumnya (p)",
           click: function(){ stepEp(-1); }
@@ -3431,6 +3431,11 @@ function playUrl(url,referrer,sub,subRef,resumeTime,token){
     });
 
     window.art = art;
+
+    // Pindahkan seekbar (.art-progress) ke dalam wadah kosong di tengah bilah kendali (.art-controls-center)
+    if(art.template && art.template.$controlsCenter && art.template.$progress){
+      art.template.$controlsCenter.appendChild(art.template.$progress);
+    }
 
     if(art.template && art.template.$video){
       var oldV = $("vid");

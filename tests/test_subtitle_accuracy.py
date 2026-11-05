@@ -202,3 +202,61 @@ async def test_subtitle_endpoint_accepts_seasonal_string_without_422(monkeypatch
         res_sub = await client.get("/api/player/sub?url=http://example.com/sub.vtt&referer=http://example.com&lang=id&mode=os_merge&title=Demon%20Slayer&ep=1&season=Spring%202019")
         # Must not be 422 Unprocessable Entity
         assert res_sub.status_code != 422
+
+
+def test_malay_subtitle_rejection_for_indonesian_target():
+    # 1. Candidate tagged as Malay (ms, may, msa) or filename containing Malay keywords must be rejected
+    sc_malay_cand = _score_subtitle_candidate(
+        filename="Demon Slayer - 01 (MAY).srt",
+        ep=1,
+        season=1,
+        target_lang="id",
+        cand_lang="ms",
+    )
+    assert sc_malay_cand == -999
+
+    sc_malay_fn = _score_subtitle_candidate(
+        filename="[Bahasa Melayu] Naruto - 01.srt",
+        ep=1,
+        season=1,
+        target_lang="id",
+        cand_lang="id",
+    )
+    assert sc_malay_fn == -999
+
+    # 2. AnimeTosho label check
+    from api.animetosho import _is_indonesian_subtitle_label
+    assert not _is_indonesian_subtitle_label("[may, ass]")
+    assert not _is_indonesian_subtitle_label("Crunchyroll [may, eng]")
+    assert not _is_indonesian_subtitle_label("Malay Subtitle")
+    assert _is_indonesian_subtitle_label("[ind, ass]")
+    assert _is_indonesian_subtitle_label("Indonesian")
+    assert _is_indonesian_subtitle_label("cr [ind, ass]")
+
+
+def test_malay_to_indonesian_lexicon_normalization():
+    from api.translate import apply_universal_lexicon_id
+
+    # Normal Malay sentence should become natural Indonesian
+    malay_text = "Awak semua jangan risau, kerana kami takkan bercakap pasal tu!"
+    normalized = apply_universal_lexicon_id(malay_text)
+    assert "kalian semua" in normalized.lower()
+    assert "jangan khawatir" in normalized.lower()
+    assert "karena" in normalized.lower()
+    assert "tidak akan" in normalized.lower()
+    assert "soal itu" in normalized.lower()
+    assert "awak" not in normalized.lower()
+    assert "risau" not in normalized.lower()
+    assert "pasal" not in normalized.lower()
+
+    # Awak kapal (ship crew) must NOT be replaced with kamu kapal
+    crew_text = "Semua awak kapal bersiap di pos masing-masing!"
+    normalized_crew = apply_universal_lexicon_id(crew_text)
+    assert "awak kapal" in normalized_crew.lower()
+
+    # Time phrases
+    time_text = "Tunggu sekejap, dia orang akan sampai sekejap lagi."
+    normalized_time = apply_universal_lexicon_id(time_text)
+    assert "tunggu sebentar" in normalized_time.lower()
+    assert "mereka" in normalized_time.lower()
+    assert "sebentar lagi" in normalized_time.lower()

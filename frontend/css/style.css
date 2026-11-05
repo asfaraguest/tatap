@@ -1978,6 +1978,65 @@ body.mobile-native-sub video::cue {
   gap: 5px !important;
 }
 
+/* Floating Dock Compressed Seekbar (.art-controls-center) */
+.art-video-player .art-controls-center {
+  flex: 1 1 auto !important;
+  display: flex !important;
+  align-items: center !important;
+  min-width: 60px !important;
+  margin: 0 10px !important;
+  height: 100% !important;
+  position: relative !important;
+}
+
+.art-video-player .art-controls-center .art-progress {
+  width: 100% !important;
+  height: 6px !important;
+  position: relative !important;
+  cursor: pointer !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  background: transparent !important;
+  transform: none !important;
+  transition: height 0.15s ease !important;
+}
+
+.art-video-player .art-controls-center .art-progress:hover {
+  height: 8px !important;
+}
+
+.art-video-player .art-controls-center .art-control-progress {
+  width: 100% !important;
+  height: 100% !important;
+  position: relative !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.art-video-player .art-controls-center .art-control-progress-inner {
+  width: 100% !important;
+  height: 100% !important;
+  position: relative !important;
+  border-radius: 3px !important;
+  background: rgba(255, 255, 255, 0.18) !important;
+}
+
+.art-video-player .art-controls-center .art-progress-tip {
+  bottom: calc(100% + 8px) !important;
+  top: auto !important;
+  background: rgba(10, 14, 22, 0.94) !important;
+  border: 1px solid rgba(56, 189, 248, 0.45) !important;
+  border-radius: 6px !important;
+  color: #f8fafc !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  padding: 2px 7px !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6) !important;
+}
+
 /* Base custom control button */
 .art-ctrl-btn {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Inter", sans-serif !important;
@@ -2162,12 +2221,21 @@ body.mobile-native-sub video::cue {
 
 .art-video-player .art-progress-played {
   background: var(--accent, #38bdf8) !important;
+  border-radius: 3px !important;
+}
+
+.art-video-player .art-progress-loaded {
+  background: rgba(255, 255, 255, 0.30) !important;
+  border-radius: 3px !important;
 }
 
 .art-video-player .art-progress-indicator {
+  width: 12px !important;
+  height: 12px !important;
   background: #ffffff !important;
   border: 2px solid var(--accent, #38bdf8) !important;
   box-shadow: 0 0 10px var(--accent, #38bdf8) !important;
+  border-radius: 50% !important;
 }
 
 /* Artplayer In-Player Notification Notice (Toast inside video stage) */

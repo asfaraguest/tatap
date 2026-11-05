@@ -62,6 +62,11 @@ Kenaikan digit PATCH diterapkan sesuai kaidah Semantic Versioning 2.0.0 dan Dire
 5. **Redesign Total Antarmuka Modal Pengaturan AI Fansub (`frontend/index.html`, `frontend/css/style.css`):**
    - Mengganti tampilan modal `#ai-settings-modal` yang sebelumnya bergaya form lawas menjadi antarmuka cyber modern yang menyatu sempurna (*blend*) dengan kontrol Artplayer dan tema Tatap.
    - Menggunakan latar belakang gelap konsisten tanpa membebani GPU perangkat berspesifikasi rendah (*Zero Backdrop Blur Tax*), kontainer modular cards (`.ai-glass-card`), badge status bercahaya neon cyan (`.ai-cyber-badge`, `.ai-badge-dot`), tombol preset provider dengan ikon SVG minimalis, input password bertema cyber dark, serta textarea custom prompt dengan template instan bergaya tags.
+6. **Enhancement Bilah Kendali Artplayer.js: Seekbar Terintegrasi & Tata Ulang Navigasi Playback (`frontend/js/app.js`, `frontend/css/style.css`):**
+   - **Seekbar Terkompresi di Ruang Tengah (`.art-controls-center`):** Memindahkan elemen `.art-progress` langsung ke dalam kapsul kendali utama (`art.template.$controlsCenter.appendChild`) sehingga menyatu di bilah kendali melayang tanpa membentang selebar layar.
+   - **Visual Seekbar Ramping & Modern:** Mengatur track progres 6px (membesar ke 8px saat di-hover), loaded buffer track semi-transparan 30%, played track `#38bdf8`, indicator dot putih ber-glow, serta floating time tooltip (`.art-progress-tip`) presisi tepat di atas bilah kapsul.
+   - **Tata Ulang Ergonomis Tombol Playback:** Mengubah urutan tombol navigasi playback di sisi kiri sehingga tombol **Play/Pause** berada tepat di tengah antara tombol navigasi episode: `[PREV]` (indeks 8) ➔ `[PLAY/PAUSE]` (indeks 10) ➔ `[NEXT]` (indeks 12).
+   - Menonaktifkan `miniProgressBar` bawaan untuk mencegah garis translasi terpisah saat bilah kendali bersembunyi.
 
 ### Fixed
 1. **Pencegahan Ketat Subtitle Mismatch / Tertukar dengan Judul Anime Lain, Season Berbeda, atau Episode Tertukar (`backend/api/opensubtitles.py`, `backend/api/animetosho.py`, `backend/main.py`, `frontend/js/app.js`, Paritas Chaquopy `android/`):**
@@ -145,8 +150,14 @@ Kenaikan digit PATCH diterapkan sesuai kaidah Semantic Versioning 2.0.0 dan Dire
     - **Restorasi Modal Pengaturan AI Fansub:** Menyelaraskan z-index `#ai-settings-modal.overlay` (`99999 !important`) dan menambahkan pause video otomatis saat tombol AI di bar kontrol diklik, serta listener event `mounted` langsung pada elemen kontrol.
     - **Restorasi Navigasi Tombol Tutup ke List Episode:** Memperbaiki fungsi `closePlayer()` agar membersihkan sisa elemen Artplayer secara tuntas, keluar dari mode layar penuh secara rapi, serta langsung membuka kembali `#title-modal` dengan daftar episode (`renderEpRanges()` dan `renderEpGrid()`) yang menyorot episode terakhir ditonton (`.last-watch`).
     - **Peningkatan Deteksi & Pemuatan Stream HLS Anime Baru:** Memperluas deteksi `isHls` pada format URL playlist master/varian dan menyembunyikan spinner buffering secara otomatis pada event `canplay`, `playing`, `loadeddata`, dan `loadedmetadata`.
+10. **Eliminasi Total Kebocoran Subtitle Bahasa Melayu / Malaysia (`backend/api/animetosho.py`, `backend/api/opensubtitles.py`, `backend/api/translate.py`, Paritas Chaquopy `android/`):**
+    - **Pemisahan Kode Bahasa OpenSubtitles:** Memisahkan pemetaan kode ISO 639-2 Bahasa Melayu (`may`, `msa`) menjadi `ms` (bukan lagi `id`) di `_ISO639_2_TO_LANG`. Menambahkan penalti mutlak skor kandidat (`-999`) pada `_score_subtitle_candidate()` jika kandidat terdeteksi Bahasa Melayu saat pencarian ditujukan untuk Bahasa Indonesia (`id`).
+    - **Penyaringan Bersih AnimeTosho:** Menghapus pola tag `[may,` dan `malay` dari `_is_indonesian_subtitle_label()` serta menambahkan filter negatif eksplisit agar berkas Bahasa Melayu tidak lagi keliru dianggap sebagai rilis Bahasa Indonesia.
+    - **Kamus Leksikon Normalisasi Melayu-ke-Indonesia:** Menambahkan puluhan aturan normalisasi otomatis pada `_UNIVERSAL_FANSUB_RULES` di `apply_universal_lexicon_id()` untuk mengubah kosakata khas Melayu (*awak*, *kerana*, *ialah*, *sahaja*, *takkan*, *tak nak*, *tak boleh*, *tengok*, *jangan risau*, *pelik*, *comel*, *sekejap*, *lepas tu*, *bercakap*, dsb.) menjadi Bahasa Indonesia lisan yang alami dengan proteksi frasa kontekstual (misal "awak kapal" tetap terjaga).
+    - **Penguatan Direktif Prompt AI Fansub:** Memperbarui `_FANSUB_PROMPT_ID` dengan direktif mutlak Anti-Diksi Melayu/Malaysia pada seluruh pemrosesan subtitle LLM.
 
 ### Tests
+- Menambahkan test suite `tests/test_subtitle_accuracy.py` untuk menguji eliminasi kandidat subtitle Bahasa Melayu saat mencari Bahasa Indonesia, penolakan label Melayu AnimeTosho, dan normalisasi leksikon Melayu-ke-Indonesia.
 - Menambahkan test suite `tests/test_custom_prompt.py` untuk menguji pembuatan system prompt dengan instruksi khusus pengguna, prioritas prompt, dan persistensi database settings.
 - Menambahkan test suite `tests/test_stream_optimizations.py` untuk menguji cache master m3u8, in-memory segment ring cache, non-blocking AniSkip resolving, dan endpoint skip times.
 

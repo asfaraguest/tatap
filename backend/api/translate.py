@@ -557,11 +557,14 @@ def _model_chain(prov: str, model: str):
 _FANSUB_PROMPT_ID = """Kamu adalah penerjemah sekaligus editor (TLC/Translation Checker) fansub anime Indonesia berpengalaman. Terjemahkan subtitle {src} menjadi bahasa Indonesia yang sangat luwes, hidup, enak dibaca sekilas, dan adaptif mengikuti situasi adegan (scene) serta kepribadian karakter — BUKAN terjemahan harfiah yang kaku ala mesin penerjemah.
 
 PRINSIP UTAMA KELUWESAN FANSUB:
-1. Terjemahkan Makna & Emosi, Bukan Kata demi Kata:
+1. Murni Bahasa Indonesia (ZERO DIKSI MELAYU/MALAYSIA):
+   - DILARANG KERAS menggunakan kosakata atau struktur Bahasa Melayu/Malaysia (seperti "awak", "kerana", "ialah", "sahaja", "tak", "tengok", "pula", "mereka itu", "kau orang", "jangan risau", "pelik", "comel", "sekejap", "lepas tu", "bercakap").
+   - WAJIB 100% menggunakan Bahasa Indonesia lisan/fansub yang alami ("kamu/aku", "karena", "adalah", "saja", "nggak/tidak", "lihat", "kalian", "jangan khawatir", "aneh", "imut", "sebentar", "setelah itu", "bicara")!
+2. Terjemahkan Makna & Emosi, Bukan Kata demi Kata:
    - Ubah struktur kalimat bahasa Inggris menjadi susunan kalimat lisan bahasa Indonesia yang mengalir alami saat diucapkan.
    - Hindari pengulangan kata ganti atau kepemilikan ("aku", "kamu", "dia", "milikku") jika sudah jelas dari konteks kalimat.
    - Pilih diksi yang ringkas dan padat emosi agar nyaman dibaca mengikuti tempo bicara karakter.
-2. Pertahankan Identitas & Format Teknis:
+3. Pertahankan Identitas & Format Teknis:
    - Pertahankan nama orang, tempat, honorifik Jepang (-san, -kun, -chan, -sama, -dono, Senpai, Sensei), serta gagap & interjeksi emosi ("A-Apa?!", "Tch", "Cih", "Hmph").
    - Pertahankan token <br> persis pada posisinya untuk ganti baris dalam 1 cue.
    - DILARANG membiarkan kata sifat bahasa Inggris tanpa terjemahan di tengah kalimat:
@@ -1313,6 +1316,61 @@ def _proper_title(title: str):
 
 # Aturan universal: selalu dikoreksi (karena merupakan blunder/calque harfiah).
 _UNIVERSAL_FANSUB_RULES = [
+    # Normalisasi kosakata Bahasa Melayu/Malaysia ke Bahasa Indonesia baku/luwes
+    (r"\bawak semua\b", "kalian semua"),
+    (r"\bkau orang\b", "kalian"),
+    (r"\bkorang\b", "kalian"),
+    (r"\bdia orang\b", "mereka"),
+    (r"\bmereka itu\b", "mereka"),
+    (r"\bawak\b(?!\s+(?:kapal|pesawat|kendaraan|helikopter|pesiar))", "kamu"),
+    (r"\bkerana\b", "karena"),
+    (r"\bialah\b", "adalah"),
+    (r"\bsahaja\b", "saja"),
+    (r"\bjangan risau\b", "jangan khawatir"),
+    (r"\brisau\b", "khawatir"),
+    (r"\bmerisaukan\b", "mengkhawatirkan"),
+    (r"\btengok\b", "lihat"),
+    (r"\bmenengok\b", "melihat"),
+    (r"\bpelik\b", "aneh"),
+    (r"\bcomel\b", "imut"),
+    (r"\bseronok\b", "menyenangkan"),
+    (r"\bkeseronokan\b", "kesenangan"),
+    (r"\btunggu sekejap\b", "tunggu sebentar"),
+    (r"\bsekejap lagi\b", "sebentar lagi"),
+    (r"\bsekejap saja\b", "sebentar saja"),
+    (r"\bkejap lagi\b", "sebentar lagi"),
+    (r"\bkejap saja\b", "sebentar saja"),
+    (r"\btunggu kejap\b", "tunggu sebentar"),
+    (r"\bsekejap\b", "sebentar"),
+    (r"\bkejap\b", "sebentar"),
+    (r"\blepas ni\b", "setelah ini"),
+    (r"\blepas tu\b", "setelah itu"),
+    (r"\blepas itu\b", "setelah itu"),
+    (r"\bbilakah\b", "kapan"),
+    (r"\bmengapakah\b", "mengapa"),
+    (r"\bkenapakah\b", "kenapa"),
+    (r"\bbagaimanakah\b", "bagaimana"),
+    (r"\bsiapakah\b", "siapa"),
+    (r"\bdi manakah\b", "di mana"),
+    (r"\badakah\b", "apakah"),
+    (r"\bapakah yang\b", "apa yang"),
+    (r"\bbercakap\b", "berbicara"),
+    (r"\bcakap\b", "bicara"),
+    (r"\bbualkan\b", "bicarakan"),
+    (r"\bberbual\b", "mengobrol"),
+    (r"\bpasal apa\b", "soal apa"),
+    (r"\bpasal tu\b", "soal itu"),
+    (r"\bmak cik\b", "bibi"),
+    (r"\bpak cik\b", "paman"),
+    (r"\btakkan\b", "tidak akan"),
+    (r"\btak nak\b", "tidak mau"),
+    (r"\btak boleh\b", "tidak bisa"),
+    (r"\btak ada\b", "tidak ada"),
+    (r"\btak tahu\b", "tidak tahu"),
+    (r"\btak pernah\b", "tidak pernah"),
+    (r"\btakkanlah\b", "mana mungkin"),
+    (r"\bsudah tentu\b", "tentu saja"),
+
     (r"\bapakah kamu\b", "kamu"),
     (r"\bapakah kau\b", "kamu"),
     (r"\bapakah anda\b", "Anda"),

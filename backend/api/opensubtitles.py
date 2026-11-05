@@ -43,7 +43,9 @@ _LANG_TO_ISO639_2 = {
 _ISO639_2_TO_LANG = {
     "ind": "id",
     "id": "id",
-    "may": "id",
+    "may": "ms",
+    "msa": "ms",
+    "ms": "ms",
     "eng": "en",
     "en": "en",
     "jpn": "ja",
@@ -392,6 +394,11 @@ def _score_subtitle_candidate(filename: str, ep: int, season: int, target_lang: 
     cand_ep = _extract_file_episode_num(fn_low)
     if cand_ep > 0 and cand_ep != target_e:
         return -999
+
+    # Eliminasi mutlak jika mencari Bahasa Indonesia namun rilisan berbahasa Melayu
+    if target_lang == "id":
+        if cand_lang in ("ms", "may", "msa") or any(m in fn_low for m in ("[may", "(may", "malay", "bahasa melayu")):
+            return -999
 
     score = 50
     if cand_lang == target_lang:

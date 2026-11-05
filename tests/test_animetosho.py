@@ -33,7 +33,8 @@ def test_is_indonesian_subtitle_label():
     assert _is_indonesian_subtitle_label("[ind, SRT]") is True
     assert _is_indonesian_subtitle_label("Indonesian Subtitle") is True
     assert _is_indonesian_subtitle_label("Bahasa Indonesia Fansub") is True
-    assert _is_indonesian_subtitle_label("CR [may, ASS]") is True
+    assert _is_indonesian_subtitle_label("CR [may, ASS]") is False
+    assert _is_indonesian_subtitle_label("Malay [may, SRT]") is False
     assert _is_indonesian_subtitle_label("English [eng, ASS]") is False
     assert _is_indonesian_subtitle_label("Spanish [spa, ASS]") is False
     assert _is_indonesian_subtitle_label("Japanese [jpn, ASS]") is False
