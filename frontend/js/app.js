@@ -2085,7 +2085,9 @@ function openOpenSubtitlesPicker(subtitles, baseSubUrl){
     if(e.key==="Escape"){ e.preventDefault(); e.stopPropagation(); closeOpenSubtitlesPicker(); }
   });
   var token=cur.playToken;
-  window.Tatap.searchOpenSubtitles(cur.title, cur.slug, cur.ep, "id").then(function(res){
+  var altTitle=(cur.meta&&(cur.meta.title_romaji||cur.meta.title_english))||"";
+  var seasonNum=(cur.meta&&cur.meta.season)||0;
+  window.Tatap.searchOpenSubtitles(cur.title, cur.slug, cur.ep, "id", seasonNum, altTitle).then(function(res){
     if(cur.playToken!==token||!document.getElementById("os-picker"))return;
     var items=(res&&res.success&&res.data&&res.data.items)||[];
     if(!items.length){
@@ -2525,7 +2527,11 @@ function prefetchSubtitleTrack(url, ref, langCode){
   if(isDual) qs += "&dual=true";
   if(isOs){
     // Konteks judul & episode agar backend dapat mencari rilis yang cocok di OpenSubtitles
+    var altTitle=(cur.meta&&(cur.meta.title_romaji||cur.meta.title_english))||"";
+    var seasonNum=(cur.meta&&cur.meta.season)||0;
     qs += "&title=" + encodeURIComponent(cur.title || "") + "&slug=" + encodeURIComponent(cur.slug || "") + "&ep=" + encodeURIComponent(cur.ep || 1);
+    if(seasonNum) qs += "&season=" + encodeURIComponent(seasonNum);
+    if(altTitle) qs += "&alt_title=" + encodeURIComponent(altTitle);
   }
   var prox = "/api/player/sub?" + qs;
 

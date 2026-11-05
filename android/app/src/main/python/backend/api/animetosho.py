@@ -97,26 +97,22 @@ def _is_indonesian_subtitle_label(label: str) -> bool:
 
 def search_animetosho_indonesian(title: str, slug: str = "", ep: int = 1, season: int = 1) -> list:
     """Cari daftar track subtitle khusus Bahasa Indonesia dari AnimeTosho untuk episode anime aktif."""
-    clean_titles = _clean_anime_title(title, slug)
+    from api.opensubtitles import (
+        clean_anime_title_variations,
+        _extract_file_season_num,
+        _extract_file_episode_num,
+        is_accurate_sub_title_match,
+    )
+    clean_titles = clean_anime_title_variations(title, slug)
     ep = max(1, int(ep or 1))
     season = max(1, int(season or 1))
 
     if season <= 1:
         # Ekstrak nomor season dari title atau slug jika ada indikasi Season 2+
         combined_text = f"{title or ''} {slug or ''}"
-        m_s = re.search(r"\b(?:season\s*(\d+)|\b(\d+)(?:nd|rd|th|st)\s*season|part\s*(\d+)|cour\s*(\d+)|s(\d+))\b", combined_text, flags=re.I)
-        if m_s:
-            for g in m_s.groups():
-                if g and g.isdigit() and int(g) > 1:
-                    season = int(g)
-                    break
-        elif re.search(r"\b(?:season\s*iv|season\s*iii|season\s*ii)\b", combined_text, flags=re.I):
-            if re.search(r"\bseason\s*iv\b", combined_text, flags=re.I):
-                season = 4
-            elif re.search(r"\bseason\s*iii\b", combined_text, flags=re.I):
-                season = 3
-            elif re.search(r"\bseason\s*ii\b", combined_text, flags=re.I):
-                season = 2
+        s_extracted = _extract_file_season_num(combined_text)
+        if s_extracted > 1:
+            season = s_extracted
 
     primary_title = clean_titles[0]
     cache_key = f"{primary_title.lower()}|s{season}|e{ep}|id"
@@ -160,23 +156,21 @@ def search_animetosho_indonesian(title: str, slug: str = "", ep: int = 1, season
         for item in items[:12]:
             t_title = item.get("title") or item.get("torrent_name") or ""
             t_id = item.get("id")
-            if not t_id:
+            if not t_id or not t_title:
                 continue
 
-            # Verifikasi kecocokan nomor episode di judul torrent
-            t_low = t_title.lower()
-            ep_patterns = [
-                rf"\bs0*{season}e0*{ep}\b",
-                rf"\bep(?:isode)?[\s._-]*0*{ep}\b",
-                rf"[\s._\[\(-]0*{ep}(?:v\d+)?[\s._\]\)-]",
-            ]
-            if not any(re.search(pat, t_low) for pat in ep_patterns):
-                # Lewati rilis yang nomor episodenya tidak cocok
+            # Verifikasi kecocokan nomor season jika terdeteksi di torrent
+            t_season = _extract_file_season_num(t_title)
+            if t_season > 0 and t_season != season:
+                continue
+
+            # Verifikasi kecocokan nomor episode eksplisit di torrent
+            t_ep = _extract_file_episode_num(t_title)
+            if t_ep > 0 and t_ep != ep:
                 continue
 
             # Verifikasi ketat kecocokan judul anime agar subtitle tidak tertukar
-            from api.opensubtitles import is_accurate_sub_title_match
-            if not any(is_accurate_sub_title_match(c_title, t_title) for c_title in clean_titles):
+            if not any(is_accurate_sub_title_match(c_title, t_title, target_season=season, target_ep=ep) for c_title in clean_titles):
                 continue
 
             v_url = f"https://animetosho.net/view/{t_id}"

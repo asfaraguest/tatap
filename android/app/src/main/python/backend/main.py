@@ -6,7 +6,7 @@ from fastapi.responses import JSONResponse, FileResponse, Response, StreamingRes
 from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
 from config import APP_PORT, APP_HOST, HI_BASE, HI_UA
-from database import init_db, get_search_cache, set_search_cache, get_episode_cache, get_episode_cache_modes, set_episode_cache, delete_episode_cache, clear_episode_cache_for_slug, get_cached_episode, cache_episode, add_history, get_history, clear_history, save_progress, get_progress, clear_progress, add_bookmark, remove_bookmark, get_bookmarks, is_bookmarked, clear_bookmarks, get_setting, get_settings_bulk, set_setting, get_browse_cache, set_browse_cache, get_slug_map, set_slug_map, get_mal_map, set_mal_map, get_subtitle_cache, set_subtitle_cache, delete_subtitle_cache, get_today_char_count, add_today_char_count
+from database import init_db, get_search_cache, set_search_cache, get_episode_cache, get_episode_cache_modes, set_episode_cache, delete_episode_cache, clear_episode_cache_for_slug, get_cached_episode, cache_episode, add_history, get_history, clear_history, save_progress, get_progress, clear_progress, add_bookmark, remove_bookmark, get_bookmarks, is_bookmarked, clear_bookmarks, get_setting, get_settings_bulk, set_setting, get_browse_cache, set_browse_cache, get_slug_map, set_slug_map, get_mal_map, set_mal_map, get_subtitle_cache, set_subtitle_cache, delete_subtitle_cache, clear_os_merge_subtitle_cache, get_today_char_count, add_today_char_count
 from api import hianime as hi
 from api import anilist as al
 from api import otakudesu as otaku
@@ -124,6 +124,10 @@ frontend_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "f
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_db()
+    try:
+        await clear_os_merge_subtitle_cache()
+    except Exception:
+        pass
     # Bersihkan cache kedaluwarsa saat startup. Semua TTL di modul database
     # bersifat "ignore on read" — tanpa sweeper ini tabel cache (terutama
     # subtitle_cache yang menyimpan payload VTT utuh) tumbuh tanpa batas.
@@ -2654,6 +2658,8 @@ async def proxy_sub(url: str = Query(""),
                    title: str = Query(""),
                    slug: str = Query(""),
                    ep: int = Query(1),
+                   season: int = Query(0),
+                   alt_title: str = Query(""),
                    os_file_id: str = Query(""),
                    refresh: bool = Query(False)):
     """Proxy subtitle VTT. Menjalankan translasi Smart Lexicon atau Smart Fansub & Merge
@@ -2679,8 +2685,13 @@ async def proxy_sub(url: str = Query(""),
     base_hash = hashlib.sha1(
         (url + "|" + (referer or "") + "|" + (lang or "id")).encode("utf-8")
     ).hexdigest()
+
+    from api.opensubtitles import clean_title_And_season
+    inferred_s = clean_title_And_season(title or alt_title, slug)[1]
+    actual_season = season if season > 0 else inferred_s
+
     os_ctx_hash = hashlib.sha1(
-        f"{url}|{slug}|{title}|{ep}|{os_file_id}|{lang or 'id'}".encode("utf-8")
+        f"{url}|{slug}|{title}|s{actual_season}|e{ep}|{os_file_id}|{lang or 'id'}".encode("utf-8")
     ).hexdigest()
     key_gtxplus = "sub2|gtx+|" + base_hash
     key_aigtx = "sub2|aigtx|" + base_hash
@@ -2723,6 +2734,8 @@ async def proxy_sub(url: str = Query(""),
                     is_dual=False,
                     cache_key=target_os_key,
                     fallback_key_gtxplus=key_gtxplus,
+                    season=actual_season,
+                    alt_title=alt_title,
                 )
             )
             _SUB_INFLIGHT[os_job_key] = fut_os
@@ -2998,6 +3011,8 @@ async def _opensubtitles_merge_sub_job(
     is_dual: bool,
     cache_key: str,
     fallback_key_gtxplus: str,
+    season: int = 0,
+    alt_title: str = "",
 ):
     """Cari dan unduh subtitle khusus Bahasa Indonesia dari AnimeTosho (prioritas fansub & CR/Netflix resmi)
     atau OpenSubtitles, lalu lakukan Smart Merge + Smart Lexicon + Scene Detector dengan subtitle bawaan anime.
@@ -3023,10 +3038,14 @@ async def _opensubtitles_merge_sub_job(
         download_opensubtitle_text,
         strip_opensubtitles_ads,
         is_accurate_sub_title_match,
+        clean_title_And_season,
     )
 
     loop = asyncio.get_running_loop()
     target_lang = (lang or "id").lower()
+
+    inferred_s = clean_title_And_season(title or alt_title, slug)[1]
+    actual_season = max(1, int(season if season > 0 else inferred_s))
 
     # 1. Ambil subtitle bawaan anime (builtin_cues)
     builtin_text = ""
@@ -3069,7 +3088,7 @@ async def _opensubtitles_merge_sub_job(
             # 2b.1 Cek AnimeTosho
             at_cands = await loop.run_in_executor(
                 None,
-                lambda: search_animetosho_indonesian(title=title, slug=slug, ep=ep),
+                lambda: search_animetosho_indonesian(title=title or alt_title, slug=slug, ep=ep, season=actual_season),
             )
             if at_cands:
                 picked_cand = at_cands[0]
@@ -3088,15 +3107,15 @@ async def _opensubtitles_merge_sub_job(
             try:
                 os_cands = await loop.run_in_executor(
                     None,
-                    lambda: search_opensubtitles(title=title, slug=slug, ep=ep, lang="id"),
+                    lambda: search_opensubtitles(title=title or alt_title, slug=slug, ep=ep, season=actual_season, lang="id"),
                 )
                 id_os_cands = [
                     c for c in os_cands
                     if (c.get("lang") or "").lower() in ("id", "ind", "indonesian")
-                    and is_accurate_sub_title_match(title or slug, c.get("filename", ""))
+                    and is_accurate_sub_title_match(title or alt_title or slug, c.get("filename", ""), target_season=actual_season, target_ep=ep)
                 ]
                 if not id_os_cands and os_cands:
-                    log_translate(f"[Smart Fansub & Merge] Melewati kandidat OpenSubtitles karena tidak cocok dengan judul '{title}'")
+                    log_translate(f"[Smart Fansub & Merge] Melewati kandidat OpenSubtitles karena tidak cocok dengan judul '{title}' S{actual_season}E{ep}")
                 elif id_os_cands:
                     picked_cand = id_os_cands[0]
                     raw_txt = await loop.run_in_executor(
@@ -3178,16 +3197,20 @@ async def api_search_external_subtitles(
     slug: str = Query(""),
     ep: int = Query(1),
     season: int = Query(0),
+    alt_title: str = Query(""),
     lang: str = Query("id"),
 ):
     """Cari daftar subtitle khusus Bahasa Indonesia yang tersedia di AnimeTosho dan OpenSubtitles."""
     try:
         from api.animetosho import search_animetosho_indonesian
-        from api.opensubtitles import search_opensubtitles, is_accurate_sub_title_match
+        from api.opensubtitles import search_opensubtitles, is_accurate_sub_title_match, clean_title_And_season
         loop = asyncio.get_running_loop()
 
-        at_task = loop.run_in_executor(None, lambda: search_animetosho_indonesian(title=title, slug=slug, ep=ep, season=season or 1))
-        os_task = loop.run_in_executor(None, lambda: search_opensubtitles(title=title, slug=slug, ep=ep, season=season, lang="id"))
+        inferred_s = clean_title_And_season(title or alt_title, slug)[1]
+        actual_season = max(1, int(season if season > 0 else inferred_s))
+
+        at_task = loop.run_in_executor(None, lambda: search_animetosho_indonesian(title=title or alt_title, slug=slug, ep=ep, season=actual_season))
+        os_task = loop.run_in_executor(None, lambda: search_opensubtitles(title=title or alt_title, slug=slug, ep=ep, season=actual_season, lang="id"))
         at_items, os_items = await asyncio.gather(at_task, os_task, return_exceptions=True)
 
         items = []
@@ -3196,11 +3219,12 @@ async def api_search_external_subtitles(
         if isinstance(os_items, list):
             for it in os_items:
                 if (it.get("lang") or "id").lower() in ("id", "ind", "indonesian"):
-                    if not title or is_accurate_sub_title_match(title or slug, it.get("filename", "")):
+                    cand_name = it.get("filename", "")
+                    if not title or is_accurate_sub_title_match(title or alt_title or slug, cand_name, target_season=actual_season, target_ep=ep):
                         it["source"] = "OpenSubtitles"
                         items.append(it)
 
-        return ok({"items": items, "count": len(items), "title": title, "slug": slug, "ep": ep})
+        return ok({"items": items, "count": len(items), "title": title, "slug": slug, "ep": ep, "season": actual_season})
     except Exception as e:
         return fail(f"Gagal mencari subtitle eksternal: {e}")
 

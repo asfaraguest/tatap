@@ -740,6 +740,13 @@ async def delete_subtitle_cache(key):
         await db.commit()
 
 
+async def clear_os_merge_subtitle_cache():
+    """Hapus seluruh cache sub2|os_merge| lama agar rilis subtitle yang mismatch tidak tersimpan."""
+    async with _write_db() as db:
+        await db.execute("DELETE FROM subtitle_cache WHERE key LIKE 'sub2|os_merge|%'")
+        await db.commit()
+
+
 async def set_subtitle_cache(key, payload):
     """Cache translated VTT TEXT."""
     async with _write_db() as db:

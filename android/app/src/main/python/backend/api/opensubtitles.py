@@ -142,6 +142,89 @@ def clean_title_And_season(raw_title: str, slug: str = "") -> tuple:
     return (base_title or source or "Anime", season_num)
 
 
+def clean_anime_title_variations(raw_title: str, slug: str = "") -> list:
+    """Bangun daftar variasi judul anime untuk pencarian multi-tier (lengkap, utama tanpa sub-arc, dan slug)."""
+    titles = []
+
+    def add(cand):
+        c = re.sub(r"\s+", " ", (cand or "")).strip(" -:;,._")
+        if c and len(c) > 1 and c.lower() not in [x.lower() for x in titles]:
+            titles.append(c)
+
+    t = (raw_title or "").strip()
+    if t:
+        add(t)
+        t_nosub = re.sub(r"[\(\[\{][^\)\]\}]*[\)\]\}]", " ", t)
+        t_nosub = re.sub(r"\b(?:season\s*\d+|\d+(?:nd|rd|th|st)\s*season|part\s*\d+|cour\s*\d+|s\d+|ii|iii|iv|v|vi)\b", "", t_nosub, flags=re.I)
+        add(t_nosub)
+        for sep in [":", " - ", " – "]:
+            if sep in t:
+                left = t.split(sep)[0]
+                left_clean = re.sub(r"\b(?:season\s*\d+|\d+(?:nd|rd|th|st)\s*season|part\s*\d+|cour\s*\d+|s\d+|ii|iii|iv|v|vi)\b", "", left, flags=re.I)
+                add(left_clean)
+
+    if slug:
+        s = slug.split(":", 1)[1] if ":" in slug else slug
+        s = re.sub(r"-\d+$", "", s)
+        s = s.replace("-sub-indo", "").replace("-episode", "")
+        slug_title = s.replace("-", " ")
+        add(slug_title)
+        slug_clean = re.sub(r"\b(?:season\s*\d+|\d+(?:nd|rd|th|st)\s*season|part\s*\d+|cour\s*\d+|s\d+|ii|iii|iv|v|vi)\b", "", slug_title, flags=re.I)
+        add(slug_clean)
+        for sep in [":", " - ", " – "]:
+            if sep in slug_title:
+                add(slug_title.split(sep)[0])
+
+    return titles or ["Anime"]
+
+
+def _extract_file_season_num(filename: str) -> int:
+    """Ekstrak nomor season eksplisit dari nama file/rilis subtitle (return 0 jika tidak ada tanda season)."""
+    fn_low = (filename or "").lower()
+    m_s = re.search(r"\bs0*(\d+)e\d+\b", fn_low)
+    if m_s:
+        try:
+            return int(m_s.group(1))
+        except ValueError:
+            pass
+    m_season = re.search(r"\b(?:season\s*(\d+)|(\d+)(?:nd|rd|th|st)\s*season|s(\d+))\b", fn_low)
+    if m_season:
+        for g in m_season.groups():
+            if g:
+                try:
+                    return int(g)
+                except ValueError:
+                    pass
+    m_roman = re.search(r"\b(ii|iii|iv|v|vi)\b", fn_low)
+    if m_roman:
+        return {"ii": 2, "iii": 3, "iv": 4, "v": 5, "vi": 6}[m_roman.group(1)]
+    return 0
+
+
+def _extract_file_episode_num(filename: str) -> int:
+    """Ekstrak nomor episode sebenarnya dari nama file subtitle (return -1 jika tidak terdeteksi)."""
+    fn_low = (filename or "").lower()
+    m_se = re.search(r"\bs\d+e0*(\d+)\b", fn_low)
+    if m_se:
+        try:
+            return int(m_se.group(1))
+        except ValueError:
+            pass
+    m_ep = re.search(r"\bep(?:isode)?[\s._-]*0*(\d+)\b", fn_low)
+    if m_ep:
+        try:
+            return int(m_ep.group(1))
+        except ValueError:
+            pass
+    m_del = re.search(r"[\s._\[\(-]0*(\d+)(?:v\d+)?[\s._\]\)-]", fn_low)
+    if m_del:
+        try:
+            return int(m_del.group(1))
+        except ValueError:
+            pass
+    return -1
+
+
 def _http_get_bytes(url: str, headers: dict = None, timeout: float = 9.0, prefer_desync: bool = False) -> bytes:
     """Ambil response bytes via httpx atau fallback ke tls_desync_request (DoH + DPI Bypass)."""
     hdrs = {"User-Agent": HI_UA}
@@ -187,20 +270,62 @@ def _title_similarity(query_title: str, candidate_title: str) -> float:
         return 0.0
     cov = len(inter) / len(ta)
     jaccard = len(inter) / len(ta.union(tb))
-    # Jika query pendek (<= 2 token seperti 'No Game', 'Solo Leveling'), semua token wajib hadir
+    # Jika query pendek (<= 2 token seperti 'No Game', 'Solo Leveling')
     if len(ta) <= 2:
-        return cov if cov >= 0.99 else 0.0
+        # Semua token query wajib hadir (coverage 100%) dan jaccard minimal 0.28
+        # untuk mencegah false positive pada spinoff atau franchise yang beda judul
+        if cov >= 0.99 and (jaccard >= 0.28 or len(tb) <= len(ta) + 2):
+            return cov
+        return 0.0
     # Jika query panjang, butuh coverage >= 70% dan jaccard >= 0.20
     if cov >= 0.70 and jaccard >= 0.20:
         return cov
     return 0.0
 
 
-def is_accurate_sub_title_match(anime_title: str, candidate_title: str) -> bool:
-    """True jika judul file/rilis subtitle cocok dengan judul anime yang dicari."""
+def is_accurate_sub_title_match(anime_title: str, candidate_title: str, target_season: int = 1, target_ep: int = 0) -> bool:
+    """True jika judul file/rilis subtitle cocok dengan judul anime yang dicari (termasuk verifikasi season, episode, dan batas franchise)."""
     if not anime_title or not candidate_title:
         return False
-    return _title_similarity(anime_title, candidate_title) >= 0.70
+
+    cand_low = candidate_title.lower()
+    anime_low = anime_title.lower()
+
+    # 1. Cek pemisahan franchise / spinoff yang kerap salah tertaut (misal Naruto vs Boruto)
+    offshoot_pairs = [
+        ("naruto", "boruto"),
+        ("inuyasha", "yashahime"),
+        ("bleach", "burn the witch"),
+    ]
+    for parent, spinoff in offshoot_pairs:
+        if parent in anime_low and spinoff not in anime_low and spinoff in cand_low:
+            return False
+        if spinoff in anime_low and parent not in anime_low and parent in cand_low and spinoff not in cand_low:
+            return False
+
+    # 2. Verifikasi kesamaan token judul di seluruh variasi judul anime
+    variations = clean_anime_title_variations(anime_title)
+    best_sim = 0.0
+    for v in variations:
+        sim = _title_similarity(v, candidate_title)
+        if sim > best_sim:
+            best_sim = sim
+    if best_sim < 0.60:
+        return False
+
+    # 3. Verifikasi nomor season jika terdeteksi di candidate
+    target_s = max(1, int(target_season or 1))
+    cand_season = _extract_file_season_num(candidate_title)
+    if cand_season > 0 and cand_season != target_s:
+        return False
+
+    # 4. Verifikasi nomor episode jika target_ep > 0 dan terdeteksi di candidate
+    if target_ep > 0:
+        cand_ep = _extract_file_episode_num(candidate_title)
+        if cand_ep > 0 and cand_ep != int(target_ep):
+            return False
+
+    return True
 
 
 def resolve_imdb_id(title: str, slug: str = "") -> tuple:
@@ -255,43 +380,35 @@ def resolve_imdb_id(title: str, slug: str = "") -> tuple:
 
 def _score_subtitle_candidate(filename: str, ep: int, season: int, target_lang: str, cand_lang: str, downloads: int = 0) -> int:
     """Beri skor relevansi untuk mengurutkan rilis subtitle OpenSubtitles terbaik."""
-    score = 50
     fn_low = (filename or "").lower()
+    target_s = max(1, int(season or 1))
+    target_e = max(1, int(ep or 1))
 
+    # Eliminasi mutlak jika season atau episode terdeteksi tapi tidak cocok
+    cand_season = _extract_file_season_num(fn_low)
+    if cand_season > 0 and cand_season != target_s:
+        return -999
+
+    cand_ep = _extract_file_episode_num(fn_low)
+    if cand_ep > 0 and cand_ep != target_e:
+        return -999
+
+    score = 50
     if cand_lang == target_lang:
         score += 100
     elif cand_lang == "en":
         score += 30
 
-    # Cek kecocokan nomor episode eksplisit di nama file
-    ep_patterns = [
-        rf"\bs0*{season}e0*{ep}\b",
-        rf"\bs\d+e0*{ep}\b",
-        rf"\be0*{ep}\b",
-        rf"\bep(?:isode)?[\s._-]*0*{ep}\b",
-        rf"[\s._-]0*{ep}(?:v\d+)?[\s._\[\(-]",
-    ]
-    matched_ep = False
-    for pat in ep_patterns:
-        if re.search(pat, fn_low):
-            matched_ep = True
-            score += 45
-            break
-
-    # Penalti jika ada nomor SxxExx eksplisit tetapi episodenya berbeda
-    m_other_ep = re.search(r"\bs\d+e(\d+)\b", fn_low)
-    if m_other_ep:
-        try:
-            if int(m_other_ep.group(1)) != int(ep):
-                score -= 120
-        except ValueError:
-            pass
+    if cand_season == target_s:
+        score += 30
+    if cand_ep == target_e:
+        score += 50
 
     # Bonus grup rilis anime / webrip resmi yang timingnya rapi
-    trusted_tags = ("nf", "netflix", "cr", "crunchyroll", "webrip", "web-dl", "bstation", "muse", "judas", "subsplease", "erai")
+    trusted_tags = ("nf", "netflix", "cr", "crunchyroll", "webrip", "web-dl", "bstation", "muse", "judas", "subsplease", "erai", "asw")
     for tag in trusted_tags:
         if tag in fn_low:
-            score += 12
+            score += 15
 
     score += min(30, int(downloads // 100))
     return score
@@ -325,10 +442,10 @@ def search_opensubtitles(title: str = "", slug: str = "", ep: int = 1, season: i
             return
         fname = (filename or f"OpenSubtitles_{fid}.srt").strip()
 
-        # Validasi ketat kecocokan judul anime jika base_title tersedia (mencegah anime & sub berbeda)
+        # Validasi ketat kecocokan judul anime, season, dan episode jika base_title tersedia
         if base_title:
             combined_cand = f"{fname} {meta_title or ''}".strip()
-            if not is_accurate_sub_title_match(base_title, combined_cand):
+            if not is_accurate_sub_title_match(base_title, combined_cand, target_season=season_num, target_ep=ep):
                 return
 
         sc = _score_subtitle_candidate(fname, ep, season_num, target_lang, norm_lang, downloads)
@@ -399,10 +516,11 @@ def search_opensubtitles(title: str = "", slug: str = "", ep: int = 1, season: i
                 f"https://rest.opensubtitles.org/search/episode-{ep}/imdbid-{num_imdb}/season-{season_num}/sublanguageid-{iso_l}"
             )
         if base_title:
-            q_slug = urllib.parse.quote(base_title.lower())
-            rest_urls.append(
-                f"https://rest.opensubtitles.org/search/episode-{ep}/query-{q_slug}/season-{season_num}/sublanguageid-{iso_l}"
-            )
+            for t_var in clean_anime_title_variations(base_title, slug)[:2]:
+                q_slug = urllib.parse.quote(t_var.lower())
+                rest_urls.append(
+                    f"https://rest.opensubtitles.org/search/episode-{ep}/query-{q_slug}/season-{season_num}/sublanguageid-{iso_l}"
+                )
 
         for u_rest in rest_urls:
             try:
