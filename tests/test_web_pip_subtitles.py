@@ -32,16 +32,16 @@ def test_web_pip_subtitles_in_app_js():
     assert "pip-focus-overlay" in app_js
     assert "pip-focus-restore-btn" in app_js
 
-    # 6. Pastikan Document PiP dan Direct Native Video PiP diprioritaskan
+    # 6. Pastikan Native Go Launcher Floating PiP (Opsi B) dan Direct Native Video PiP diprioritaskan
     pip_fn_start = app_js.find("async function toggleSmartPip()")
     pip_fn_end = app_js.find("function syncFullscreenSubtitles()")
     assert pip_fn_start > 0 and pip_fn_end > pip_fn_start
     pip_fn = app_js[pip_fn_start:pip_fn_end]
-    doc_pip_pos = pip_fn.find("window.documentPictureInPicture")
+    go_pip_pos = pip_fn.find("window.tatap_open_pip")
     direct_req_pos = pip_fn.find("sourceVideo.requestPictureInPicture()")
-    assert doc_pip_pos > 0, "Document Picture-in-Picture API must be present"
+    assert go_pip_pos > 0, "Native Go tatap_open_pip API must be present"
     assert direct_req_pos > 0, "Direct sourceVideo.requestPictureInPicture must be present"
-    assert doc_pip_pos < direct_req_pos, "Doc PiP -> Direct PiP hierarchy must be maintained"
+    assert go_pip_pos < direct_req_pos, "Go PiP -> Direct PiP hierarchy must be maintained"
 
 
 def test_player_loading_animation_hides_on_artplayer_ready():
@@ -60,14 +60,30 @@ def test_player_loading_animation_hides_on_artplayer_ready():
     assert 'art.once("video:canplay"' in app_js
 
 
-
-def test_webview2_hardware_acceleration_flags():
-    """Memastikan launcher Windows Go menyetel argumen browser WebView2 hardware accelerated dan DocumentPictureInPictureAPI."""
+def test_webview2_hardware_acceleration_and_native_pip():
+    """Memastikan launcher Windows Go menyetel argumen browser WebView2 hardware accelerated dan bridge PiP native Always on Top (Opsi B)."""
     main_go = (ROOT / "launcher" / "main.go").read_text(encoding="utf-8")
     assert "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS" in main_go
     assert "--enable-gpu-rasterization" in main_go
     assert "--enable-zero-copy" in main_go
-    assert "--enable-features=DocumentPictureInPictureAPI" in main_go
+    assert "runPipWebView" in main_go
+    assert "HWND_TOPMOST" in main_go
+    assert "tatap_open_pip" in main_go
+    assert "tatap_close_pip" in main_go
+    assert "tatap_exit_pip" in main_go
+
+
+def test_pip_html_page_and_route():
+    """Memastikan frontend/pip.html ada dan terkonfigurasi dengan Artplayer, subtitle, dan restore button."""
+    pip_html = (ROOT / "frontend" / "pip.html").read_text(encoding="utf-8")
+    assert "pip-player" in pip_html
+    assert "art.subtitle" in pip_html
+    assert "pip-restore-btn" in pip_html
+    assert "Always On Top" in pip_html
+
+    main_py = (ROOT / "backend" / "main.py").read_text(encoding="utf-8")
+    assert '@app.get("/pip")' in main_py
+    assert '@app.get("/pip.html")' in main_py
 
 
 def test_web_pip_subtitles_css_rule():
