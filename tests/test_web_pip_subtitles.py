@@ -34,15 +34,36 @@ def test_web_pip_subtitles_in_app_js():
     assert "pip-focus-overlay" in app_js
     assert "pip-focus-restore-btn" in app_js
 
-    # 6. Pastikan Direct Native Video PiP diprioritaskan sebelum canvas stream capture
+    # 6. Pastikan Document PiP dan Direct Native Video PiP diprioritaskan
     pip_fn_start = app_js.find("async function toggleSmartPip()")
-    assert pip_fn_start > 0
-    pip_fn = app_js[pip_fn_start:pip_fn_start + 6000]
+    pip_fn_end = app_js.find("function syncFullscreenSubtitles()")
+    assert pip_fn_start > 0 and pip_fn_end > pip_fn_start
+    pip_fn = app_js[pip_fn_start:pip_fn_end]
+    doc_pip_pos = pip_fn.find("window.documentPictureInPicture")
     direct_req_pos = pip_fn.find("sourceVideo.requestPictureInPicture()")
     canvas_cap_pos = pip_fn.find("pipCanvas.captureStream(")
+    assert doc_pip_pos > 0, "Document Picture-in-Picture API must be present"
     assert direct_req_pos > 0, "Direct sourceVideo.requestPictureInPicture must be present"
     assert canvas_cap_pos > 0, "Canvas captureStream fallback must be present"
-    assert direct_req_pos < canvas_cap_pos, "Direct Hardware Video PiP must precede canvas stream capture"
+    assert doc_pip_pos < direct_req_pos < canvas_cap_pos, "Doc PiP -> Direct PiP -> Canvas Fallback hierarchy must be maintained"
+
+
+def test_player_buffering_loading_animation():
+    """Memastikan animasi loading/buffering aktif saat Artplayer inisiasi sampai video buffer siap."""
+    app_js = (ROOT / "frontend" / "js" / "app.js").read_text(encoding="utf-8")
+    style_css = (ROOT / "frontend" / "css" / "style.css").read_text(encoding="utf-8")
+
+    # 1. Pastikan CSS spinner berada di top layer z-index 100 dengan efek glow
+    assert "z-index: 100 !important" in style_css or "z-index:100!important" in style_css.replace(" ", "")
+    assert ".ring{" in style_css.replace(" ", "") or ".ring {" in style_css
+    assert "animation:spin" in style_css.replace(" ", "")
+
+    # 2. Pastikan app.js menangani video:waiting untuk buffering
+    assert 'art.on("video:waiting"' in app_js
+    assert "buffering video..." in app_js or "buffering" in app_js
+    assert 'showBufferSpinner("memuat video & buffer...")' in app_js
+    assert 'art.once("video:canplay"' in app_js
+
 
 
 def test_webview2_hardware_acceleration_flags():

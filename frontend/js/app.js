@@ -2628,7 +2628,7 @@ function getActiveVideos(){
 }
 
 function isPipActive(){
-  return !!(document.pictureInPictureElement || (window.art && window.art.pip) || document.body.classList.contains("is-pip"));
+  return !!(document.pictureInPictureElement || (window.art && window.art.pip) || window.tatapPipWindow || document.body.classList.contains("is-pip"));
 }
 
 function syncPipSubtitles(isPip){
@@ -2638,7 +2638,11 @@ function syncPipSubtitles(isPip){
   document.body.classList.toggle("is-pip", !!isPip);
   var focusOverlay = $("pip-focus-overlay");
   if(focusOverlay){
-    focusOverlay.classList.toggle("hidden", !isPip);
+    if(window.tatapPipWindow){
+      focusOverlay.classList.add("hidden");
+    } else {
+      focusOverlay.classList.toggle("hidden", !isPip);
+    }
   }
   var vids = getActiveVideos();
   var isVidFs = isVideoFullscreen();
@@ -2779,18 +2783,21 @@ function drawCanvasSubtitles(ctx, lines, w, h){
 }
 
 async function toggleSmartPip(){
-  // 1. Jika True Native PiP aktif, keluar
-  if(document.pictureInPictureElement){
-    try{ await document.exitPictureInPicture(); }catch(_){}
-    return;
-  }
+  // 1. Jika PiP aktif, tutup
   if(window.tatapPipWindow){
     try{ window.tatapPipWindow.close(); }catch(_){}
     window.tatapPipWindow = null;
+    syncPipSubtitles(false);
+    return;
+  }
+  if(document.pictureInPictureElement){
+    try{ await document.exitPictureInPicture(); }catch(_){}
+    syncPipSubtitles(false);
     return;
   }
   if(window.art && window.art.pip){
     try{ window.art.pip = false; }catch(_){}
+    syncPipSubtitles(false);
     return;
   }
 
@@ -2813,9 +2820,14 @@ async function toggleSmartPip(){
     restoreBtn.addEventListener("click", async function(e){
       e.preventDefault();
       e.stopPropagation();
+      if(window.tatapPipWindow){
+        try{ window.tatapPipWindow.close(); }catch(_){}
+        window.tatapPipWindow = null;
+      }
       if(document.pictureInPictureElement){
         try{ await document.exitPictureInPicture(); }catch(_){}
       }
+      syncPipSubtitles(false);
     });
   }
 
@@ -2824,17 +2836,119 @@ async function toggleSmartPip(){
     focusOverlay._tatapInit = true;
     focusOverlay.addEventListener("click", async function(e){
       if(e.target === focusOverlay){
+        if(window.tatapPipWindow){
+          try{ window.tatapPipWindow.close(); }catch(_){}
+          window.tatapPipWindow = null;
+        }
         if(document.pictureInPictureElement){
           try{ await document.exitPictureInPicture(); }catch(_){}
         }
+        syncPipSubtitles(false);
       }
     });
   }
 
-  // 2. Direct Native Video PiP (Prioritas Utama: Zero GPU Readback, 100% Hardware Accelerated DXVA/D3D11)
-  if(typeof sourceVideo.requestPictureInPicture === "function"){
+  var hasActiveSub = !!(cur.cues && cur.cues.length && cur.activeSub && cur.activeSub !== "off");
+
+  // 2. Prioritas 1: Document Picture-in-Picture API (Chrome 116+, Edge WebView2)
+  // Menampilkan video hardware accelerated dengan subtitle DOM kustom (#pm-subs-overlay),
+  // font kustom, translasi, dan styling penuh tanpa beban GPU berlebih (0% readback overhead).
+  if(window.documentPictureInPicture && typeof window.documentPictureInPicture.requestWindow === "function"){
     try{
-      syncNativeTextTrack(cur._rawVtt, cur.cues, cur.subLang, true);
+      var stage = document.querySelector(".ambient-stage");
+      if(stage){
+        var pipWidth = Math.min(640, window.innerWidth || 640);
+        var pipHeight = Math.round(pipWidth * 9 / 16);
+        var pipWindow = await window.documentPictureInPicture.requestWindow({
+          width: pipWidth,
+          height: pipHeight
+        });
+
+        // Kloning seluruh link css dan tag style ke dokumen PiP
+        [].forEach.call(document.querySelectorAll("link[rel='stylesheet'], style"), function(sheet){
+          try{ pipWindow.document.head.appendChild(sheet.cloneNode(true)); }catch(_){}
+        });
+
+        var stageParent = stage.parentNode;
+        var stageSibling = stage.nextSibling;
+
+        // Pasang placeholder di window utama agar tata letak tetap rapi
+        var placeholder = document.getElementById("pip-stage-placeholder");
+        if(!placeholder){
+          placeholder = document.createElement("div");
+          placeholder.id = "pip-stage-placeholder";
+          placeholder.className = "pip-focus-placeholder";
+          placeholder.innerHTML = '<div class="pip-focus-card">' +
+            '<div class="pip-focus-icon-wrap"><svg class="ui-icon pip-focus-icon"><use href="#icon-fullscreen"/></svg></div>' +
+            '<h3 class="pip-focus-title">Memutar di Picture-in-Picture</h3>' +
+            '<p class="pip-focus-sub">Fokus visual dan subtitle dialihkan ke jendela mengambang PiP OS.</p>' +
+            '<button type="button" class="pip-focus-restore-btn"><svg class="ui-icon"><use href="#icon-arrow-left"/></svg> <span>Kembalikan ke Jendela Ini</span></button>' +
+            '</div>';
+          var phBtn = placeholder.querySelector(".pip-focus-restore-btn");
+          if(phBtn){
+            phBtn.onclick = function(){
+              if(window.tatapPipWindow){
+                try{ window.tatapPipWindow.close(); }catch(_){}
+              }
+            };
+          }
+        }
+        if(stageParent){
+          stageParent.insertBefore(placeholder, stageSibling || null);
+        }
+
+        pipWindow.document.body.style.margin = "0";
+        pipWindow.document.body.style.padding = "0";
+        pipWindow.document.body.style.width = "100vw";
+        pipWindow.document.body.style.height = "100vh";
+        pipWindow.document.body.style.overflow = "hidden";
+        pipWindow.document.body.style.background = "#000";
+
+        var inStageOverlay = stage.querySelector("#pip-focus-overlay");
+        if(inStageOverlay) inStageOverlay.classList.add("hidden");
+
+        pipWindow.document.body.appendChild(stage);
+        window.tatapPipWindow = pipWindow;
+        syncPipSubtitles(true);
+
+        var restoreFromDocPip = function(){
+          if(placeholder && placeholder.parentNode){
+            placeholder.parentNode.removeChild(placeholder);
+          }
+          if(stageParent){
+            if(stageSibling) stageParent.insertBefore(stage, stageSibling);
+            else stageParent.appendChild(stage);
+          }
+          window.tatapPipWindow = null;
+          syncPipSubtitles(false);
+          if(window.art && typeof window.art.resize === "function"){
+            window.art.resize();
+          }
+        };
+
+        pipWindow.addEventListener("pagehide", restoreFromDocPip, { once: true });
+        pipWindow.addEventListener("unload", restoreFromDocPip, { once: true });
+        pipWindow.addEventListener("resize", function(){
+          if(window.art && typeof window.art.resize === "function"){
+            window.art.resize();
+          }
+        });
+
+        if(window.art && typeof window.art.resize === "function"){
+          window.art.resize();
+        }
+        toast("Mode PiP Aktif (Subtitle Lengkap & Presisi)", 1500);
+        return;
+      }
+    }catch(docPipErr){
+      console.warn("Document Picture-in-Picture gagal, mencoba fallback:", docPipErr);
+    }
+  }
+
+  // 3. Jika pengguna tidak menyalakan subtitle (Off/Raw), gunakan Direct Native Video PiP
+  // Zero GPU Readback, 100% Hardware Accelerated DXVA/D3D11
+  if(!hasActiveSub && typeof sourceVideo.requestPictureInPicture === "function"){
+    try{
       await sourceVideo.requestPictureInPicture();
       syncPipSubtitles(true);
       toast("Mode PiP Aktif (Hardware Accelerated)", 1500);
@@ -2844,7 +2958,7 @@ async function toggleSmartPip(){
     }
   }
 
-  // 3. Fallback: True Native PiP via Canvas Stream (Subtitle di-render langsung ke dalam frame video PiP)
+  // 4. Fallback: True Native PiP via Canvas Stream (Subtitle di-burn langsung ke frame PiP dengan 640x360 @ 30fps)
   if(window.HTMLCanvasElement && typeof HTMLCanvasElement.prototype.captureStream === "function" && typeof document.createElement("video").requestPictureInPicture === "function"){
     try{
       if(!window._tatapPipCanvas){
@@ -2865,31 +2979,42 @@ async function toggleSmartPip(){
       var pipCanvas = window._tatapPipCanvas;
       var pipVid = window._tatapPipVideo;
 
-      var w = sourceVideo.videoWidth || 1280;
-      var h = sourceVideo.videoHeight || 720;
-      pipCanvas.width = w;
-      pipCanvas.height = h;
+      // Downsampled target resolution 640x360 agar rendering sangat ringan di GPU/CPU
+      var targetW = 640;
+      var targetH = 360;
+      if(sourceVideo.videoWidth && sourceVideo.videoHeight){
+        var ratio = sourceVideo.videoWidth / sourceVideo.videoHeight;
+        targetW = 640;
+        targetH = Math.round(640 / ratio);
+        if(targetH % 2 !== 0) targetH += 1;
+      }
+      pipCanvas.width = targetW;
+      pipCanvas.height = targetH;
 
       var ctx = pipCanvas.getContext("2d");
       var pipRunning = true;
+      var lastDraw = 0;
+      var fpsInterval = 1000 / 30; // 30 FPS cap
 
-      function drawPipLoop(){
+      function drawPipLoop(now){
         if(!pipRunning) return;
+        window._tatapPipRaf = requestAnimationFrame(drawPipLoop);
+        if(now - lastDraw < fpsInterval) return;
+        lastDraw = now;
         if(sourceVideo && sourceVideo.readyState >= 2){
           try{
-            ctx.drawImage(sourceVideo, 0, 0, w, h);
+            ctx.drawImage(sourceVideo, 0, 0, targetW, targetH);
             var lines = getActiveSubtitleLines(sourceVideo.currentTime);
             if(lines && lines.length){
-              drawCanvasSubtitles(ctx, lines, w, h);
+              drawCanvasSubtitles(ctx, lines, targetW, targetH);
             }
           }catch(e){
             console.warn("Canvas PiP frame warning:", e);
           }
         }
-        window._tatapPipRaf = requestAnimationFrame(drawPipLoop);
       }
 
-      drawPipLoop();
+      drawPipLoop(performance.now());
 
       var stream = pipCanvas.captureStream(30);
       pipVid.srcObject = stream;
@@ -2916,10 +3041,23 @@ async function toggleSmartPip(){
 
       await pipVid.requestPictureInPicture();
       syncPipSubtitles(true);
-      toast("Mode PiP Aktif (Canvas Stream Fallback)", 2000);
+      toast("Mode PiP Aktif (Subtitle Burn-In)", 2000);
       return;
     }catch(err){
       console.warn("Canvas PiP fallback gagal:", err);
+    }
+  }
+
+  // 5. Fallback terakhir: Direct Native Video PiP
+  if(typeof sourceVideo.requestPictureInPicture === "function"){
+    try{
+      syncNativeTextTrack(cur._rawVtt, cur.cues, cur.subLang, true);
+      await sourceVideo.requestPictureInPicture();
+      syncPipSubtitles(true);
+      toast("Mode PiP Aktif (Hardware Accelerated)", 1500);
+      return;
+    }catch(err){
+      console.warn("Final Direct Native PiP request gagal:", err);
     }
   }
 
@@ -3679,7 +3817,7 @@ function playUrl(url,referrer,sub,subRef,resumeTime,token){
   var validSub = (typeof sub === "string" && !/^\d+$/.test(sub.trim())) ? sub : null;
   switchSubtitleTrack(validSub);
   $("pm-spinner").classList.remove("hidden");
-  $("pm-status").textContent="buffering...";
+  $("pm-status").textContent="menyiapkan pemutar...";
   var onCan=function(){
     $("pm-spinner").classList.add("hidden");
     if(resumeTime && resumeTime > 0){
@@ -4458,10 +4596,25 @@ function playUrl(url,referrer,sub,subRef,resumeTime,token){
       syncNativeTextTrack(cur._rawVtt, cur.cues, cur.subLang);
     }
 
+    var showBufferSpinner = function(msg){
+      var sp = $("pm-spinner");
+      var st = $("pm-status");
+      if(st && msg) st.textContent = msg;
+      if(sp) sp.classList.remove("hidden");
+    };
     var hideSpinner = function(){
       var sp = $("pm-spinner");
       if(sp) sp.classList.add("hidden");
     };
+
+    // Tampilkan animasi pemuatan & buffering saat Artplayer inisiasi sampai video buffer siap berputar
+    showBufferSpinner("memuat video & buffer...");
+
+    art.on("video:waiting", function(){
+      showBufferSpinner("buffering video...");
+    });
+    art.on("video:playing", hideSpinner);
+    art.on("video:canplaythrough", hideSpinner);
     art.once("video:canplay", function(){
       hideSpinner();
       if(resumeTime && resumeTime > 0){
@@ -4469,10 +4622,10 @@ function playUrl(url,referrer,sub,subRef,resumeTime,token){
         resumeTime = 0;
       }
     });
-    art.once("video:playing", hideSpinner);
-    art.once("video:loadeddata", hideSpinner);
+
     art.once("video:loadedmetadata", function(){
-      hideSpinner();
+      // Catatan: Jangan panggil hideSpinner di sini agar animasi loading tetap aktif
+      // sampai frame video dan buffer pertama benar-benar siap diputar (canplay/playing).
       if((!cur.intro || !cur.outro) && window.Tatap && window.Tatap.skipTimes && art.duration > 0){
         var dur = Math.round(art.duration);
         var skipMal = (cur.res && cur.res.mal_id) || cur.mal_id || "";
@@ -4804,6 +4957,27 @@ function closePlayer(){
   TvNavigationManager.setPlayerModalState(false);
   TvNavigationManager.setPlayerState(TvNavigationManager.PLAYER_IDLE);
   closeOpenSubtitlesPicker();
+
+  // Bersihkan Picture-in-Picture jika sedang aktif
+  if(window.tatapPipWindow){
+    try{ window.tatapPipWindow.close(); }catch(_){}
+    window.tatapPipWindow = null;
+  }
+  if(document.pictureInPictureElement){
+    try{ document.exitPictureInPicture(); }catch(_){}
+  }
+  if(window._tatapPipRaf){
+    cancelAnimationFrame(window._tatapPipRaf);
+    window._tatapPipRaf = null;
+  }
+  if(window._tatapPipVideo){
+    try{ window._tatapPipVideo.srcObject = null; }catch(_){}
+  }
+  var pipPlaceholder = document.getElementById("pip-stage-placeholder");
+  if(pipPlaceholder && pipPlaceholder.parentNode){
+    try{ pipPlaceholder.parentNode.removeChild(pipPlaceholder); }catch(_){}
+  }
+  syncPipSubtitles(false);
 
   try{ recordWatchProgress(true); }catch(e){}
 
