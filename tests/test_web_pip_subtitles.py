@@ -34,6 +34,24 @@ def test_web_pip_subtitles_in_app_js():
     assert "pip-focus-overlay" in app_js
     assert "pip-focus-restore-btn" in app_js
 
+    # 6. Pastikan Direct Native Video PiP diprioritaskan sebelum canvas stream capture
+    pip_fn_start = app_js.find("async function toggleSmartPip()")
+    assert pip_fn_start > 0
+    pip_fn = app_js[pip_fn_start:pip_fn_start + 6000]
+    direct_req_pos = pip_fn.find("sourceVideo.requestPictureInPicture()")
+    canvas_cap_pos = pip_fn.find("pipCanvas.captureStream(")
+    assert direct_req_pos > 0, "Direct sourceVideo.requestPictureInPicture must be present"
+    assert canvas_cap_pos > 0, "Canvas captureStream fallback must be present"
+    assert direct_req_pos < canvas_cap_pos, "Direct Hardware Video PiP must precede canvas stream capture"
+
+
+def test_webview2_hardware_acceleration_flags():
+    """Memastikan launcher Windows Go menyetel argumen browser WebView2 hardware accelerated."""
+    main_go = (ROOT / "launcher" / "main.go").read_text(encoding="utf-8")
+    assert "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS" in main_go
+    assert "--enable-gpu-rasterization" in main_go
+    assert "--enable-zero-copy" in main_go
+
 
 def test_web_pip_subtitles_css_rule():
     """Memastikan CSS mendefinisikan aturan visual ::cue saat jendela PiP aktif serta efek blur panggung utama."""

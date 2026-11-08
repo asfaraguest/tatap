@@ -2789,11 +2789,62 @@ async function toggleSmartPip(){
     window.tatapPipWindow = null;
     return;
   }
+  if(window.art && window.art.pip){
+    try{ window.art.pip = false; }catch(_){}
+    return;
+  }
 
   var sourceVideo = (window.art && window.art.video) || $("vid");
   if(!sourceVideo) return;
 
-  // 2. True Native PiP via Canvas Stream (Subtitle di-render langsung ke dalam frame video PiP)
+  // Bersihkan sisa loop canvas terdahulu jika ada
+  if(window._tatapPipRaf){
+    cancelAnimationFrame(window._tatapPipRaf);
+    window._tatapPipRaf = null;
+  }
+  if(window._tatapPipVideo){
+    try{ window._tatapPipVideo.srcObject = null; }catch(_){}
+  }
+
+  // Inisialisasi tombol kembalikan fokus dari PiP
+  var restoreBtn = $("pip-focus-restore-btn");
+  if(restoreBtn && !restoreBtn._tatapInit){
+    restoreBtn._tatapInit = true;
+    restoreBtn.addEventListener("click", async function(e){
+      e.preventDefault();
+      e.stopPropagation();
+      if(document.pictureInPictureElement){
+        try{ await document.exitPictureInPicture(); }catch(_){}
+      }
+    });
+  }
+
+  var focusOverlay = $("pip-focus-overlay");
+  if(focusOverlay && !focusOverlay._tatapInit){
+    focusOverlay._tatapInit = true;
+    focusOverlay.addEventListener("click", async function(e){
+      if(e.target === focusOverlay){
+        if(document.pictureInPictureElement){
+          try{ await document.exitPictureInPicture(); }catch(_){}
+        }
+      }
+    });
+  }
+
+  // 2. Direct Native Video PiP (Prioritas Utama: Zero GPU Readback, 100% Hardware Accelerated DXVA/D3D11)
+  if(typeof sourceVideo.requestPictureInPicture === "function"){
+    try{
+      syncNativeTextTrack(cur._rawVtt, cur.cues, cur.subLang, true);
+      await sourceVideo.requestPictureInPicture();
+      syncPipSubtitles(true);
+      toast("Mode PiP Aktif (Hardware Accelerated)", 1500);
+      return;
+    }catch(err){
+      console.warn("Direct Native PiP request gagal, mencoba fallback canvas:", err);
+    }
+  }
+
+  // 3. Fallback: True Native PiP via Canvas Stream (Subtitle di-render langsung ke dalam frame video PiP)
   if(window.HTMLCanvasElement && typeof HTMLCanvasElement.prototype.captureStream === "function" && typeof document.createElement("video").requestPictureInPicture === "function"){
     try{
       if(!window._tatapPipCanvas){
@@ -2821,11 +2872,6 @@ async function toggleSmartPip(){
 
       var ctx = pipCanvas.getContext("2d");
       var pipRunning = true;
-
-      if(window._tatapPipRaf){
-        cancelAnimationFrame(window._tatapPipRaf);
-        window._tatapPipRaf = null;
-      }
 
       function drawPipLoop(){
         if(!pipRunning) return;
@@ -2868,49 +2914,16 @@ async function toggleSmartPip(){
         if(sourceVideo && !sourceVideo.paused) sourceVideo.pause();
       };
 
-      // Inisialisasi tombol kembalikan fokus dari PiP
-      var restoreBtn = $("pip-focus-restore-btn");
-      if(restoreBtn && !restoreBtn._tatapInit){
-        restoreBtn._tatapInit = true;
-        restoreBtn.addEventListener("click", async function(e){
-          e.preventDefault();
-          e.stopPropagation();
-          if(document.pictureInPictureElement){
-            try{ await document.exitPictureInPicture(); }catch(_){}
-          }
-        });
-      }
-
-      var focusOverlay = $("pip-focus-overlay");
-      if(focusOverlay && !focusOverlay._tatapInit){
-        focusOverlay._tatapInit = true;
-        focusOverlay.addEventListener("click", async function(e){
-          if(e.target === focusOverlay){
-            if(document.pictureInPictureElement){
-              try{ await document.exitPictureInPicture(); }catch(_){}
-            }
-          }
-        });
-      }
-
       await pipVid.requestPictureInPicture();
       syncPipSubtitles(true);
-      toast("Mode True PiP Aktif (Fokus pada Jendela PiP)", 2000);
+      toast("Mode PiP Aktif (Canvas Stream Fallback)", 2000);
       return;
     }catch(err){
-      console.warn("True Canvas PiP gagal, beralih ke direct video PiP:", err);
+      console.warn("Canvas PiP fallback gagal:", err);
     }
   }
 
-  // 3. Fallback langsung ke video utama dengan native text track
-  syncNativeTextTrack(cur._rawVtt, cur.cues, cur.subLang, true);
-  try{
-    await sourceVideo.requestPictureInPicture();
-    syncPipSubtitles(true);
-    toast("Mode True PiP Aktif (Fokus pada Jendela PiP)", 2000);
-  }catch(err){
-    toast("Gagal membuka PiP: " + (err && err.message || err));
-  }
+  toast("Picture-in-Picture tidak didukung di perangkat/peramban ini.", 2500);
 }
 
 function syncFullscreenSubtitles(){
@@ -4396,27 +4409,33 @@ function playUrl(url,referrer,sub,subRef,resumeTime,token){
     });
 
     art.on("pip", function(state){
+      if(state && typeof syncNativeTextTrack === "function"){
+        syncNativeTextTrack(cur._rawVtt, cur.cues, cur.subLang, true);
+      }
       syncPipSubtitles(state);
       toast(state ? "Masuk ke mode Picture-in-Picture (PiP)" : "Keluar dari mode Picture-in-Picture", 1500);
     });
 
     if(art.video){
-      art.video.addEventListener("enterpictureinpicture", function(){ syncPipSubtitles(true); });
+      art.video.addEventListener("enterpictureinpicture", function(){
+        if(typeof syncNativeTextTrack === "function"){
+          syncNativeTextTrack(cur._rawVtt, cur.cues, cur.subLang, true);
+        }
+        syncPipSubtitles(true);
+      });
       art.video.addEventListener("leavepictureinpicture", function(){ syncPipSubtitles(false); });
     }
 
-    // Intercept tombol PiP Artplayer agar memprioritaskan Document Picture-in-Picture API
+    // Intercept tombol PiP Artplayer agar selalu mengeksekusi toggleSmartPip teroptimasi
     var interceptPipBtn = function(){
       var pipEl = artContainer.querySelector(".art-control-pip") || (art.template && art.template.$pip);
       if(pipEl && !pipEl._tatapSmartPip){
         pipEl._tatapSmartPip = true;
         pipEl.addEventListener("click", function(e){
-          if(window.documentPictureInPicture && typeof window.documentPictureInPicture.requestWindow === "function"){
-            e.preventDefault();
-            e.stopPropagation();
-            e.stopImmediatePropagation();
-            toggleSmartPip();
-          }
+          e.preventDefault();
+          e.stopPropagation();
+          e.stopImmediatePropagation();
+          toggleSmartPip();
         }, true);
       }
     };
@@ -7416,6 +7435,7 @@ function copyBackendDebugInfo(){
 }
 
 document.addEventListener("enterpictureinpicture", function(){
+  if(typeof syncNativeTextTrack === "function") syncNativeTextTrack(cur._rawVtt, cur.cues, cur.subLang, true);
   if(typeof syncPipSubtitles === "function") syncPipSubtitles(true);
 });
 document.addEventListener("leavepictureinpicture", function(){

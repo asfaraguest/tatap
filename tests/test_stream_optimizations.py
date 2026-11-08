@@ -88,7 +88,7 @@ async def test_non_blocking_aniskip_on_resolve(monkeypatch):
     monkeypatch.setattr(main.aniskip, "get_skip_times", slow_aniskip)
     
     t0 = asyncio.get_event_loop().time()
-    res = await main.resolve(slug=slug, ep=ep, mode="sub", force=True, title="Fast Anime")
+    res = await main.resolve(slug=slug, ep=ep, mode="sub", force=True, title="Fast Anime", source="hianime")
     t1 = asyncio.get_event_loop().time()
     
     assert res["success"] is True

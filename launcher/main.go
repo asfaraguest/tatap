@@ -485,6 +485,9 @@ func main() {
 	}
 
 	// 7. Jendela native WebView2
+	if os.Getenv("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS") == "" {
+		_ = os.Setenv("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS", "--enable-gpu-rasterization --enable-zero-copy")
+	}
 	dataPath := filepath.Join(appDir, "cache", "webview2-data")
 	_ = os.MkdirAll(dataPath, 0755)
 	runWebView(startURL, dataPath)
