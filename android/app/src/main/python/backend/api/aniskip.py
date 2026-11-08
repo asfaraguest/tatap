@@ -210,16 +210,29 @@ def get_skip_times(mal_id, episode_num: int, episode_length: float = 0, timeout:
             if resp.status_code == 200:
                 body = resp.json()
                 if body.get("found") and isinstance(body.get("results"), list):
+                    op_priority = 0  # 1: mixed-op, 2: pure op
+                    ed_priority = 0  # 1: mixed-ed, 2: pure ed
                     for item in body["results"]:
-                        st = (item.get("skipType") or "").lower()
+                        st = (item.get("skipType") or "").strip().lower()
                         interval = item.get("interval") or {}
                         start = round(float(interval.get("startTime") or 0), 2)
                         end = round(float(interval.get("endTime") or 0), 2)
                         if is_valid_interval(start, end):
-                            if "op" in st and intro["end"] == 0:
+                            # Prioritisasi: pure 'op' (prioritas 2) > 'mixed-op' (prioritas 1)
+                            if st == "op":
                                 intro = {"start": start, "end": end}
-                            elif "ed" in st and outro["end"] == 0:
+                                op_priority = 2
+                            elif ("op" in st) and op_priority < 1:
+                                intro = {"start": start, "end": end}
+                                op_priority = 1
+
+                            # Prioritisasi: pure 'ed' (prioritas 2) > 'mixed-ed' (prioritas 1)
+                            if st == "ed":
                                 outro = {"start": start, "end": end}
+                                ed_priority = 2
+                            elif ("ed" in st) and ed_priority < 1:
+                                outro = {"start": start, "end": end}
+                                ed_priority = 1
                     should_cache = True
                     cache_ttl = _CACHE_TTL
                 else:

@@ -457,6 +457,62 @@ public class PlayerActivity extends Activity {
         }
     }
 
+    private void fetchSkipTimesAsync(final String curSlug, final int curEp, final String curTitle, final String curMalId) {
+        final int targetResolveId = currentResolveLoadId;
+        new Thread(() -> {
+            HttpURLConnection conn = null;
+            try {
+                String u = "http://127.0.0.1:8767/api/episode/skip_times?slug=" + URLEncoder.encode(curSlug != null ? curSlug : "", "UTF-8")
+                        + "&ep=" + curEp
+                        + (curTitle != null && !curTitle.isEmpty() ? "&title=" + URLEncoder.encode(curTitle, "UTF-8") : "")
+                        + (curMalId != null && !curMalId.isEmpty() ? "&mal_id=" + URLEncoder.encode(curMalId, "UTF-8") : "");
+                conn = (HttpURLConnection) new URL(u).openConnection();
+                conn.setConnectTimeout(6000);
+                conn.setReadTimeout(10000);
+                if (conn.getResponseCode() == 200) {
+                    BufferedReader r = new BufferedReader(new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8));
+                    StringBuilder sb = new StringBuilder();
+                    String line;
+                    while ((line = r.readLine()) != null) sb.append(line);
+                    r.close();
+                    JSONObject res = new JSONObject(sb.toString());
+                    if (res.optBoolean("success", false)) {
+                        JSONObject data = res.optJSONObject("data");
+                        if (data != null) {
+                            JSONObject inObj = data.optJSONObject("intro");
+                            JSONObject outObj = data.optJSONObject("outro");
+                            long sIn = inObj != null ? (long) (inObj.optDouble("start", 0) * 1000) : 0;
+                            long eIn = inObj != null ? (long) (inObj.optDouble("end", 0) * 1000) : 0;
+                            long sOut = outObj != null ? (long) (outObj.optDouble("start", 0) * 1000) : 0;
+                            long eOut = outObj != null ? (long) (outObj.optDouble("end", 0) * 1000) : 0;
+
+                            runOnUiThread(() -> {
+                                if (targetResolveId != currentResolveLoadId) return;
+                                boolean updated = false;
+                                if (eIn > sIn && eIn > 0 && (eIn - sIn) >= 5000 && introEndMs == 0) {
+                                    introStartMs = sIn;
+                                    introEndMs = eIn;
+                                    updated = true;
+                                }
+                                if (eOut > sOut && eOut > 0 && (eOut - sOut) >= 5000 && outroEndMs == 0) {
+                                    outroStartMs = sOut;
+                                    outroEndMs = eOut;
+                                    updated = true;
+                                }
+                                if (updated && player != null) {
+                                    checkSkipTimes(player.getCurrentPosition());
+                                }
+                            });
+                        }
+                    }
+                }
+            } catch (Exception ignored) {
+            } finally {
+                if (conn != null) conn.disconnect();
+            }
+        }).start();
+    }
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -2973,6 +3029,11 @@ public class PlayerActivity extends Activity {
                         outroEndMs = 0;
                     }
                     currentSkipTargetMs = 0;
+
+                    if (introEndMs == 0 || outroEndMs == 0) {
+                        String malIdStr = data.optString("mal_id", "");
+                        fetchSkipTimesAsync(slug, ep, title, malIdStr);
+                    }
 
                     if (!rawStreamUrl.isEmpty()) {
                         runOnUiThread(() -> {

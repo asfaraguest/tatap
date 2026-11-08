@@ -214,11 +214,9 @@ def resolve_anilist_id(slug_or_title: str) -> int:
             data = r.json()
             results = data.get("results") or []
             for item in results:
-                # Blacklist filter Hentai & Adult
-                if item.get("isAdult") is True:
-                    continue
+                # Blacklist filter Hentai (Direktif #4 Master Directives)
                 genres = [g.lower() for g in (item.get("genres") or [])]
-                if "hentai" in genres or "adult" in genres:
+                if "hentai" in genres:
                     continue
 
                 item_id = item.get("id")
@@ -232,10 +230,10 @@ def resolve_anilist_id(slug_or_title: str) -> int:
                     _SLUG_ID_CACHE[slug_or_title] = int(item_id)
                     return int(item_id)
 
-            # Jika tidak ada yang exact match, tapi ada hasil pertama non-adult
+            # Jika tidak ada yang exact match, tapi ada hasil pertama non-hentai
             if results:
                 first = results[0]
-                if not first.get("isAdult") and "hentai" not in [g.lower() for g in (first.get("genres") or [])]:
+                if "hentai" not in [g.lower() for g in (first.get("genres") or [])]:
                     first_id = first.get("id")
                     if first_id:
                         _SLUG_ID_CACHE[slug_or_title] = int(first_id)

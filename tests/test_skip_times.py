@@ -305,3 +305,94 @@ async def test_persistent_sqlite_mal_map():
     assert fetched == 52991
 
 
+def test_aniskip_pure_op_priority_over_mixed_op():
+    """AniSkip harus memprioritaskan pure OP di atas mixed-op terlepas dari urutan array results."""
+    mock_body = {
+        "found": True,
+        "results": [
+            {
+                "skipType": "mixed-op",
+                "interval": {"startTime": 50.0, "endTime": 140.0}
+            },
+            {
+                "skipType": "op",
+                "interval": {"startTime": 10.0, "endTime": 100.0}
+            },
+            {
+                "skipType": "mixed-ed",
+                "interval": {"startTime": 1200.0, "endTime": 1290.0}
+            },
+            {
+                "skipType": "ed",
+                "interval": {"startTime": 1300.0, "endTime": 1390.0}
+            }
+        ]
+    }
+    aniskip._CACHE.clear()
+    resp = MagicMock()
+    resp.status_code = 200
+    resp.json.return_value = mock_body
+
+    with patch("httpx.Client.get", return_value=resp):
+        res = aniskip.get_skip_times(99999, 1)
+        # Harus memilih pure op {10, 100} bukan mixed-op {50, 140}
+        assert res["intro"] == {"start": 10.0, "end": 100.0}
+        # Harus memilih pure ed {1300, 1390} bukan mixed-ed {1200, 1290}
+        assert res["outro"] == {"start": 1300.0, "end": 1390.0}
+
+
+@pytest.mark.asyncio
+async def test_update_episode_cache_skip_times():
+    """Fungsi update_episode_cache_skip_times harus memperbarui intro/outro di SQLite."""
+    from backend.database import init_db, set_episode_cache, get_episode_cache, update_episode_cache_skip_times
+    await init_db()
+
+    test_slug = "test-anime-skip-update"
+    await set_episode_cache(test_slug, 1, "sub", "https://example.com/master.m3u8", [], "sub.vtt", "English", "", "Server-1")
+
+    # Sebelum update, intro/outro kosong
+    before = await get_episode_cache(test_slug, 1, "sub")
+    assert before["intro"] == {"start": 0, "end": 0}
+
+    # Lakukan update
+    updated_rows = await update_episode_cache_skip_times(test_slug, 1, {"start": 12.5, "end": 102.5}, {"start": 1200.0, "end": 1290.0})
+    assert updated_rows >= 1
+
+    after = await get_episode_cache(test_slug, 1, "sub")
+    assert after["intro"] == {"start": 12.5, "end": 102.5}
+    assert after["outro"] == {"start": 1200.0, "end": 1290.0}
+
+
+@pytest.mark.asyncio
+async def test_episode_skip_times_endpoint(monkeypatch):
+    """Endpoint /api/episode/skip_times harus mengembalikan intro/outro dan meng-update SQLite cache."""
+    from backend import main
+    from backend.database import init_db, set_episode_cache, get_episode_cache
+    await init_db()
+
+    slug = "test-unique-endpoint-slug-999"
+    await set_episode_cache(slug, 1, "sub", "https://example.com/stream.m3u8", [], "sub.vtt", "English", "", "HD-1")
+
+    # Mock aniskip
+    def mock_get(m_id, ep_num, episode_length=0, timeout=4.0):
+        return {
+            "intro": {"start": 5.0, "end": 95.0},
+            "outro": {"start": 1400.0, "end": 1490.0}
+        }
+    monkeypatch.setattr(main.aniskip, "get_skip_times", mock_get)
+    monkeypatch.setattr(aniskip, "get_skip_times", mock_get)
+    main.aniskip._CACHE.clear()
+    aniskip._CACHE.clear()
+
+    res = await main.episode_skip_times(mal_id="88888", title="UniqueTestTitle", slug=slug, ep=1, duration=1450.0)
+    assert res["success"] is True
+    assert res["data"]["intro"]["end"] == 95.0
+    assert res["data"]["outro"]["start"] == 1400.0
+
+    # SQLite episode_cache harus otomatis terupdate
+    cached = await get_episode_cache(slug, 1, "sub")
+    assert cached["intro"]["end"] == 95.0
+    assert cached["outro"]["start"] == 1400.0
+
+
+

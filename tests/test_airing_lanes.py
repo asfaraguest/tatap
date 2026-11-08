@@ -1,3 +1,4 @@
+import asyncio
 import os
 import sys
 import pytest
@@ -43,7 +44,9 @@ async def test_seasonal_airing_dual_lane_structure():
     items_with_headers = data.get("items", [])
 
     assert len(seasonal_items) > 0
+    assert len(seasonal_items) <= 8, "Anime musiman wajib dibatasi maksimal 8 kartu per halaman"
     assert len(long_running_items) > 0
+    assert len(long_running_items) <= 8, "Anime serial panjang wajib dibatasi maksimal 8 kartu per halaman"
     assert len(items_with_headers) >= len(seasonal_items) + len(long_running_items) + 2
 
     # Verifikasi header ada di items
@@ -81,3 +84,81 @@ async def test_yani_neko_classified_as_seasonal():
         it = yani_in_seasonal[0]
         assert it.get("lane") == "seasonal"
         assert it.get("is_long_running") is False
+
+@pytest.mark.asyncio
+async def test_airing_serves_stale_immediately_and_refreshes_in_background(monkeypatch):
+    """Cache kedaluwarsa harus dilayani instan (SWR), lalu disegarkan di latar belakang."""
+    import backend.main as bm
+
+    key = "airing_lanes_v6|page=1|safe=1"
+    stale_payload = {
+        "which": "airing", "page": 1, "total_pages": 5,
+        "seasonal": [{"id": "x", "title": "X"}], "long_running": [],
+        "items": [{"id": "x", "title": "X"}], "cached": False,
+    }
+    fresh_payload = dict(stale_payload, seasonal=[{"id": "y", "title": "Y"}])
+
+    calls = {"build": 0}
+
+    async def fake_get_browse_cache(k, ttl=6 * 3600):
+        if ttl == 3600:
+            return None            # cache utama dianggap kedaluwarsa
+        return stale_payload       # versi basi masih ada (stale window)
+
+    async def fake_set_browse_cache(k, payload):
+        calls["set"] = payload
+
+    async def fake_build(page, safe_mode_int):
+        calls["build"] += 1
+        return fresh_payload
+
+    monkeypatch.setattr(bm, "get_browse_cache", fake_get_browse_cache)
+    monkeypatch.setattr(bm, "set_browse_cache", fake_set_browse_cache)
+    monkeypatch.setattr(bm, "_build_airing_payload", fake_build)
+    monkeypatch.setattr(bm, "_AIRING_REFRESH_INFLIGHT", set())
+
+    res = await bm.seasonal(which="airing", page=1)
+    data = res.get("data", {})
+
+    # Dilayani seketika dari data basi (tanpa blocking scrape)
+    assert res.get("success") is True
+    assert data.get("stale") is True
+    assert data.get("cached") is True
+    assert data.get("seasonal") == stale_payload["seasonal"]
+
+    # Background refresh dijalankan (tidak blocking request)
+    for _ in range(50):
+        if calls.get("build", 0) > 0:
+            break
+        await asyncio.sleep(0.02)
+    assert calls.get("build", 0) == 1, "Refresh latar belakang harus berjalan"
+
+@pytest.mark.asyncio
+async def test_airing_cold_path_builds_payload_and_caches(monkeypatch):
+    """Cache kosong → payload dibangun, ditulis ke cache, dan ditandai bukan stale."""
+    import backend.main as bm
+
+    async def fake_get_browse_cache(k, ttl=6 * 3600):
+        return None
+
+    written = {}
+
+    async def fake_set_browse_cache(k, payload):
+        written["key"] = k
+        written["payload"] = payload
+
+    async def fake_build(page, safe_mode_int):
+        return {"which": "airing", "page": page, "total_pages": 5,
+                "seasonal": [], "long_running": [], "items": [], "cached": False}
+
+    monkeypatch.setattr(bm, "get_browse_cache", fake_get_browse_cache)
+    monkeypatch.setattr(bm, "set_browse_cache", fake_set_browse_cache)
+    monkeypatch.setattr(bm, "_build_airing_payload", fake_build)
+
+    res = await bm.seasonal(which="airing", page=1)
+    data = res.get("data", {})
+
+    assert res.get("success") is True
+    assert data.get("stale") is None
+    assert written["key"].startswith("airing_lanes_v6|page=1")
+    assert written["payload"]["which"] == "airing"

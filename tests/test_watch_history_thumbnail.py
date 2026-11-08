@@ -7,7 +7,7 @@ ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if ROOT_DIR not in sys.path:
     sys.path.insert(0, ROOT_DIR)
 
-from backend.database import add_history, get_history, clear_history, add_bookmark, _connect_db
+from backend.database import add_history, get_history, clear_history, add_bookmark, remove_bookmark, _connect_db
 
 
 @pytest.mark.asyncio
@@ -50,22 +50,26 @@ async def test_watch_history_backfills_poster_from_bookmarks():
     test_poster = "https://img.hianime.to/poster/bookmark123.jpg"
     test_title = "Bookmarked Anime Title"
 
-    # Tambah bookmark dengan poster
-    await add_bookmark(test_slug, test_title, poster=test_poster, type="MOVIE")
+    try:
+        # Tambah bookmark dengan poster
+        await add_bookmark(test_slug, test_title, poster=test_poster, type="MOVIE")
 
-    # Tambah history tanpa poster
-    async with _connect_db() as db:
-        await db.execute("DELETE FROM watch_history WHERE slug=?", (test_slug,))
-        await db.execute("INSERT INTO watch_history(slug,title,episode,mode,progress,poster,type,played_at) VALUES(?,?,?,?,?,?,?,CURRENT_TIMESTAMP)",
-                         (test_slug, test_title, 1, "sub", 100, "", ""))
-        await db.commit()
+        # Tambah history tanpa poster
+        async with _connect_db() as db:
+            await db.execute("DELETE FROM watch_history WHERE slug=?", (test_slug,))
+            await db.execute("INSERT INTO watch_history(slug,title,episode,mode,progress,poster,type,played_at) VALUES(?,?,?,?,?,?,?,CURRENT_TIMESTAMP)",
+                             (test_slug, test_title, 1, "sub", 100, "", ""))
+            await db.commit()
 
-    # Panggil get_history yang melakukan auto-backfill
-    h = await get_history()
-    found = next((x for x in h if x["slug"] == test_slug), None)
-    assert found is not None
-    assert found["poster"] == test_poster
-    assert found["type"] == "MOVIE"
+        # Panggil get_history yang melakukan auto-backfill
+        h = await get_history()
+        found = next((x for x in h if x["slug"] == test_slug), None)
+        assert found is not None
+        assert found["poster"] == test_poster
+        assert found["type"] == "MOVIE"
+    finally:
+        await remove_bookmark(test_slug)
+        await clear_history()
 
 
 def test_chaquopy_backend_parity():

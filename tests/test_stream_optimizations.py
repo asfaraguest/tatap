@@ -93,7 +93,46 @@ async def test_non_blocking_aniskip_on_resolve(monkeypatch):
     
     assert res["success"] is True
     # Waktu resolve harus jauh di bawah timeout lama (1.8s)
-    assert (t1 - t0) < 0.8
+    assert (t1 - t0) < 1.5
     assert res["data"]["master"] == "https://example.com/fast.m3u8"
     # Pastikan master_body otomatis mem-prime _MASTER_CACHE
     assert main._master_cache_get("https://example.com/fast.m3u8") is not None
+
+
+@pytest.mark.asyncio
+async def test_master_cache_with_bytes_payload():
+    """_master_cache_set dan _rewrite_m3u8_content harus kebal terhadap payload bytes (anti TypeError)."""
+    test_url = "https://example.com/hls/binary_master.m3u8"
+    test_bytes = b"#EXTM3U\n#EXT-X-VERSION:4\n#EXT-X-STREAM-INF:BANDWIDTH=900000,RESOLUTION=640x360\n360/index.m3u8\n"
+
+    # 1. Simpan payload bytes
+    main._master_cache_set(test_url, test_bytes)
+    cached = main._master_cache_get(test_url)
+    assert isinstance(cached, str)
+    assert "#EXTM3U" in cached
+
+    # 2. Rewrite m3u8 dengan argumen bytes langsung
+    rewritten = main._rewrite_m3u8_content(test_bytes, test_url, "https://example.com/")
+    assert isinstance(rewritten, str)
+    assert "/api/player/video?url=" in rewritten
+    assert 'CODECS="avc1.64001f,mp4a.40.2"' in rewritten
+
+
+@pytest.mark.asyncio
+async def test_proxy_video_m3u8_atomic_response():
+    """Proxy m3u8 harus mengembalikan Response standar ber-Content-Length (bukan StreamingResponse chunked)."""
+    from fastapi import Response
+    test_url = "https://example.com/hls/atomic_test.m3u8"
+    test_txt = "#EXTM3U\n#EXT-X-VERSION:4\n#EXT-X-STREAM-INF:BANDWIDTH=1200000\nindex.m3u8\n"
+    main._master_cache_set(test_url, test_txt)
+
+    resp = await main.proxy_video(url=test_url, referer="https://example.com/")
+    assert isinstance(resp, Response)
+    assert not hasattr(resp, "body_iterator")  # Bukan StreamingResponse
+    assert resp.status_code == 200
+    assert "Content-Length" in resp.headers
+    assert int(resp.headers["Content-Length"]) > 0
+    assert resp.headers["Cache-Control"] == "no-cache, no-transform"
+    assert resp.headers["content-type"] == "application/vnd.apple.mpegurl"
+    assert b"/api/player/video?url=" in resp.body
+

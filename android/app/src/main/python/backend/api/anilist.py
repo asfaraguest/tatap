@@ -50,7 +50,8 @@ query ($season: MediaSeason, $year: Int, $page: Int, $perPage: Int, $statusIn: [
           name
         }
       }
-      coverImage { large medium }
+      coverImage { extraLarge large medium }
+      bannerImage
       siteUrl
       description(asHtml: false)
       nextAiringEpisode {
@@ -115,7 +116,8 @@ query AiringFinished($page: Int, $perPage: Int) {
       }
       startDate { year month day }
       endDate { year month day }
-      coverImage { large medium }
+      coverImage { extraLarge large medium }
+      bannerImage
       siteUrl
       description(asHtml: false)
     }
@@ -249,7 +251,8 @@ query ($now: Int, $end: Int, $perPage: Int) {
       media {
         id idMal title { romaji english }
         season seasonYear format
-        coverImage { large medium }
+        coverImage { extraLarge large medium }
+      bannerImage
       }
     }
   }
@@ -268,7 +271,8 @@ query GetSchedule($page: Int, $now: Int, $end: Int, $perPage: Int) {
         id idMal title { romaji english }
         season seasonYear format
         genres averageScore
-        coverImage { large medium }
+        coverImage { extraLarge large medium }
+      bannerImage
       }
     }
   }
@@ -497,10 +501,51 @@ query ($search: String, $perPage: Int) {
       season
       seasonYear
       startDate { year }
+      bannerImage
+      coverImage { extraLarge large medium }
     }
   }
 }
 """
+
+
+def get_anime_cover_and_banner(title_or_query: str) -> dict:
+    """Ambil URL banner horizontal dan cover poster beresolusi tinggi dari AniList."""
+    if not title_or_query or not title_or_query.strip() or _is_rate_limited():
+        return {"banner": "", "cover": "", "title_romaji": "", "title_english": "", "title_native": ""}
+    import re
+    clean_q = title_or_query.strip()
+    # Siapkan beberapa kandidat query pencarian jika query asli terlalu panjang/spesifik
+    queries_to_try = [clean_q]
+    # Coba hilangkan imbuhan judul sekunder seperti "Season 2", ": Part 2", "- War of Underworld", dsb.
+    sub_title = re.split(r"[:\-(]", clean_q)[0].strip()
+    if sub_title and sub_title.lower() != clean_q.lower() and len(sub_title) >= 3:
+        queries_to_try.append(sub_title)
+    # Coba 2-3 kata utama judul
+    words = [w for w in re.sub(r"[^\w\s]", " ", clean_q).split() if w]
+    if len(words) > 2:
+        queries_to_try.append(" ".join(words[:2]))
+
+    for q in queries_to_try:
+        try:
+            results = search_anime_metadata(q, per_page=4)
+            for m in results:
+                t_obj = m.get("title") or {}
+                t_en = (t_obj.get("english") or "").strip()
+                t_ro = (t_obj.get("romaji") or "").strip()
+                if _match_title_tokens(clean_q, t_en) or _match_title_tokens(clean_q, t_ro) or _match_title_tokens(q, t_en) or _match_title_tokens(q, t_ro) or clean_q.lower() in t_en.lower() or clean_q.lower() in t_ro.lower() or len(results) == 1:
+                    cov = m.get("coverImage") or {}
+                    cover_url = cov.get("extraLarge") or cov.get("large") or cov.get("medium") or ""
+                    return {
+                        "banner": m.get("bannerImage") or "",
+                        "cover": cover_url,
+                        "title_romaji": t_ro,
+                        "title_english": t_en,
+                        "title_native": (t_obj.get("native") or "").strip()
+                    }
+        except Exception:
+            pass
+    return {"banner": "", "cover": "", "title_romaji": "", "title_english": "", "title_native": ""}
 
 
 def search_anime_metadata(search_query: str, per_page: int = 12) -> list:

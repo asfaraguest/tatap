@@ -82,43 +82,50 @@ except Exception:
     "${HERE}/usr/bin/python3" "${HERE}/backend/main.py" > "$SERVER_LOG" 2>&1 &
     SERVER_PID=$!
 
-    # 3. Wait for server ready (max 15 seconds, polling every 200ms)
-    READY=0
-    for i in {1..75}; do
-        if "${HERE}/usr/bin/python3" -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8767/api/ping', timeout=0.5)" >/dev/null 2>&1; then
-            READY=1
-            break
-        fi
-        if ! kill -0 "$SERVER_PID" 2>/dev/null; then
-            break
-        fi
-        sleep 0.2
-    done
+    # 3. Fallback: Wait for server ready jika bootscreen tidak tersedia
+    if [ ! -f "${HERE}/frontend/bootscreen.html" ]; then
+        READY=0
+        for i in {1..75}; do
+            if "${HERE}/usr/bin/python3" -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8767/api/ping', timeout=0.5)" >/dev/null 2>&1; then
+                READY=1
+                break
+            fi
+            if ! kill -0 "$SERVER_PID" 2>/dev/null; then
+                break
+            fi
+            sleep 0.2
+        done
 
-    if [ "$READY" -ne 1 ]; then
-        ERR_LOG=""
-        if [ -f "$SERVER_LOG" ]; then
-            ERR_LOG=$(tail -n 15 "$SERVER_LOG")
-        fi
-        MSG="Server backend Tatap tidak dapat dimulai atau gagal merespons dalam 15 detik pada http://127.0.0.1:8767.\n\nLog Kesalahan:\n${ERR_LOG:-Tidak ada catatan error di log.}"
+        if [ "$READY" -ne 1 ]; then
+            ERR_LOG=""
+            if [ -f "$SERVER_LOG" ]; then
+                ERR_LOG=$(tail -n 15 "$SERVER_LOG")
+            fi
+            MSG="Server backend Tatap tidak dapat dimulai atau gagal merespons dalam 15 detik pada http://127.0.0.1:8767.\n\nLog Kesalahan:\n${ERR_LOG:-Tidak ada catatan error di log.}"
 
-        if command -v zenity >/dev/null 2>&1; then
-            run_sys zenity --error --title="Tatap — Gagal Memulai Backend" --text="$MSG" --width=520 2>/dev/null || true
-        elif command -v kdialog >/dev/null 2>&1; then
-            run_sys kdialog --error "$MSG" --title "Tatap — Gagal Memulai Backend" 2>/dev/null || true
-        elif command -v xmessage >/dev/null 2>&1; then
-            run_sys xmessage -center -title "Tatap — Gagal Memulai Backend" "$MSG" 2>/dev/null || true
-        elif command -v notify-send >/dev/null 2>&1; then
-            run_sys notify-send -u critical "Tatap — Gagal Memulai Backend" "Server backend gagal berjalan. Periksa log di $SERVER_LOG" 2>/dev/null || true
-        fi
+            if command -v zenity >/dev/null 2>&1; then
+                run_sys zenity --error --title="Tatap — Gagal Memulai Backend" --text="$MSG" --width=520 2>/dev/null || true
+            elif command -v kdialog >/dev/null 2>&1; then
+                run_sys kdialog --error "$MSG" --title "Tatap — Gagal Memulai Backend" 2>/dev/null || true
+            elif command -v xmessage >/dev/null 2>&1; then
+                run_sys xmessage -center -title "Tatap — Gagal Memulai Backend" "$MSG" 2>/dev/null || true
+            elif command -v notify-send >/dev/null 2>&1; then
+                run_sys notify-send -u critical "Tatap — Gagal Memulai Backend" "Server backend gagal berjalan. Periksa log di $SERVER_LOG" 2>/dev/null || true
+            fi
 
-        echo -e "$MSG" >&2
-        exit 1
+            echo -e "$MSG" >&2
+            exit 1
+        fi
     fi
 fi
 
 # Detect browser for App Mode (frameless window)
-APP_URL="http://127.0.0.1:8767"
+# Jika server baru saja dinyalakan dan bootscreen tersedia, buka bootscreen seketika
+if [ "$ALREADY_RUNNING" -ne 1 ] && [ -f "${HERE}/frontend/bootscreen.html" ]; then
+    APP_URL="file://${HERE}/frontend/bootscreen.html"
+else
+    APP_URL="http://127.0.0.1:8767"
+fi
 BROWSER_CMD=""
 
 for candidate in google-chrome google-chrome-stable chromium chromium-browser brave-browser microsoft-edge; do

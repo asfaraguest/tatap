@@ -86,9 +86,13 @@ async def test_schedule_endpoint_filter_and_3days(monkeypatch):
     async def fake_get_cache(key, ttl=None):
         return None
 
+    async def fake_set_cache(key, payload):
+        return None
+
     monkeypatch.setattr(al, "anilist_schedules_range", fake_schedules_range)
     monkeypatch.setattr(main, "_match_slug_batch", fake_match_batch)
     monkeypatch.setattr(main, "get_browse_cache", fake_get_cache)
+    monkeypatch.setattr(main, "set_browse_cache", fake_set_cache)
 
     async with AsyncClient(transport=ASGITransport(app=main.app), base_url="http://test") as ac:
         # 1. Test 'today' (default)
@@ -164,9 +168,13 @@ async def test_upcoming_episodes_synced(monkeypatch):
     async def fake_cache_synced(key, ttl=None):
         return None
 
+    async def fake_set_synced(key, payload):
+        return None
+
     monkeypatch.setattr(al, "anilist_schedules_range", lambda s, e, max_pages=3: fake_schedules)
     monkeypatch.setattr(main, "_match_slug_batch", fake_batch_synced)
     monkeypatch.setattr(main, "get_browse_cache", fake_cache_synced)
+    monkeypatch.setattr(main, "set_browse_cache", fake_set_synced)
 
     async with AsyncClient(transport=ASGITransport(app=main.app), base_url="http://test") as ac:
         r = await ac.get("/api/upcoming-episodes?day=today")
@@ -219,9 +227,13 @@ async def test_schedule_7days_full_weekly(monkeypatch):
     async def fake_get_cache_7(key, ttl=None):
         return None
 
+    async def fake_set_cache_7(key, payload):
+        return None
+
     monkeypatch.setattr(al, "anilist_schedules_range", lambda s, e, max_pages=6: fake_items)
     monkeypatch.setattr(main, "_match_slug_batch", fake_batch_7)
     monkeypatch.setattr(main, "get_browse_cache", fake_get_cache_7)
+    monkeypatch.setattr(main, "set_browse_cache", fake_set_cache_7)
 
     async with AsyncClient(transport=ASGITransport(app=main.app), base_url="http://test") as ac:
         # 1. Test semua 7 hari via nama Inggris

@@ -26,8 +26,17 @@ INDEX_HTML = FRONTEND_DIR / "index.html"
 def test_term_js_rendersel_supports_poster_cards_and_trows():
     """Memastikan renderSel di term.js memilih kedua jenis item: .poster-card dan .trow."""
     content = TERM_JS.read_text(encoding="utf-8")
-    assert 'box.querySelectorAll(".poster-card, .trow")' in content, (
-        "renderSel() wajib mengueri .poster-card dan .trow agar navigasi keyboard bekerja pada tampilan katalog, musim, riwayat, dsb."
+    # Resolver item dipakai bersama oleh kartu poster (.poster-card) dan baris (.trow).
+    # Update seleksi sengaja tidak menyapu seluruh grid per tekan tombol (performa),
+    # jadi keduanya harus tercakup dalam satu query terarah.
+    assert (
+        '.poster-card[data-idx="' in content and '.trow[data-idx="' in content
+    ), (
+        "renderSel() wajib menangani .poster-card dan .trow agar navigasi keyboard bekerja "
+        "pada tampilan katalog, musim, riwayat, dsb."
+    )
+    assert "function itemEl(" in content, (
+        "Helper itemEl() harus ada sebagai sumber tunggal resolusi item .poster-card / .trow."
     )
     assert 'scrollIntoView' in content
     assert 'selEl.focus' in content or 'all[S.sel].focus' in content

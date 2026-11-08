@@ -456,9 +456,6 @@ OLLAMA_FREE_MODELS = ["gpt-oss:20b", "gpt-oss:120b"]
 # Normalisasi penamaan model lama ke model aktif
 _LEGACY_MODEL_UPGRADE = {
     "ollama": {
-        "gemma4:31b": "gpt-oss:20b",
-        "gemma3:12b": "gpt-oss:20b",
-        "gemma4": "gpt-oss:20b",
         "gpt-oss:20b-cloud": "gpt-oss:20b",
         "gpt-oss-20b": "gpt-oss:20b",
     },
@@ -468,6 +465,16 @@ _LEGACY_MODEL_UPGRADE = {
         "gemini-1.5-flash-latest": "gemini-1.5-flash",
     },
 }
+
+def _normalize_model_name(prov: str, model: str) -> str:
+    """Normalisasi nama model: tangani variasi penulisan/typo dan pembaruan model lama."""
+    m = (model or "").strip()
+    if not m:
+        return _DEFAULT_MODEL.get(prov, "gpt-oss:20b")
+    # Koreksi typo penulisan umum (misal genma -> gemma)
+    if "genma" in m.lower():
+        m = _re.sub(r"(?i)genma", "gemma", m)
+    return _LEGACY_MODEL_UPGRADE.get(prov, {}).get(m, m)
 
 _DEFAULT_MODEL = {
     "ollama": "gpt-oss:20b",
@@ -1255,6 +1262,31 @@ _PRE_GTX_EN_SLANG_RULES = [
     (r"\bin the same boat\b", "in the same difficult situation"),
     (r"\blet the cat out of the bag\b", "accidentally reveal the secret"),
     (r"\badd(ing)? fuel to the fire\b", "making the situation worse"),
+    # Stage-1: Spoken English Anime & Spoken Idioms Disambiguation
+    (r"\b(?:i\s+got|i've\s+got)\s+this\b", "I will handle this myself"),
+    (r"\byou\s+got\s+it\b", "consider it done"),
+    (r"\bgive\s+me\s+a\s+break\b", "give me peace and be serious"),
+    (r"\bwhat\s+a\s+drag\b", "how very troublesome"),
+    (r"\bspeak\s+of\s+the\s+devil\b", "speaking of that person right now"),
+    (r"\blike\s+hell\s+i\s+(?:will|would)\b", "there is no way I will"),
+    (r"\blike\s+hell\s+you\s+(?:will|would)\b", "there is no way you will"),
+    (r"\bover\s+my\s+dead\s+body\b", "never as long as I am alive"),
+    (r"\bi\s+mean\s+it\b", "I am completely serious"),
+    (r"\byou\s+had\s+me\s+worried\b", "you made me worry so much"),
+    (r"\bleave\s+it\s+to\s+me\b", "entrust this matter to me"),
+    (r"\bwhat\s+do\s+you\s+mean\b", "what is your meaning"),
+    (r"\bnever\s+mind\b", "forget about it"),
+    (r"\bcome\s+to\s+think\s+of\s+it\b", "now that I think about it"),
+    (r"\bfair\s+enough\b", "that makes good sense"),
+    (r"\bbe\s+my\s+guest\b", "please go right ahead"),
+    (r"\bway\s+to\s+go\b", "you did a great job"),
+    (r"\bfor\s+real\s*\?", "seriously?"),
+    (r"\bfor\s+real\b", "seriously"),
+    (r"\bno\s+way\s+in\s+hell\b", "there is no way ever"),
+    (r"\bcut\s+it\s+out\b", "stop doing that right now"),
+    (r"\bbeat\s+around\s+the\s+bush\b", "avoid speaking directly"),
+    (r"\bsave\s+your\s+breath\b", "do not waste your words"),
+    (r"\bget\s+a\s+grip\b", "calm down and regain control"),
     # Stage-1: Spoken English Contractions (Agar Struktur Kalimat Tidak Rusak di GTX)
     (r"\bwhatcha\b", "what are you"),
     (r"\bgotcha\b", "I understand"),
@@ -1327,10 +1359,20 @@ _UNIVERSAL_FANSUB_RULES = [
     (r"\bialah\b", "adalah"),
     (r"\bsahaja\b", "saja"),
     (r"\bjangan risau\b", "jangan khawatir"),
+    (r"\bjangan bimbang\b", "jangan khawatir"),
+    (r"\bbimbang\b", "khawatir"),
+    (r"\btak guna\b", "tidak berguna"),
+    (r"\btidak guna\b", "tidak berguna"),
     (r"\brisau\b", "khawatir"),
     (r"\bmerisaukan\b", "mengkhawatirkan"),
+    (r"\btengok tu\b", "lihat itu"),
     (r"\btengok\b", "lihat"),
     (r"\bmenengok\b", "melihat"),
+    (r"\bjom\b", "ayo"),
+    (r"\bsenang je\b", "gampang banget"),
+    (r"\bpadan muka\b", "rasakan itu"),
+    (r"\bmacam mana\b", "bagaimana"),
+    (r"\bterlampau\b", "terlalu"),
     (r"\bpelik\b", "aneh"),
     (r"\bcomel\b", "imut"),
     (r"\bseronok\b", "menyenangkan"),
@@ -2026,6 +2068,10 @@ _CASUAL_FANSUB_RULES = [
     (r"\bbertahanlah\b", "tunggu sebentar"),
     (r"\baku melihat\b", "begitu rupanya"),
     (r"\bkulihat\b", "begitu rupanya"),
+    (r"\bsemuanya akan baik-baik saja\b", "semuanya bakal baik-baik aja"),
+    (r"\bsemua akan baik-baik saja\b", "semuanya bakal baik-baik aja"),
+    (r"\baku baik-baik saja kok\b", "aku nggak apa-apa kok"),
+    (r"\baku baik-baik saja\b", "aku nggak apa-apa kok"),
     (r"\btidak apa-apa\b", "nggak apa-apa"),
     (r"\btak apa-apa\b", "nggak apa-apa"),
     (r"\btak apa\b", "nggak apa-apa"),
@@ -2049,6 +2095,13 @@ _CASUAL_FANSUB_RULES = [
     (r"\btidak usah\b", "nggak usah"),
     (r"\btidak boleh\b", "nggak boleh"),
     (r"\btak boleh\b", "nggak boleh"),
+    (r"\btidak ada gunanya\b", "percuma aja"),
+    (r"\btak ada gunanya\b", "percuma aja"),
+    (r"\bnggak ada gunanya\b", "percuma aja"),
+    (r"\btidak ada pilihan lain\b", "nggak ada pilihan lain"),
+    (r"\btak ada pilihan lain\b", "nggak ada pilihan lain"),
+    (r"\btidak salah lagi\b", "nggak salah lagi"),
+    (r"\btak salah lagi\b", "nggak salah lagi"),
     (r"\btidak ada\b", "nggak ada"),
     (r"\btak ada\b", "nggak ada"),
     (r"\b(?:emang\s+)?(?:sudah|udah)\s+kuduga\b", "emang udah kuduga"),
@@ -2080,6 +2133,8 @@ _CASUAL_FANSUB_RULES = [
     (r"\bsangat banyak\b", "banget"),
     (r"\bbodoh sekali\b", "bodoh banget"),
     (r"\bbagus sekali\b", "hebat banget"),
+    (r"\bcantik sekali\b", "cantik banget"),
+    (r"\bsangat cantik\b", "cantik banget"),
     (r"\bdi sini untuk mengambil\b", "mau mengambil"),
     (r"\banda berpikir\b", "kamu rasa"),
     (r"\bmau bagaimana lagi\b", "mau gimana lagi"),
@@ -2108,6 +2163,45 @@ _CASUAL_FANSUB_RULES = [
     (r"\bgampang sekali\b", "gampang banget"),
     (r"\bmudah sekali\b", "gampang banget"),
     (r"\bapa-apaan ini\b", "ada apa-apaan nih"),
+    (r"\bapa yang sedang terjadi\b", "ada apa sebenarnya nih"),
+    (r"\bapa yang terjadi di sini\b", "ada apa sih di sini"),
+    (r"\bapa katamu\b", "kamu bilang apa"),
+    (r"\bpercuma saja\b", "percuma aja"),
+    (r"\bjangan khawatirkan aku\b", "nggak usah khawatirin aku"),
+    (r"\bjangan khawatirkan hal itu\b", "nggak usah dipikirin"),
+    (r"\bjangan pedulikan aku\b", "nggak usah peduliin aku"),
+    (r"\bterserah padamu\b", "terserah kamu aja"),
+    (r"\bterserah kepadamu\b", "terserah kamu aja"),
+    (r"\bapa yang harus (?:kita|kami) lakukan\b", "gimana nih"),
+    (r"\bapa yang harus (?:ku|aku) lakukan\b", "aku harus gimana nih"),
+    (r"\bapa yang harus saya lakukan\b", "aku harus gimana nih"),
+    (r"\blepaskan aku\b", "lepasin aku"),
+    (r"\btinggalkan aku sendiri\b", "tinggalin aku sendiri"),
+    (r"\bbiarkan aku sendiri\b", "biarin aku sendiri"),
+    (r"\bjangan dekati aku\b", "jangan deket-deket"),
+    (r"\bjangan sentuh aku\b", "jangan pegang-pegang"),
+    (r"\bbukan masalah besar\b", "nggak masalah kok"),
+    (r"\bbukan masalah\b", "nggak masalah kok"),
+    (r"\btidak masalah\b", "nggak masalah"),
+    (r"\btak masalah\b", "nggak masalah"),
+    (r"\bjangan salah paham dulu\b", "jangan salah paham dulu"),
+    (r"\bjangan salah paham\b", "jangan salah paham dulu"),
+    (r"\bjangan dipikirkan\b", "nggak usah dipikirin"),
+    (r"\bjangan menyerah\b", "jangan nyerah"),
+    (r"\bkamu pasti bisa melakukannya\b", "kamu pasti bisa"),
+    (r"\bkamu bisa melakukannya\b", "kamu pasti bisa"),
+    (r"\bkita pasti bisa melakukannya\b", "kita pasti bisa"),
+    (r"\bkita bisa melakukannya\b", "kita pasti bisa"),
+    (r"\bseperti itu\b", "kayak gitu"),
+    (r"\bseperti ini\b", "kayak gini"),
+    (r"\bseperti biasanya\b", "kayak biasanya"),
+    (r"\bsebagaimana mestinya\b", "kayak biasanya"),
+    (r"\bterima kasih atas bantuannya\b", "makasih atas bantuannya"),
+    (r"\bterima kasih bantuannya\b", "makasih bantuannya"),
+    (r"\bsampai jumpa besok\b", "sampai ketemu besok"),
+    (r"\bhati-hati di jalan\b", "hati-hati ya"),
+    (r"\bjangan buru-buru\b", "nggak usah buru-buru"),
+    (r"\baku tidak tahu apa yang harus kulakukan\b", "aku nggak tahu harus gimana"),
     (r"\bsedikit pun\b", "dikit pun"),
     # Diksi Percakapan & Slang Santai Tambahan
     (r"\bbercanda kan\b", "bercanda ya"),
@@ -2133,6 +2227,7 @@ _CASUAL_FANSUB_RULES = [
     (r",\s*tidakkah begitu\s*\?", ", kan?"),
     (r",\s*bukankah begitu\s*\?", ", kan?"),
     (r",\s*benar kan\s*\?", ", ya kan?"),
+    (r",\s*benarkah\s*\?", ", beneran?"),
     (r"\bapakah kamu baik-baik saja\b", "kamu nggak apa-apa"),
     (r"\bapakah kamu nggak apa-apa\b", "kamu nggak apa-apa"),
     (r"\bapakah kau baik-baik saja\b", "kamu nggak apa-apa"),
@@ -2509,7 +2604,12 @@ async def _chat_completion(client, apiurl, headers, payload) -> str:
         raise RuntimeError(f"HTTP {r.status_code}: {_extract_err(r)}")
     d = r.json()
     msg = (d.get("choices") or [{}])[0].get("message") or {}
-    return (msg.get("content") or "").strip()
+    content = (msg.get("content") or "").strip()
+    if not content and (msg.get("reasoning") or msg.get("reasoning_content")):
+        raw_r = (msg.get("reasoning") or msg.get("reasoning_content") or "").strip()
+        if _re.search(r'^\d+\|', raw_r, _re.M):
+            content = raw_r
+    return content
 
 
 async def call_openai_translate(cues, src, tgt, apikey, model, apiurl, timeout=120.0, fill_with_gtx=True, custom_prompt=None):
@@ -2540,8 +2640,7 @@ async def call_openai_translate(cues, src, tgt, apikey, model, apiurl, timeout=1
             apiurl = inferred_url
             model = inferred_model
 
-    model = (model or "").strip() or _DEFAULT_MODEL[prov]
-    model = _LEGACY_MODEL_UPGRADE.get(prov, {}).get(model, model)
+    model = _normalize_model_name(prov, model)
     cfg = _PROVIDER_CFG[prov]
     stats["provider"] = prov
 
@@ -2567,6 +2666,14 @@ async def call_openai_translate(cues, src, tgt, apikey, model, apiurl, timeout=1
     src_lines = [_prep_line(c["text"]) for c in cues]
     n = len(cues)
     B = cfg["batch"]
+
+    # Deteksi model penalaran / reasoning / thinking (Nemotron, GPT-OSS, DeepSeek-R1, QwQ, dll.)
+    is_reasoning_target = any(x in (model or "").lower() for x in (
+        "gpt-oss", "nemotron", "deepseek-r1", "qwq", "o1-", "o3-", "reason", "thinking"
+    ))
+    if is_reasoning_target and B > 25:
+        B = 20  # Batch lebih ramping agar respon reasoning cepat dan tidak bottleneck timeout
+
     ranges = [(lo, min(n, lo + B)) for lo in range(0, n, B)]
     state = {"models": _model_chain(prov, model), "fatal": "", "last_err": "",
              "used": _collections.Counter()}
@@ -2585,19 +2692,23 @@ async def call_openai_translate(cues, src, tgt, apikey, model, apiurl, timeout=1
                          + "\n".join("- " + x for x in ctx))
         parts.append(f"Terjemahkan {len(ids)} baris berikut:\n"
                      + "\n".join(f"{i}|{src_lines[lo + i - 1]}" for i in ids))
-        reasoning = "gpt-oss" in cur_model
-        # Direct instruction to prevent unnecessary chain-of-thought delay on reasoning models
+        is_cur_reasoning = any(x in (cur_model or "").lower() for x in (
+            "gpt-oss", "nemotron", "deepseek-r1", "qwq", "o1-", "o3-", "reason", "thinking"
+        ))
         user_body = "\n\n".join(parts)
-        if reasoning:
-            user_body = "JANGAN sertakan penalaran/thinking. Langsung keluarkan format N|terjemahan secara ringkas.\n\n" + user_body
+        if is_cur_reasoning:
+            user_body = "JANGAN sertakan penalaran/thinking panjang. Langsung keluarkan format N|terjemahan secara ringkas.\n\n" + user_body
+            calc_tokens = min(8192, max(3072, len(ids) * 90 + 2500))
+        else:
+            calc_tokens = min(8192, max(1024, len(ids) * 75 + 500))
         p = {
             "model": cur_model,
             "messages": [{"role": "system", "content": system_prompt},
                          {"role": "user", "content": user_body}],
             "temperature": 0.3,
-            "max_tokens": min(8192, len(ids) * 65 + 250),
+            "max_tokens": calc_tokens,
         }
-        if reasoning:
+        if is_cur_reasoning:
             p["reasoning_effort"] = "low"
             if prov == "groq":
                 p["reasoning_format"] = "hidden"

@@ -6,7 +6,7 @@ from fastapi.responses import JSONResponse, FileResponse, Response, StreamingRes
 from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
 from config import APP_PORT, APP_HOST, HI_BASE, HI_UA
-from database import init_db, get_search_cache, set_search_cache, get_episode_cache, get_episode_cache_modes, set_episode_cache, delete_episode_cache, clear_episode_cache_for_slug, get_cached_episode, cache_episode, add_history, get_history, clear_history, save_progress, get_progress, clear_progress, add_bookmark, remove_bookmark, get_bookmarks, is_bookmarked, clear_bookmarks, get_setting, get_settings_bulk, set_setting, get_browse_cache, set_browse_cache, get_slug_map, set_slug_map, get_mal_map, set_mal_map, get_subtitle_cache, set_subtitle_cache, delete_subtitle_cache, clear_os_merge_subtitle_cache, get_today_char_count, add_today_char_count
+from database import init_db, get_search_cache, set_search_cache, get_episode_cache, get_episode_cache_modes, set_episode_cache, update_episode_cache_skip_times, delete_episode_cache, clear_episode_cache_for_slug, get_cached_episode, cache_episode, add_history, get_history, clear_history, save_progress, get_progress, clear_progress, add_bookmark, remove_bookmark, get_bookmarks, is_bookmarked, clear_bookmarks, get_setting, get_settings_bulk, set_setting, get_browse_cache, set_browse_cache, get_slug_map, set_slug_map, get_mal_map, set_mal_map, get_subtitle_cache, set_subtitle_cache, delete_subtitle_cache, clear_os_merge_subtitle_cache, get_today_char_count, add_today_char_count
 from api import hianime as hi
 from api import anilist as al
 from api import otakudesu as otaku
@@ -43,10 +43,15 @@ def _master_cache_get(url: str):
     return txt
 
 
-def _master_cache_set(url: str, text: str):
+def _master_cache_set(url: str, text):
     """Simpan body master m3u8 ke cache dengan batas jumlah entri."""
     if not url or not text:
         return
+    if isinstance(text, bytes):
+        try:
+            text = text.decode("utf-8", errors="replace")
+        except Exception:
+            return
     _MASTER_CACHE[url] = (time.time() + _MASTER_CACHE_TTL, text)
     if len(_MASTER_CACHE) > _MASTER_CACHE_MAX:
         for k in list(_MASTER_CACHE.keys())[:len(_MASTER_CACHE) - _MASTER_CACHE_MAX]:
@@ -180,7 +185,16 @@ async def lifespan(app: FastAPI):
         pass
 
 from version import __version__ as CURRENT_VERSION
+from fastapi.middleware.cors import CORSMiddleware
+
 app = FastAPI(title="Tatap", version=CURRENT_VERSION, lifespan=lifespan)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 def ok(data):
     return {"success": True, "data": data}
@@ -687,167 +701,229 @@ def _is_long_running(title: str, episodes: int = 0, start_year: int = 0, sub_cou
     return False
 
 
+_AIRING_STALE_TTL = 7 * 24 * 3600
+_AIRING_REFRESH_INFLIGHT = set()
+
+
+def _schedule_airing_refresh(key, page, safe_mode_int):
+    """Segarkan cache halaman 'Masih Tayang' di latar belakang (satu refresh per key)."""
+    if key in _AIRING_REFRESH_INFLIGHT:
+        return
+    _AIRING_REFRESH_INFLIGHT.add(key)
+
+    async def _runner():
+        try:
+            payload = await _build_airing_payload(page, safe_mode_int)
+            await set_browse_cache(key, payload)
+        except Exception:
+            pass
+        finally:
+            _AIRING_REFRESH_INFLIGHT.discard(key)
+
+    try:
+        asyncio.get_running_loop().create_task(_runner())
+    except RuntimeError:
+        _AIRING_REFRESH_INFLIGHT.discard(key)
+
+
+async def _build_airing_payload(page, safe_mode_int):
+    """Bangun payload dual-lane 'Masih Tayang' (AniList musiman + HiAnime releasing)."""
+    loop = asyncio.get_running_loop()
+    PAGE_SIZE_SEASONAL = 8
+    PAGE_SIZE_LONG = 8
+
+    # Jalur HiAnime (releasing) tidak bergantung pada AniList → jalankan paralel
+    # agar waktu cold-cache turun dari penjumlahan (AniList+slug+browse) ke maksimum.
+    hi_task = asyncio.ensure_future(
+        loop.run_in_executor(None, lambda: hi.browse({"status": "releasing", "sort": "latest"}, page))
+    )
+    # 1. Ambil anime musiman yang baru saja tamat dari AniList (diurutkan paling baru tamat)
+    finished_data = await loop.run_in_executor(None, lambda: al.recently_finished_page(page, PAGE_SIZE_SEASONAL))
+    finished_media = (finished_data or {}).get("media") or []
+
+    title_pairs = []
+    finished_by_title = {}
+    for m in finished_media:
+        t_en = (m.get("title") or {}).get("english") or ""
+        t_ro = (m.get("title") or {}).get("romaji") or ""
+        primary_title = t_en or t_ro or ""
+        if not primary_title or "hentai" in primary_title.lower():
+            continue
+        alt_title = t_ro if primary_title != t_ro else ""
+        title_pairs.append((primary_title, alt_title))
+        finished_by_title[primary_title] = m
+
+    slug_pairs = await _match_slug_batch(title_pairs) if title_pairs else []
+    slug_by_title = {t: s for t, s in slug_pairs}
+
+    finished_seasonal = []
+    seen_slugs = set()
+    for title, m in finished_by_title.items():
+        slug = slug_by_title.get(title)
+        if not slug or slug in seen_slugs:
+            continue
+        seen_slugs.add(slug)
+        m_mal_id = str(m.get("idMal") or "")
+        if m_mal_id:
+            aniskip.store_mal_id(slug, m_mal_id)
+            aniskip.store_mal_id(title, m_mal_id)
+        cover = (m.get("coverImage") or {})
+        tot = m.get("episodes") or 0
+        studio_nodes = (m.get("studios") or {}).get("nodes") or []
+        studio_name = studio_nodes[0].get("name", "") if studio_nodes else ""
+        finished_seasonal.append({
+            "id": slug,
+            "title": title,
+            "poster": cover.get("large") or cover.get("medium") or "",
+            "type": _format_to_type(m.get("format")),
+            "eps": tot,
+            "sub": tot,
+            "eps_released": tot,
+            "eps_total": tot,
+            "eps_counter": f"{tot}/{tot}" if tot > 0 else "?/?",
+            "duration": (str(m.get("duration") or "") + "m") if m.get("duration") else "",
+            "score": round((m.get("averageScore") or 0) / 10.0, 1) if m.get("averageScore") else 0.0,
+            "genres": m.get("genres") or [],
+            "studio": studio_name,
+            "season": f"{(m.get('season') or '').capitalize()} {m.get('seasonYear') or ''}".strip(),
+            "source": (m.get("source") or "").replace("_", " ").title(),
+            "status": "finished",
+            "badge": "TAMAT",
+            "is_finished": True,
+            "is_long_running": False,
+            "lane": "seasonal",
+            "synopsis": al.clean_synopsis_text(m.get("description") or ""),
+            "anilist_id": m.get("id"),
+            "mal_id": m_mal_id,
+            "matched": True,
+        })
+
+    # 2. Ambil data releasing dari HiAnime (diurutkan sort=latest untuk episode terbaru)
+    hi_data = await hi_task
+    hi_items = (hi_data or {}).get("items") or []
+
+    long_running_items = []
+    hi_seasonal = []
+    for item in hi_items:
+        slug = item.get("id", "")
+        if not slug or slug in seen_slugs:
+            continue
+        title = item.get("title", "")
+        if "hentai" in title.lower() or "hentai" in slug.lower():
+            continue
+        eps = item.get("eps") or 0
+        sub = item.get("sub") or 0
+        rel_cnt = item.get("eps_released") or (sub if sub > 0 else (eps if eps > 0 else 0))
+        tot_cnt = item.get("eps_total") or (eps if eps > 0 else 0)
+        if tot_cnt > 0:
+            cnt_str = f"{rel_cnt}/{tot_cnt}"
+        elif rel_cnt > 0:
+            cnt_str = f"{rel_cnt}/?"
+        else:
+            cnt_str = ""
+
+        if _is_long_running(title, eps, 0, sub, slug):
+            item_copy = dict(item)
+            item_copy["badge"] = "SERIAL PANJANG"
+            item_copy["is_long_running"] = True
+            item_copy["is_finished"] = False
+            item_copy["lane"] = "long_running"
+            item_copy["eps_released"] = rel_cnt
+            item_copy["eps_total"] = tot_cnt
+            item_copy["eps_counter"] = cnt_str
+            seen_slugs.add(slug)
+            long_running_items.append(item_copy)
+        else:
+            item_copy = dict(item)
+            is_fin = bool(item.get("is_finished")) or (tot_cnt > 0 and rel_cnt >= tot_cnt)
+            item_copy["badge"] = "TAMAT" if is_fin else "ONGOING"
+            item_copy["is_long_running"] = False
+            item_copy["is_finished"] = is_fin
+            item_copy["status"] = "finished" if is_fin else "releasing"
+            item_copy["lane"] = "seasonal"
+            item_copy["eps_released"] = rel_cnt
+            item_copy["eps_total"] = tot_cnt
+            item_copy["eps_counter"] = cnt_str
+            seen_slugs.add(slug)
+            hi_seasonal.append(item_copy)
+
+    # 3. Seimbangkan kuota anime musiman: Baru Tamat (AniList) & Sedang Tayang (HiAnime)
+    half_target = PAGE_SIZE_SEASONAL // 2
+    fin_take = min(len(finished_seasonal), half_target)
+    rel_take = min(len(hi_seasonal), PAGE_SIZE_SEASONAL - fin_take)
+    if fin_take + rel_take < PAGE_SIZE_SEASONAL:
+        fin_take = min(len(finished_seasonal), PAGE_SIZE_SEASONAL - rel_take)
+
+    seasonal_items = finished_seasonal[:fin_take] + hi_seasonal[:rel_take]
+    long_running_items = long_running_items[:PAGE_SIZE_LONG]
+
+    # 4. Rakit items dengan section headers pembatas dua jalur
+    items_dual_lane = []
+    if seasonal_items:
+        items_dual_lane.append({
+            "is_header": True,
+            "id": "header-seasonal",
+            "title": "ANIME MUSIMAN (BARU TAMAT / BERJALAN)",
+            "header_title": "ANIME MUSIMAN (BARU TAMAT / BERJALAN)",
+            "lane": "seasonal",
+            "matched": False
+        })
+        items_dual_lane.extend(seasonal_items)
+
+    if long_running_items:
+        items_dual_lane.append({
+            "is_header": True,
+            "id": "header-long-running",
+            "title": "ANIME PANJANG BERKELANJUTAN (CONTINUOUS ON-GOING)",
+            "header_title": "ANIME PANJANG BERKELANJUTAN (CONTINUOUS ON-GOING)",
+            "lane": "long_running",
+            "matched": False
+        })
+        items_dual_lane.extend(long_running_items)
+
+    response_payload = {
+        "which": "airing",
+        "page": page,
+        "total_pages": max((hi_data or {}).get("total_pages", 1), 5),
+        "seasonal": seasonal_items,
+        "long_running": long_running_items,
+        "items": items_dual_lane,
+        "cached": False
+    }
+    return response_payload
+
+
 @app.get("/api/seasonal")
 async def seasonal(which: str = Query("", pattern="^(now|prev|airing)$|^$"),
                    season: str = Query("", pattern="^(winter|spring|summer|fall)$|^$"),
                    year: int = Query(0, ge=0, le=2100),
-                   page: int = Query(1, ge=1, le=100)):
+                   page: int = Query(1, ge=1, le=100),
+                   safe_mode: int = Query(1)):
     """Daftar anime per musim / ongoing (AniList dengan fallback HiAnime).
     which=now|prev|airing = musim saat ini / sebelumnya / sedang tayang.
     season+year = musim spesifik (contoh: season=fall year=2024)."""
     try:
         loop = asyncio.get_running_loop()
+        safe_mode_int = _parse_safe_mode(safe_mode)
 
         # Kasus khusus: Masih Tayang / Airing Ongoing dengan Dual-Lane (Musiman vs Panjang)
         if which == "airing":
-            key = f"airing_lanes_v4|page={page}"
+            key = f"airing_lanes_v6|page={page}|safe={safe_mode_int}"
             hit = await get_browse_cache(key, ttl=3600)
             if hit:
                 hit["cached"] = True
                 return ok(hit)
 
-            # 1. Ambil anime musiman yang baru saja tamat dari AniList (diurutkan paling baru tamat)
-            finished_data = await loop.run_in_executor(None, lambda: al.recently_finished_page(page, 16))
-            finished_media = (finished_data or {}).get("media") or []
+            # Stale-While-Revalidate: layani data terakhir yang ada seketika, lalu segarkan
+            # di latar belakang. Menghilangkan jank "memuat..." 1-3 detik saat cache kedaluwarsa.
+            stale = await get_browse_cache(key, ttl=_AIRING_STALE_TTL)
+            if stale and isinstance(stale, dict):
+                stale["cached"] = True
+                stale["stale"] = True
+                _schedule_airing_refresh(key, page, safe_mode_int)
+                return ok(stale)
 
-            title_pairs = []
-            finished_by_title = {}
-            for m in finished_media:
-                t_en = (m.get("title") or {}).get("english") or ""
-                t_ro = (m.get("title") or {}).get("romaji") or ""
-                primary_title = t_en or t_ro or ""
-                if not primary_title or "hentai" in primary_title.lower():
-                    continue
-                alt_title = t_ro if primary_title != t_ro else ""
-                title_pairs.append((primary_title, alt_title))
-                finished_by_title[primary_title] = m
-
-            slug_pairs = await _match_slug_batch(title_pairs) if title_pairs else []
-            slug_by_title = {t: s for t, s in slug_pairs}
-
-            seasonal_items = []
-            seen_slugs = set()
-            for title, m in finished_by_title.items():
-                slug = slug_by_title.get(title)
-                if not slug or slug in seen_slugs:
-                    continue
-                seen_slugs.add(slug)
-                m_mal_id = str(m.get("idMal") or "")
-                if m_mal_id:
-                    aniskip.store_mal_id(slug, m_mal_id)
-                    aniskip.store_mal_id(title, m_mal_id)
-                cover = (m.get("coverImage") or {})
-                tot = m.get("episodes") or 0
-                studio_nodes = (m.get("studios") or {}).get("nodes") or []
-                studio_name = studio_nodes[0].get("name", "") if studio_nodes else ""
-                seasonal_items.append({
-                    "id": slug,
-                    "title": title,
-                    "poster": cover.get("large") or cover.get("medium") or "",
-                    "type": _format_to_type(m.get("format")),
-                    "eps": tot,
-                    "sub": tot,
-                    "eps_released": tot,
-                    "eps_total": tot,
-                    "eps_counter": f"{tot}/{tot}" if tot > 0 else "?/?",
-                    "duration": (str(m.get("duration") or "") + "m") if m.get("duration") else "",
-                    "score": round((m.get("averageScore") or 0) / 10.0, 1) if m.get("averageScore") else 0.0,
-                    "genres": m.get("genres") or [],
-                    "studio": studio_name,
-                    "season": f"{(m.get('season') or '').capitalize()} {m.get('seasonYear') or ''}".strip(),
-                    "source": (m.get("source") or "").replace("_", " ").title(),
-                    "status": "finished",
-                    "badge": "TAMAT",
-                    "is_finished": True,
-                    "is_long_running": False,
-                    "lane": "seasonal",
-                    "synopsis": al.clean_synopsis_text(m.get("description") or ""),
-                    "anilist_id": m.get("id"),
-                    "mal_id": m_mal_id,
-                    "matched": True,
-                })
-
-            # 2. Ambil data releasing dari HiAnime (diurutkan sort=latest untuk episode terbaru)
-            hi_data = await loop.run_in_executor(None, lambda: hi.browse({"status": "releasing", "sort": "latest"}, page))
-            hi_items = (hi_data or {}).get("items") or []
-
-            long_running_items = []
-            for item in hi_items:
-                slug = item.get("id", "")
-                if not slug or slug in seen_slugs:
-                    continue
-                title = item.get("title", "")
-                if "hentai" in title.lower() or "hentai" in slug.lower():
-                    continue
-                eps = item.get("eps") or 0
-                sub = item.get("sub") or 0
-                rel_cnt = item.get("eps_released") or (sub if sub > 0 else (eps if eps > 0 else 0))
-                tot_cnt = item.get("eps_total") or (eps if eps > 0 else 0)
-                if tot_cnt > 0:
-                    cnt_str = f"{rel_cnt}/{tot_cnt}"
-                elif rel_cnt > 0:
-                    cnt_str = f"{rel_cnt}/?"
-                else:
-                    cnt_str = ""
-
-                if _is_long_running(title, eps, 0, sub, slug):
-                    item_copy = dict(item)
-                    item_copy["badge"] = "SERIAL PANJANG"
-                    item_copy["is_long_running"] = True
-                    item_copy["is_finished"] = False
-                    item_copy["lane"] = "long_running"
-                    item_copy["eps_released"] = rel_cnt
-                    item_copy["eps_total"] = tot_cnt
-                    item_copy["eps_counter"] = cnt_str
-                    seen_slugs.add(slug)
-                    long_running_items.append(item_copy)
-                else:
-                    item_copy = dict(item)
-                    is_fin = bool(item.get("is_finished")) or (tot_cnt > 0 and rel_cnt >= tot_cnt)
-                    item_copy["badge"] = "TAMAT" if is_fin else "ONGOING"
-                    item_copy["is_long_running"] = False
-                    item_copy["is_finished"] = is_fin
-                    item_copy["status"] = "finished" if is_fin else "releasing"
-                    item_copy["lane"] = "seasonal"
-                    item_copy["eps_released"] = rel_cnt
-                    item_copy["eps_total"] = tot_cnt
-                    item_copy["eps_counter"] = cnt_str
-                    seen_slugs.add(slug)
-                    seasonal_items.append(item_copy)
-
-            # 3. Rakit items dengan section headers pembatas dua jalur
-            items_dual_lane = []
-            if seasonal_items:
-                items_dual_lane.append({
-                    "is_header": True,
-                    "id": "header-seasonal",
-                    "title": "ANIME MUSIMAN (BARU TAMAT / BERJALAN)",
-                    "header_title": "ANIME MUSIMAN (BARU TAMAT / BERJALAN)",
-                    "lane": "seasonal",
-                    "matched": False
-                })
-                items_dual_lane.extend(seasonal_items)
-
-            if long_running_items:
-                items_dual_lane.append({
-                    "is_header": True,
-                    "id": "header-long-running",
-                    "title": "ANIME PANJANG BERKELANJUTAN (CONTINUOUS ON-GOING)",
-                    "header_title": "ANIME PANJANG BERKELANJUTAN (CONTINUOUS ON-GOING)",
-                    "lane": "long_running",
-                    "matched": False
-                })
-                items_dual_lane.extend(long_running_items)
-
-            response_payload = {
-                "which": "airing",
-                "page": page,
-                "total_pages": max((hi_data or {}).get("total_pages", 1), 5),
-                "seasonal": seasonal_items,
-                "long_running": long_running_items,
-                "items": items_dual_lane,
-                "cached": False
-            }
+            response_payload = await _build_airing_payload(page, safe_mode_int)
             await set_browse_cache(key, response_payload)
             return ok(response_payload)
 
@@ -1761,7 +1837,7 @@ async def _async_update_skip_times(cache_slug: str, ep: int, mode: str, ep_data:
 
 
 @app.get("/api/episode/skip_times")
-async def episode_skip_times(mal_id: str = Query(""), title: str = Query(""), slug: str = Query(""), ep: int = Query(1)):
+async def episode_skip_times(mal_id: str = Query(""), title: str = Query(""), slug: str = Query(""), ep: int = Query(1), duration: float = Query(0.0)):
     """Ambil skip times (intro/outro) on-demand tanpa menghalangi stream playback."""
     try:
         eff_mal = mal_id.strip()
@@ -1771,9 +1847,15 @@ async def episode_skip_times(mal_id: str = Query(""), title: str = Query(""), sl
         sk = aniskip.get_cached_skip_times(mal_id=eff_mal, title=eff_title, ep=ep)
         if not sk and eff_mal:
             loop = asyncio.get_running_loop()
-            sk = await loop.run_in_executor(None, lambda: aniskip.get_skip_times(eff_mal, ep, episode_length=0))
+            sk = await loop.run_in_executor(None, lambda: aniskip.get_skip_times(eff_mal, ep, episode_length=duration))
             if sk:
                 aniskip.store_skip_times(mal_id=eff_mal, title=eff_title, ep=ep, intro=sk.get("intro"), outro=sk.get("outro"))
+        if sk and (sk.get("intro", {}).get("end", 0) > 0 or sk.get("outro", {}).get("end", 0) > 0):
+            if slug:
+                try:
+                    await update_episode_cache_skip_times(slug=slug, ep=ep, intro=sk.get("intro"), outro=sk.get("outro"))
+                except Exception:
+                    pass
         return ok(sk or {"intro": {"start": 0, "end": 0}, "outro": {"start": 0, "end": 0}})
     except Exception as e:
         return fail(str(e))
@@ -2209,7 +2291,7 @@ async def proxy_video(url: str = Query(""), referer: str = Query(""), range: str
     # Sanitasi header Range: hanya izinkan bentuk "bytes=<start>-<end>" agar tidak
     # menjadi vektor request smuggling / header injection ke upstream CDN.
     range_header = ""
-    if range:
+    if range and isinstance(range, str):
         _rg = range.strip()
         if _rg.lower().startswith("bytes="):
             _rg = _rg[6:].strip()
@@ -2271,10 +2353,17 @@ async def proxy_video(url: str = Query(""), referer: str = Query(""), range: str
         "Access-Control-Allow-Origin": "*",
     }
     if is_m3u8:
-        resp_headers["Cache-Control"] = "no-cache, no-transform"
-    else:
-        resp_headers["Cache-Control"] = "public, max-age=86400, immutable"
-        resp_headers["Accept-Ranges"] = "bytes"
+        # Atomic fetch & rewrite untuk playlist m3u8: Hindari chunked streaming agar tidak pernah
+        # memicu net::ERR_INCOMPLETE_CHUNKED_ENCODING saat terjadi jeda atau error upstream.
+        m3u8_bytes = await _get_m3u8_manifest_bytes(url, referer)
+        if m3u8_bytes is not None:
+            resp_headers["Cache-Control"] = "no-cache, no-transform"
+            resp_headers["Content-Length"] = str(len(m3u8_bytes))
+            return Response(content=m3u8_bytes, media_type=media_type, headers=resp_headers)
+        raise HTTPException(status_code=502, detail="Gagal mengunduh atau menulis ulang playlist m3u8")
+
+    resp_headers["Cache-Control"] = "public, max-age=86400, immutable"
+    resp_headers["Accept-Ranges"] = "bytes"
 
     # Jika host terdeteksi diblokir DPI ISP, gunakan TLS desync murni (aman dari Sangfor)
     from api.hianime import _host_from, _is_dpi_blocked_host
@@ -2287,10 +2376,12 @@ async def proxy_video(url: str = Query(""), referer: str = Query(""), range: str
                headers=resp_headers)
 
 
-def _rewrite_m3u8_content(txt: str, base_url: str, referer: str) -> str:
+def _rewrite_m3u8_content(txt, base_url: str, referer: str) -> str:
     """Tulis ulang m3u8 dan pastikan audio codec & sub-manifests (audio, subtitles, init) ter-proxy."""
     import urllib.parse as _up
     import re as _re
+    if isinstance(txt, bytes):
+        txt = txt.decode("utf-8", errors="replace")
     base = base_url.rsplit("/", 1)[0] + "/"
     out = []
     for ln in txt.splitlines():
@@ -2322,6 +2413,76 @@ def _rewrite_m3u8_content(txt: str, base_url: str, referer: str) -> str:
     return "\n".join(out)
 
 
+async def _get_m3u8_manifest_bytes(url: str, referer: str):
+    """Mengambil dan menulis ulang manifest m3u8 secara atomik dengan caching tanpa chunked streaming."""
+    import asyncio
+    import re as _re
+    from api.hianime import _host_from, _is_dpi_blocked_host
+
+    # 1. Cek cache in-memory terlebih dahulu
+    cached_txt = _master_cache_get(url)
+    if cached_txt is not None:
+        return _rewrite_m3u8_content(cached_txt, url, referer).encode("utf-8")
+
+    headers = {
+        "User-Agent": HI_UA,
+        "Accept": "*/*",
+        "Accept-Language": "en-US,en;q=0.9,id;q=0.8",
+    }
+    if referer:
+        headers["Referer"] = referer
+        orig = _re.sub(r"^(https?://[^/]+).*", r"\1", referer)
+        if orig:
+            headers["Origin"] = orig
+
+    host = _host_from(url)
+    loop = asyncio.get_running_loop()
+
+    # 2. Jika host DPI blocked, gunakan TLS Client-Hello Desync
+    if _is_dpi_blocked_host(host):
+        try:
+            from api.desync import tls_desync_request
+            body = await loop.run_in_executor(None, lambda: tls_desync_request(url, headers=headers, timeout=10.0))
+            if body and b"#EXTM3U" in body:
+                txt = body.decode("utf-8", errors="replace") if isinstance(body, bytes) else str(body)
+                _master_cache_set(url, txt)
+                return _rewrite_m3u8_content(txt, url, referer).encode("utf-8")
+        except Exception:
+            pass
+
+    # 3. Direct client request
+    c = _get_video_client(url)
+    try:
+        r = await c.get(url, headers=headers)
+        if r.status_code == 200 and (b"#EXTM3U" in r.content or "mpegurl" in r.headers.get("content-type", "").lower()):
+            txt = r.text
+            _master_cache_set(url, txt)
+            return _rewrite_m3u8_content(txt, url, referer).encode("utf-8")
+        elif r.status_code in (401, 403):
+            from api.desync import tls_desync_request
+            from api.hianime import _add_blocked_dpi_host
+            _add_blocked_dpi_host(host)
+            body = await loop.run_in_executor(None, lambda: tls_desync_request(url, headers=headers, timeout=10.0))
+            if body and b"#EXTM3U" in body:
+                txt = body.decode("utf-8", errors="replace") if isinstance(body, bytes) else str(body)
+                _master_cache_set(url, txt)
+                return _rewrite_m3u8_content(txt, url, referer).encode("utf-8")
+    except Exception:
+        try:
+            from api.desync import tls_desync_request
+            from api.hianime import _add_blocked_dpi_host
+            _add_blocked_dpi_host(host)
+            body = await loop.run_in_executor(None, lambda: tls_desync_request(url, headers=headers, timeout=10.0))
+            if body and b"#EXTM3U" in body:
+                txt = body.decode("utf-8", errors="replace") if isinstance(body, bytes) else str(body)
+                _master_cache_set(url, txt)
+                return _rewrite_m3u8_content(txt, url, referer).encode("utf-8")
+        except Exception:
+            pass
+
+    return None
+
+
 async def _pipe_desync_video(url: str, referer: str, range_header: str = ""):
     """Streaming video via TLS Client Hello Desynchronization (Direct TCP 443 tanpa VPN)."""
     from api.desync import tls_desync_request, tls_desync_stream
@@ -2350,7 +2511,7 @@ async def _pipe_desync_video(url: str, referer: str, range_header: str = ""):
             return
         body = await loop.run_in_executor(None, lambda: tls_desync_request(url, headers=headers))
         try:
-            txt = body.decode("utf-8", errors="strict")
+            txt = body.decode("utf-8", errors="replace") if isinstance(body, bytes) else str(body)
         except Exception:
             raise HTTPException(status_code=502, detail="upstream desync m3u8 binary decode error")
         if "#EXTM3U" not in txt:
@@ -2432,7 +2593,7 @@ async def _pipe_video(url: str, referer: str, range_header: str = ""):
                         return
                     body = await r.aread()
                     try:
-                        txt = body.decode("utf-8", errors="strict")
+                        txt = body.decode("utf-8", errors="replace") if isinstance(body, bytes) else str(body)
                     except Exception:
                         raise HTTPException(status_code=502, detail="upstream m3u8 binary decode error")
                     if "#EXTM3U" not in txt:

@@ -1,12 +1,15 @@
 var Tui = (function () {
-  var S = {view:"katalog",items:[],sel:-1,page:1,total:1,filter:{},promptFoc:false,seasonFilter:null};
+  var S = {view:"katalog",items:[],sel:-1,page:1,total:1,filter:{},promptFoc:false,seasonFilter:null,prevSel:-1,selApplied:-1,geom:null,cols:1};
   var MAXLOG = 200;
 
   function $(id){return document.getElementById(id);}
   function esc(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");}
   function isModalOpen(){
-    return (!$("title-modal").classList.contains("hidden")) ||
+    return ($("spotlight-modal") && !$("spotlight-modal").classList.contains("hidden")) ||
+           ($("detail-page") && !$("detail-page").classList.contains("hidden")) ||
+           (!$("title-modal").classList.contains("hidden")) ||
            (!$("player-modal").classList.contains("hidden")) ||
+           ($("sub-style-modal") && !$("sub-style-modal").classList.contains("hidden")) ||
            ($("ai-settings-modal") && !$("ai-settings-modal").classList.contains("hidden")) ||
            ($("resume-modal") && !$("resume-modal").classList.contains("hidden")) ||
            ($("genre-modal") && !$("genre-modal").classList.contains("hidden")) ||
@@ -24,6 +27,13 @@ var Tui = (function () {
     while(box.children.length>MAXLOG) box.removeChild(box.firstChild);
     box.scrollTop=box.scrollHeight;
   }
+
+  // ==== Modality pin (input mode) ====
+  // Navigasi keyboard mengunci highlight ke keyboard (.sel), bahkan saat idle.
+  // Kursor mouse yang diam / bergulir di bawahnya tidak bisa mencuri fokus;
+  // modus mouse hanya kembali setelah cursor benar-benar bergerak (mousemove/mousedown).
+  function lockKbNav(){ document.body.classList.add("kb-nav"); }
+  function unlockKbNav(){ document.body.classList.remove("kb-nav"); }
   function clearLog(){$("log").classList.add("hidden");$("log").innerHTML="";}
 
   function loadRecents(){try{return JSON.parse(localStorage.getItem("tatap_recent")||"[]");}catch(e){return [];}}
@@ -31,7 +41,7 @@ var Tui = (function () {
   function saveCmdHist(h){try{localStorage.setItem("tatap_hist",JSON.stringify(h.slice(0,50)));}catch(e){}}
 
   function cmdUsage(){
-    return "perintah:\n  cari <judul> | :musim | :lanjutan | :favorit | :katalog\n  :terbaru | :season <winter|spring|summer|fall> <tahun>\n  :switch [hianime|otaku] (ganti sumber video HiAnime / Otakudesu)\n  :filter [key=val...] | :filter reset\n  :genre <slug|title> | :genre | :genre --list | :genre reset\n  :subdelay <detik|reset> (sinkronisasi waktu subtitle, cth: :subdelay -0.5)\n  :tema [toggle|terang|gelap] (ganti mode terang / gelap Apple)\n  :update (cek versi rilis terbaru secara on-demand)\n  :ai (buka modal pengaturan AI) | :apikey <key> | :model <nama> | :prompt <gaya/arahan>\n  :logs | :crt on|off|toggle | :ambient on|off|toggle\n  :riwayat | :favorit | :status | :bantuan | :q";
+    return "perintah:\n  cari <judul> | :musim | :lanjutan | :favorit | :katalog\n  :terbaru | :season <winter|spring|summer|fall> <tahun>\n  :switch [hianime|otaku] (ganti sumber video HiAnime / Otakudesu)\n  :filter [key=val...] | :filter reset\n  :genre <slug|title> | :genre | :genre --list | :genre reset\n  :safe [on|off] (mode aman filter konten dewasa/ecchi)\n  :sfx [on|off] (efek suara taktil konsol PS5)\n  :subdelay <detik|reset> (sinkronisasi waktu subtitle, cth: :subdelay -0.5)\n  :substyle | :styler (buka dialog styler font & background subtitle)\n  :tema [toggle|terang|gelap] (ganti mode terang / gelap Apple)\n  :update (cek versi rilis terbaru secara on-demand)\n  :ai (buka modal pengaturan AI) | :apikey <key> | :model <nama> | :prompt <gaya/arahan>\n  :logs | :crt on|off|toggle | :ambient on|off|toggle\n  :riwayat | :favorit | :status | :bantuan | :q";
   }
 
   function applyFilter(){
@@ -60,7 +70,19 @@ var Tui = (function () {
   }
 
   function setView(v){
+    if(window.TatapSfx) TatapSfx.play("tab");
+    document.body.classList.remove("in-detail-view");
     S.view=v;S.page=1;S.sel=-1;S.items=[];clearLog();
+    S.prevSel=-1;S.selApplied=-1;S.geom=null;S.cols=1;
+    var dp = $("detail-page");
+    if(dp) dp.classList.add("hidden");
+    var tm = $("title-modal");
+    if(tm) tm.classList.add("hidden");
+    var searchSec = $("search-sec");
+    if(searchSec){
+      searchSec.classList.remove("hidden");
+      searchSec.classList.toggle("view-lanjutan", v === "lanjutan");
+    }
     $("empty-state").style.display="none";
     $("results").innerHTML="";$("results-title").textContent="memuat...";$("results-meta").textContent="";
     $("pager").classList.add("hidden");
@@ -332,346 +354,215 @@ var Tui = (function () {
     box.innerHTML="";
     var sBar = $("schedule-days-bar");
     if(sBar) sBar.classList.toggle("hidden", S.view !== "terbaru");
-    var isTxt = S.view==="cari" || S.view==="terbaru";
     if(!S.items.length){
       var emptyMsg = "Kosong.";
       if(S.view==="favorit"){
         emptyMsg = "Belum ada anime favorit tersimpan. Ketuk tombol + FAVORIT pada detail anime untuk menyimpannya ke sini.";
       }else if(S.view==="riwayat"){
         emptyMsg = "Belum ada riwayat menonton. Mulai tonton anime apa pun dan riwayat akan tercatat otomatis di sini.";
+      }else if(S.view==="cari"){
+        emptyMsg = "Tidak ada judul anime yang cocok dengan kata kunci pencarian tersebut.";
+      }else if(S.view==="terbaru"){
+        emptyMsg = "Tidak ada jadwal rilis anime pada hari ini.";
       }
-      box.innerHTML="<p class='dim'>"+emptyMsg+"</p>";
+      box.innerHTML="<p class='dim' style='padding:24px 6px;font-size:12.5px;'>"+emptyMsg+"</p>";
       return;
     }
-    if(isTxt){
-      var nowTs=Math.floor(Date.now()/1000);
-      var frag=document.createDocumentFragment();
-      for(var i=0;i<S.items.length;i++){
-        (function(a,idx){
-          if(S.view==="terbaru"){
-            var d=document.createElement("div");
-            var aheadSec=(a.airing_at||0)-nowTs;
-            var cls="trow trow-up trow-media"+(idx===S.sel?" sel":"");
-            if(aheadSec>0&&aheadSec<86400) cls+=" today";
-            else if(aheadSec>=86400&&aheadSec<172800) cls+=" tomorrow";
-            d.className=cls;
 
-            // Thumbnail poster
-            var thumbWrap=document.createElement("div");
-            thumbWrap.className="tr-thumb-wrap";
-            if(a.poster){
-              var img=document.createElement("img");
-              img.className="tr-thumb";
-              img.loading="lazy";
-              img.decoding="async";
-              img.alt=a.title||"";
-              img.src=a.poster;
-              img.onerror=function(){
-                this.style.display="none";
-                thumbWrap.classList.add("no-img");
-                var ph=document.createElement("span");
-                ph.className="tr-thumb-ph";
-                ph.textContent="▶";
-                thumbWrap.appendChild(ph);
-              };
-              thumbWrap.appendChild(img);
-            } else {
-              thumbWrap.classList.add("no-img");
-              var ph=document.createElement("span");
-              ph.className="tr-thumb-ph";
-              ph.textContent="▶";
-              thumbWrap.appendChild(ph);
-            }
-            d.appendChild(thumbWrap);
+    var grid=document.createElement("div");grid.className="poster-grid";
+    for(var j=0;j<S.items.length;j++){
+      (function(a,idx){
+        if(a.is_header){
+          var h=document.createElement("div");
+          h.className="lane-header-banner";
+          var isLong = a.lane === "long_running";
+          var col = isLong ? "#F59E0B" : "#38BDF8";
+          var isCompact = (S.view === "lanjutan");
+          var mTop = isCompact ? "10px" : "16px";
+          var mBtm = isCompact ? "4px" : "8px";
+          var pY = isCompact ? "6px" : "8px";
+          h.style.cssText="grid-column:1 / -1;width:100%;margin:"+mTop+" 0 "+mBtm+" 0;padding:"+pY+" 12px;background:rgba(15,23,42,0.8);border-left:4px solid "+col+";border-radius:4px;display:flex;align-items:center;justify-content:space-between;user-select:none;box-sizing:border-box;";
+          h.innerHTML="<span style='font-weight:bold;font-size:"+(isCompact?"11.5px":"12px")+";letter-spacing:0.04em;color:"+col+"'>"+(a.header_title||a.title||"")+"</span><span style='font-family:monospace;font-size:10px;color:#64748B'>"+(isLong?"[CONTINUOUS]":"[SEASONAL]")+"</span>";
+          grid.appendChild(h);
+          return;
+        }
+        if(!a.id) a.id = a.slug;
+        if(!a.badge && a.episode != null && a.episode !== undefined) a.badge = String(a.episode);
+        else if(!a.badge && a.eps_counter) a.badge = a.eps_counter;
 
-            var metaCol=document.createElement("div");
-            metaCol.className="tr-badge-col";
-            var when=(a.date?a.date+" · ":"")+(a.time||"");
-            var spanDay=document.createElement("span");
-            spanDay.className="tr-day";
-            spanDay.textContent=when;
-            var spanEp=document.createElement("span");
-            spanEp.className="tr-ep";
-            spanEp.textContent="ep "+(a.episode==null||a.episode==undefined?"?":a.episode);
-            metaCol.appendChild(spanDay);
-            metaCol.appendChild(spanEp);
-            d.appendChild(metaCol);
-
-            var infoCol=document.createElement("div");
-            infoCol.className="tr-info";
-            var spanTitle=document.createElement("span");
-            spanTitle.className="tr-title";
-            spanTitle.textContent=a.title||"";
-            infoCol.appendChild(spanTitle);
-
-            if(a.type || a.score){
-              var subMeta=document.createElement("div");
-              subMeta.className="tr-meta";
-              var sm=[];
-              if(a.type) sm.push(a.type);
-              if(a.score) sm.push("★ "+a.score);
-              subMeta.textContent=sm.join(" · ");
-              infoCol.appendChild(subMeta);
-            }
-            d.appendChild(infoCol);
-
-            d.tabIndex=0;
-            d.setAttribute("data-idx",String(idx));
-            d.addEventListener("focus",function(){
-              if(S.sel!==idx){S.sel=idx;renderSel();}
-            });
-            d.addEventListener("keydown",function(e){
-              if(e.key==="Enter"||e.key===" "){
-                e.preventDefault();
-                if(typeof App==="undefined"){log("App belum siap, coba lagi","err");return;}
-                App.openTitle(a.id||a.slug,a.title,a.poster,a.type,a.eps_counter,a);
-              }
-            });
-            d.addEventListener("click",function(){
-              if(typeof App==="undefined"){log("App belum siap, coba lagi","err");return;}
-              App.openTitle(a.id||a.slug,a.title,a.poster,a.type,a.eps_counter,a);
-            });
-            frag.appendChild(d);
-          } else {
-            var d2=document.createElement("div");
-            d2.className="trow trow-media"+(idx===S.sel?" sel":"");
-
-            var spanNum=document.createElement("span");
-            spanNum.className="tr-num";
-            spanNum.textContent=idx+1;
-            d2.appendChild(spanNum);
-
-            var thumbWrap2=document.createElement("div");
-            thumbWrap2.className="tr-thumb-wrap";
-            if(a.poster){
-              var img2=document.createElement("img");
-              img2.className="tr-thumb";
-              img2.loading="lazy";
-              img2.decoding="async";
-              img2.alt=a.title||"";
-              img2.src=a.poster;
-              img2.onerror=function(){
-                this.style.display="none";
-                thumbWrap2.classList.add("no-img");
-                var ph2=document.createElement("span");
-                ph2.className="tr-thumb-ph";
-                ph2.textContent="▶";
-                thumbWrap2.appendChild(ph2);
-              };
-              thumbWrap2.appendChild(img2);
-            } else {
-              thumbWrap2.classList.add("no-img");
-              var ph2=document.createElement("span");
-              ph2.className="tr-thumb-ph";
-              ph2.textContent="▶";
-              thumbWrap2.appendChild(ph2);
-            }
-            d2.appendChild(thumbWrap2);
-
-            var infoCol2=document.createElement("div");
-            infoCol2.className="tr-info";
-            var spanTitle2=document.createElement("span");
-            spanTitle2.className="tr-title";
-            spanTitle2.textContent=a.title||"";
-            infoCol2.appendChild(spanTitle2);
-
-            var subMeta2=document.createElement("div");
-            subMeta2.className="tr-meta";
-            var sm2=[];
-            if(a.season){
-              var sStr = a.season;
-              if(a.year && sStr.indexOf(String(a.year)) === -1) sStr += " " + a.year;
-              sm2.push(sStr);
-            } else if(a.year){
-              sm2.push(String(a.year));
-            }
-            if(a.type) sm2.push(a.type);
-            if(a.eps_counter){
-              sm2.push("Ep " + a.eps_counter);
-            } else {
-              if(a.sub) sm2.push("SUB "+a.sub);
-              if(a.dub) sm2.push("DUB "+a.dub);
-              if(a.eps) sm2.push(a.eps+" ep");
-            }
-            if(a.duration) sm2.push(a.duration);
-            subMeta2.textContent=sm2.join(" · ");
-            infoCol2.appendChild(subMeta2);
-            d2.appendChild(infoCol2);
-
-            d2.tabIndex=0;
-            d2.setAttribute("data-idx",String(idx));
-            d2.addEventListener("focus",function(){
-              if(S.sel!==idx){S.sel=idx;renderSel();}
-            });
-            d2.addEventListener("keydown",function(e){
-              if(e.key==="Enter"||e.key===" "){
-                e.preventDefault();
-                if(typeof App==="undefined"){log("App belum siap, coba lagi","err");return;}
-                App.openTitle(a.id||a.slug,a.title,a.poster,a.type,a.eps_counter,a);
-              }
-            });
-            d2.addEventListener("click",function(){
-              if(typeof App==="undefined"){log("App belum siap, coba lagi","err");return;}
-              App.openTitle(a.id||a.slug,a.title,a.poster,a.type,a.eps_counter,a);
-            });
-            frag.appendChild(d2);
-          }
-        })(S.items[i],i);
-      }
-      box.appendChild(frag);
-    } else {
-      var grid=document.createElement("div");grid.className="poster-grid";
-      for(var j=0;j<S.items.length;j++){
-        (function(a,idx){
-          if(a.is_header){
-            var h=document.createElement("div");
-            h.className="lane-header-banner";
-            var isLong = a.lane === "long_running";
-            var col = isLong ? "#F59E0B" : "#38BDF8";
-            h.style.cssText="grid-column:1 / -1;width:100%;margin:16px 0 8px 0;padding:8px 12px;background:rgba(15,23,42,0.8);border-left:4px solid "+col+";border-radius:4px;display:flex;align-items:center;justify-content:space-between;user-select:none;box-sizing:border-box;";
-            h.innerHTML="<span style='font-weight:bold;font-size:12px;letter-spacing:0.04em;color:"+col+"'>"+(a.header_title||a.title||"")+"</span><span style='font-family:monospace;font-size:10px;color:#64748B'>"+(isLong?"[CONTINUOUS]":"[SEASONAL]")+"</span>";
-            grid.appendChild(h);
-            return;
-          }
-          if(S.view==="riwayat" || S.view==="favorit"){
-            if(!a.id) a.id = a.slug;
-            if(!a.badge && a.episode) a.badge = String(a.episode);
-          }
-          var isUnavail=!a.id;
-          var d=document.createElement("div");
-          d.className="poster-card"+(idx===S.sel?" sel":"")+(isUnavail?" unmapped":"");
-          d.tabIndex=0;
-          d.setAttribute("data-idx",String(idx));
-          d.addEventListener("focus",function(){
-            if(!isUnavail && S.sel!==idx){S.sel=idx;renderSel();}
-          });
-          d.addEventListener("keydown",function(e){
-            if(e.key==="Enter"||e.key===" "){
-              e.preventDefault();
-              if(!isUnavail){
-                App.openTitle(a.id||a.slug,a.title,a.poster,a.type,a.eps_counter,a);
-              }
-            }
-          });
-
-          var media=document.createElement("div");
-          media.className="pc-media";
-
-          var ph=document.createElement("div");
-          ph.className="pc-thumb-ph";
-          ph.innerHTML='<svg class="ui-icon pc-ph-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg><span>TATAP</span>';
-
-          if(a.poster){
-            var im=document.createElement("img");
-            im.loading="lazy";
-            im.decoding="async";
-            im.alt=a.title||"";
-            im.src=a.poster;
-            im.onerror=function(){
-              this.style.display="none";
-              ph.style.display="flex";
-            };
-            ph.style.display="none";
-            media.appendChild(im);
-            media.appendChild(ph);
-          } else {
-            media.appendChild(ph);
-          }
-
-          var idxSpan=document.createElement("span");
-          idxSpan.className="pc-idx";
-          idxSpan.textContent=String(idx+1).padStart(2,"0");
-          media.appendChild(idxSpan);
-
-          if(isUnavail){
-            var bad=document.createElement("span");
-            bad.className="pc-bad";
-            bad.textContent="?";
-            bad.title="Tidak ada di hianime";
-            media.appendChild(bad);
-          }else if(a.score&&a.score>0){
-            var sc=document.createElement("span");
-            sc.className="pc-score";
-            sc.textContent="★ "+a.score.toFixed(1);
-            media.appendChild(sc);
-          }
-
-          if(a.badge){
-            var bgTag=document.createElement("span");
-            var isTam=a.badge==="TAMAT"||a.is_finished;
-            var isLongB=a.badge==="SERIAL PANJANG"||a.is_long_running;
-            var bCls=isTam?" pc-badge-tamat":(isLongB?" pc-badge-long":" pc-badge-ep");
-            bgTag.className="pc-badge-tag"+bCls;
-            var bText=a.badge;
-            if(a.badge==="ONGOING"&&a.eps_counter){
-              bText=a.eps_counter;
-            }
-            bgTag.textContent=bText;
-            media.appendChild(bgTag);
-          }
-
-          if(a.type){
-            var tp=document.createElement("span");
-            tp.className="pc-badge-type";
-            tp.textContent=String(a.type).toUpperCase();
-            media.appendChild(tp);
-          }
-
-          if(S.view==="riwayat"&&a.progress&&a.progress>=15){
-            var progTrack=document.createElement("div");
-            progTrack.className="pc-progress-track";
-            var progFill=document.createElement("div");
-            progFill.className="pc-progress-fill";
-            var pct=Math.min(100,Math.max(5,Math.round((a.progress/1440)*100)));
-            progFill.style.width=pct+"%";
-            progTrack.appendChild(progFill);
-            media.appendChild(progTrack);
-          }
-
-          d.appendChild(media);
-
-          var body=document.createElement("div");
-          body.className="poster-body";
-          var b=document.createElement("b");
-          b.textContent=a.title||"";
-          b.title=a.title||"";
-          body.appendChild(b);
-
-          var meta=document.createElement("div");
-          meta.className="poster-meta";
-          var m=[];
-          if(S.view==="riwayat"){
-            if(a.episode)m.push("Ep "+a.episode);
-            if(a.mode)m.push(String(a.mode).toUpperCase());
-            if(a.progress&&a.progress>=15&&window.App&&App.formatTimeSec)m.push(App.formatTimeSec(a.progress));
-          }else{
-            if(a.season){
-              var sStr = a.season;
-              if(a.year && sStr.indexOf(String(a.year)) === -1) sStr += " " + a.year;
-              m.push(sStr);
-            } else if(a.year){
-              m.push(String(a.year));
-            }
-            if(a.eps_counter){
-              m.push("Ep "+a.eps_counter);
-            }else if(a.eps){
-              m.push(a.eps+" ep");
-            }
-            if(a.duration)m.push(a.duration);
-          }
-          meta.textContent=m.join(" · ")||"Anime";
-          body.appendChild(meta);
-          d.appendChild(body);
-
+        var isUnavail=!a.id;
+        var d=document.createElement("div");
+        d.className="poster-card"+(idx===S.sel?" sel":"")+(isUnavail?" unmapped":"");
+        d.tabIndex=0;
+        d.setAttribute("data-idx",String(idx));
+        d.addEventListener("focus",function(){
           if(!isUnavail){
-            d.addEventListener("click",function(){App.openTitle(a.id||a.slug,a.title,a.poster,a.type,a.eps_counter,a);});
+            document.body.classList.remove("sidebar-hovered");
+            if(S.sel!==idx){S.sel=idx;renderSel({skipScroll:true,skipFocus:true});}
           }
-          grid.appendChild(d);
-        })(S.items[j],j);
-      }
-      box.appendChild(grid);
+        });
+        d.addEventListener("mouseenter",function(){
+          if(!isUnavail){
+            document.body.classList.remove("sidebar-hovered");
+            if(!document.body.classList.contains("kb-nav")) S.sel=idx;
+          }
+        });
+        d.addEventListener("keydown",function(e){
+          if(e.key==="Enter"||e.key===" "){
+            e.preventDefault();
+            if(!isUnavail){
+              App.openTitle(a.id||a.slug,a.title,a.poster,a.type,a.eps_counter,a);
+            }
+          }
+        });
+
+        var media=document.createElement("div");
+        media.className="pc-media";
+
+        var ph=document.createElement("div");
+        ph.className="pc-thumb-ph";
+        ph.innerHTML='<svg class="ui-icon pc-ph-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg><span>TATAP</span>';
+
+        var cleanPoster = (window.App && window.App.sanitizePosterUrl) ? window.App.sanitizePosterUrl(a.poster) : ((a.poster && a.poster.indexOf("img.hianime.to") === -1 && a.poster.indexOf("bookmark123.jpg") === -1) ? a.poster : "");
+        if(cleanPoster){
+          var im=document.createElement("img");
+          im.loading="lazy";
+          im.decoding="async";
+          im.alt=a.title||"";
+          im.src=cleanPoster;
+          im.onerror=function(){
+            this.style.display="none";
+            ph.style.display="flex";
+          };
+          ph.style.display="none";
+          media.appendChild(im);
+          media.appendChild(ph);
+        } else {
+          media.appendChild(ph);
+        }
+
+        var idxSpan=document.createElement("span");
+        idxSpan.className="pc-idx";
+        idxSpan.textContent=String(idx+1).padStart(2,"0");
+        media.appendChild(idxSpan);
+
+        if(isUnavail){
+          var bad=document.createElement("span");
+          bad.className="pc-bad";
+          bad.textContent="?";
+          bad.title="Tidak ada di hianime";
+          media.appendChild(bad);
+        }else if(a.score&&a.score>0){
+          var sc=document.createElement("span");
+          sc.className="pc-score";
+          sc.textContent="★ "+a.score.toFixed(1);
+          media.appendChild(sc);
+        }
+
+        if(S.view==="terbaru"&&a.time){
+          var tmBadge=document.createElement("span");
+          tmBadge.className="pc-badge-time";
+          tmBadge.textContent=a.time+" WIB";
+          media.appendChild(tmBadge);
+        }
+
+        if(a.badge){
+          var bgTag=document.createElement("span");
+          var isTam=a.badge==="TAMAT"||a.is_finished;
+          var isLongB=a.badge==="SERIAL PANJANG"||a.is_long_running;
+          var bCls=isTam?" pc-badge-tamat":(isLongB?" pc-badge-long":" pc-badge-ep");
+          bgTag.className="pc-badge-tag"+bCls;
+          var bText=a.badge;
+          if(a.badge==="ONGOING"&&a.eps_counter){
+            bText=a.eps_counter;
+          } else if(S.view==="terbaru" && /^\d+$/.test(String(bText))){
+            bText="EP "+bText;
+          }
+          bgTag.textContent=bText;
+          media.appendChild(bgTag);
+        }
+
+        if(a.type){
+          var tp=document.createElement("span");
+          tp.className="pc-badge-type";
+          tp.textContent=String(a.type).toUpperCase();
+          media.appendChild(tp);
+        }
+
+        if(S.view==="riwayat"&&a.progress&&a.progress>=15){
+          var progTrack=document.createElement("div");
+          progTrack.className="pc-progress-track";
+          var progFill=document.createElement("div");
+          progFill.className="pc-progress-fill";
+          var pct=Math.min(100,Math.max(5,Math.round((a.progress/1440)*100)));
+          progFill.style.width=pct+"%";
+          progTrack.appendChild(progFill);
+          media.appendChild(progTrack);
+        }
+
+        d.appendChild(media);
+
+        var body=document.createElement("div");
+        body.className="poster-body";
+        var b=document.createElement("b");
+        b.textContent=a.title||"";
+        b.title=a.title||"";
+        body.appendChild(b);
+
+        var meta=document.createElement("div");
+        meta.className="poster-meta";
+        var m=[];
+        if(S.view==="riwayat"){
+          if(a.episode)m.push("Ep "+a.episode);
+          if(a.mode)m.push(String(a.mode).toUpperCase());
+          if(a.progress&&a.progress>=15&&window.App&&App.formatTimeSec)m.push(App.formatTimeSec(a.progress));
+        }else if(S.view==="terbaru"){
+          if(a.time)m.push(a.time+" WIB");
+          if(a.date)m.push(a.date);
+          if(a.type)m.push(String(a.type).toUpperCase());
+        }else{
+          if(a.season){
+            var sStr = a.season;
+            if(a.year && sStr.indexOf(String(a.year)) === -1) sStr += " " + a.year;
+            m.push(sStr);
+          } else if(a.year){
+            m.push(String(a.year));
+          }
+          if(a.eps_counter){
+            m.push("Ep "+a.eps_counter);
+          }else if(a.eps){
+            m.push(a.eps+" ep");
+          }
+          if(a.type&&!a.season&&!a.year){
+            m.push(String(a.type).toUpperCase());
+          }
+          if(a.duration)m.push(a.duration);
+        }
+        meta.textContent=m.join(" · ")||"Anime";
+        body.appendChild(meta);
+        d.appendChild(body);
+
+        if(!isUnavail){
+          d.addEventListener("click",function(){
+            if(typeof App==="undefined"){log("App belum siap, coba lagi","err");return;}
+            S.sel = idx;
+            renderSel();
+            var now = Date.now();
+            if(App._lastCardClick && now - App._lastCardClick < 450) return;
+            App._lastCardClick = now;
+            App.openTitle(a.id||a.slug,a.title,a.poster,a.type,a.eps_counter,a);
+          });
+        }
+        grid.appendChild(d);
+      })(S.items[j],j);
     }
-    if(window.TvNavigationManager){
+    box.appendChild(grid);
+    // Bangun cache geometri sekali per render (offset-based, scroll-invariant) supaya
+    // navigasi antar kartu tidak memaksa layout dihitung ulang tiap tekan tombol.
+    buildGeom();
+    S.prevSel=-1;
+    S.selApplied=-1;
+    if(window.TvNavigationManager && (savedIdx >= 0 || (window.TvNavigationManager.isTvMode && window.TvNavigationManager.isTvMode()))){
       window.TvNavigationManager.restoreFocusedIndex("#results", ".poster-card, .trow", savedIdx, S.sel >= 0 ? S.sel : 0);
     }
   }
@@ -710,7 +601,121 @@ var Tui = (function () {
     }
   }
 
+  // ==== Cache geometri grid (scroll-invariant) ====
+  // offsetTop/offsetLeft bersifat relatif terhadap offsetParent sehingga TIDAK berubah
+  // saat container digulir -> aman di-cache dan dipakai untuk navigasi antar kartu tanpa
+  // memaksa browser menghitung ulang layout (forced reflow) pada tiap tekan tombol.
+  function buildGeom(){
+    var box=$("results");
+    if(!box){S.geom=null;S.cols=1;return;}
+    var cards=box.querySelectorAll(".poster-card");
+    var geom=[];
+    for(var i=0;i<cards.length;i++){
+      var c=cards[i];
+      geom.push({
+        idx:parseInt(c.getAttribute("data-idx"),10),
+        top:c.offsetTop,left:c.offsetLeft,w:c.offsetWidth,h:c.offsetHeight
+      });
+    }
+    S.geom=geom;
+    // Jumlah kolom = kartu pertama yang berada di baris berikutnya
+    var cols=1;
+    if(geom.length>1){
+      var firstTop=geom[0].top;
+      for(var g=1;g<geom.length;g++){
+        if(geom[g].top>firstTop+8){cols=g;break;}
+      }
+      if(cols===1)cols=geom.length;
+    }
+    S.cols=cols;
+  }
+
+  // Target spasial 2D berbasis cache geometri (setara getSpatialTarget, tanpa rect read)
+  function spatialTarget(idx, direction){
+    var geom=S.geom;
+    if(!geom||!geom.length)return null;
+    var cur=null;
+    for(var i=0;i<geom.length;i++){ if(geom[i].idx===idx){cur=geom[i];break;} }
+    if(!cur)return null;
+    var curCX=cur.left+cur.w/2, curCY=cur.top+cur.h/2;
+
+    var candidates=[];
+    for(var j=0;j<geom.length;j++){
+      var it=geom[j];
+      if(it.idx===idx)continue;
+      candidates.push({
+        idx:it.idx,
+        top:it.top,
+        left:it.left,
+        w:it.w,
+        h:it.h,
+        bottom:it.top+it.h,
+        cx:it.left+it.w/2,
+        cy:it.top+it.h/2
+      });
+    }
+    if(!candidates.length)return null;
+
+    if(direction==="left"){
+      var leftCands=candidates.filter(function(c){
+        return (Math.abs(c.cy-curCY)<cur.h*0.48) && (c.cx<curCX);
+      });
+      if(!leftCands.length)return null;
+      leftCands.sort(function(a,b){ return b.cx-a.cx; });
+      return leftCands[0];
+    }
+
+    if(direction==="right"){
+      var rightCands=candidates.filter(function(c){
+        return (Math.abs(c.cy-curCY)<cur.h*0.48) && (c.cx>curCX);
+      });
+      if(!rightCands.length)return null;
+      rightCands.sort(function(a,b){ return a.cx-b.cx; });
+      return rightCands[0];
+    }
+
+    if(direction==="down"){
+      var belowCands=candidates.filter(function(c){
+        return (c.top>=cur.top+cur.h-8)||(c.cy>curCY+cur.h*0.4);
+      });
+      if(!belowCands.length)return null;
+      var minTop=Infinity;
+      for(var b1=0;b1<belowCands.length;b1++){
+        if(belowCands[b1].top<minTop) minTop=belowCands[b1].top;
+      }
+      var nextRow=belowCands.filter(function(c){
+        return c.top<=minTop+28;
+      });
+      if(!nextRow.length)return null;
+      nextRow.sort(function(a,b){
+        return Math.abs(a.cx-curCX)-Math.abs(b.cx-curCX);
+      });
+      return nextRow[0];
+    }
+
+    if(direction==="up"){
+      var aboveCands=candidates.filter(function(c){
+        return (c.bottom<=cur.top+8)||(c.cy<curCY-cur.h*0.4);
+      });
+      if(!aboveCands.length)return null;
+      var maxBottom=-Infinity;
+      for(var a1=0;a1<aboveCands.length;a1++){
+        if(aboveCands[a1].bottom>maxBottom) maxBottom=aboveCands[a1].bottom;
+      }
+      var prevRow=aboveCands.filter(function(c){
+        return c.bottom>=maxBottom-28;
+      });
+      if(!prevRow.length)return null;
+      prevRow.sort(function(a,b){
+        return Math.abs(a.cx-curCX)-Math.abs(b.cx-curCX);
+      });
+      return prevRow[0];
+    }
+    return null;
+  }
+
   function getGridCols(){
+    if(S.cols&&S.cols>0)return S.cols;
     var box=$("results");
     if(!box)return 1;
     var cards=box.querySelectorAll(".poster-card");
@@ -726,16 +731,68 @@ var Tui = (function () {
 
   function moveSel(d){
     if(!S.items.length)return;
+    lockKbNav();
     var count=S.items.length;
     var next;
-    if(S.sel < 0){
+
+    // Navigasi spasial 2D geometris untuk pergerakan vertikal (ArrowDown / ArrowUp)
+    if(Math.abs(d) > 1 && S.sel >= 0){
+      var box=$("results");
+      var curCard = box ? box.querySelector('.poster-card[data-idx="' + S.sel + '"]') : null;
+      var dir = (d > 0) ? "down" : "up";
+      // Cache geometri (offset-based, tanpa forced layout) untuk path desktop;
+      // TV memakai spatial manager (butuh rect real-time untuk D-Pad).
+      var useTvSpatial = window.TvNavigationManager && window.TvNavigationManager.isTvMode && window.TvNavigationManager.isTvMode();
+      var target = null;
+      if(useTvSpatial && curCard && window.TvNavigationManager.getSpatialTarget){
+        var allCards = Array.prototype.slice.call(box.querySelectorAll(".poster-card"));
+        target = window.TvNavigationManager.getSpatialTarget(curCard, allCards, dir);
+      } else {
+        var geoHit = spatialTarget(S.sel, dir);
+        if(geoHit) target = box ? box.querySelector('.poster-card[data-idx="' + geoHit.idx + '"]') : null;
+      }
+      if(target){
+        var tIdx = parseInt(target.getAttribute("data-idx"), 10);
+        if(!isNaN(tIdx) && S.items[tIdx] && !S.items[tIdx].is_header){
+          S.sel = tIdx;
+          renderSel();
+          return;
+        }
+      } else {
+          // Batas tepi atas atau bawah (clamping tanpa wrap-around)
+          if(d > 0){
+            if(window.TvNavigationManager && window.TvNavigationManager.isTvMode && window.TvNavigationManager.isTvMode()){
+              window.TvNavigationManager.setFocus($("search-input-wrap"), "search");
+            }
+            return;
+          } else {
+            if(window.TvNavigationManager && window.TvNavigationManager.isTvMode && window.TvNavigationManager.isTvMode()){
+              var sched = $("schedule-days-bar");
+              if(sched && !sched.classList.contains("hidden")){
+                var firstChip = sched.querySelector(".ep-range-chip");
+                if(firstChip){ window.TvNavigationManager.setFocus(firstChip, "chips"); return; }
+              }
+              var actTab = document.querySelector(".nav-tab-btn.active") || document.querySelector(".nav-tab-btn");
+              if(actTab){ window.TvNavigationManager.setFocus(actTab, "tabs"); return; }
+            } else {
+              var actTab = document.querySelector(".nav-tab-btn.active") || document.querySelector(".nav-tab-btn");
+              if(actTab){ actTab.focus(); return; }
+            }
+            return;
+          }
+        }
+      }
+
+    if(d === 0){
+      next = (S.sel >= 0) ? S.sel : 0;
+    } else if(S.sel < 0){
       next = (d > 0) ? 0 : count - 1;
     } else {
       if(Math.abs(d) > 1){
         if(d > 0){
           if(S.sel + d >= count){
             if(S.sel >= count - getGridCols()){
-              if(window.TvNavigationManager){
+              if(window.TvNavigationManager && window.TvNavigationManager.isTvMode && window.TvNavigationManager.isTvMode()){
                 window.TvNavigationManager.setFocus($("search-input-wrap"), "search");
                 return;
               }
@@ -746,7 +803,7 @@ var Tui = (function () {
           }
         } else {
           if(S.sel + d < 0){
-            if(window.TvNavigationManager){
+            if(window.TvNavigationManager && window.TvNavigationManager.isTvMode && window.TvNavigationManager.isTvMode()){
               var sched = $("schedule-days-bar");
               if(sched && !sched.classList.contains("hidden")){
                 var firstChip = sched.querySelector(".ep-range-chip");
@@ -770,44 +827,96 @@ var Tui = (function () {
         next = (S.sel + d + count) % count;
       }
     }
+    var stepDir = (d >= 0 ? 1 : -1);
     for(var step=0;step<count;step++){
       if(S.items[next] && !S.items[next].is_header){
         S.sel=next;
         renderSel();
         return;
       }
-      next = (next + (d > 0 ? 1 : -1) + count) % count;
+      next = (next + stepDir + count) % count;
     }
   }
 
-  function renderSel(){
+  // Resolver item grid (kartu poster .poster-card maupun baris .trow) berdasarkan indeks.
+  // Satu helper untuk kedua jenis item agar navigasi keyboard konsisten di semua tampilan.
+  function itemEl(box, idx){
+    if(!box || idx < 0) return null;
+    return box.querySelector('.poster-card[data-idx="'+idx+'"], .trow[data-idx="'+idx+'"]');
+  }
+
+  function renderSel(opts){
+    opts = opts || {};
     var box=$("results");
     if(!box)return;
-    var all=box.querySelectorAll(".poster-card, .trow");
     var isTv = !!(window.TvNavigationManager && window.TvNavigationManager.isTvMode && window.TvNavigationManager.isTvMode());
-    for(var i=0;i<all.length;i++){
-      var itemIdx = parseInt(all[i].getAttribute("data-idx"), 10);
-      var isUnm=all[i].classList.contains("unmapped");
-      var isThis = (itemIdx === S.sel && !isUnm);
-      all[i].classList.toggle("sel", isThis);
+    // Update tersasar: hanya kartu yang benar-benar berubah state-nya yang disentuh.
+    // Menyapu seluruh grid (44 kartu) per tekan tombol = hundreds classList ops per keypress.
+    var prevIdx=S.prevSel;
+    S.prevSel=S.sel;
+    if(prevIdx===S.sel && S.selApplied===S.sel) return;
+    if(prevIdx>=0 && prevIdx!==S.sel && S.sel>=0 && window.TatapSfx){
+      TatapSfx.play("tick");
+    }
+    S.selApplied=S.sel;
+    var touched=[];
+    if(prevIdx>=0 && prevIdx!==S.sel){
+      var prevEl=itemEl(box, prevIdx);
+      if(prevEl)touched.push(prevEl);
+    }
+    if(S.sel>=0){
+      var nextEl=itemEl(box, S.sel);
+      if(nextEl && nextEl!==touched[0])touched.push(nextEl);
+    }
+    for(var i=0;i<touched.length;i++){
+      var el=touched[i];
+      var eIdx=parseInt(el.getAttribute("data-idx"),10);
+      var isUnm=el.classList.contains("unmapped");
+      var isThis=(eIdx===S.sel && !isUnm);
+      if(el.classList.contains("sel")!==isThis)el.classList.toggle("sel",isThis);
       if(isTv){
-        all[i].classList.toggle("tv-focus", isThis);
-      } else {
-        all[i].classList.remove("tv-focus");
+        if(el.classList.contains("tv-focus")!==isThis)el.classList.toggle("tv-focus",isThis);
+      }else if(el.classList.contains("tv-focus")){
+        el.classList.remove("tv-focus"); // all[i].classList.remove("tv-focus");
       }
     }
     if(S.sel < 0) return;
-    var selEl = box.querySelector('[data-idx="' + S.sel + '"]');
+    if(opts.skipScroll) return;
+    var selEl = itemEl(box, S.sel);
     if(selEl){
-      selEl.scrollIntoView({block:"nearest", inline:"nearest"});
+      var container = $("search-sec");
+      var shouldScroll = true;
+      if(container){
+        var cRect = container.getBoundingClientRect();
+        var eRect = selEl.getBoundingClientRect();
+        if(eRect.top >= cRect.top + 6 && eRect.bottom <= cRect.bottom - 6){
+          shouldScroll = false;
+        }
+      }
+      if(shouldScroll){
+        selEl.scrollIntoView({block:"nearest", inline:"nearest"});
+      }
       if(window.TvNavigationManager && isTv){
-        window.TvNavigationManager.setFocus(selEl, "grid", { scroll: true });
+        window.TvNavigationManager.setFocus(selEl, "grid", { scroll: shouldScroll });
       }
       if(document.activeElement !== selEl){
-        try{selEl.focus({preventScroll:true});}catch(_){}
+        if(!opts.skipFocus){
+          try{selEl.focus({preventScroll:true});}catch(_){}
+        }
       }
     }
   }
+
+  function blurCards(){
+    if(document.activeElement && document.activeElement.classList && (document.activeElement.classList.contains("poster-card") || document.activeElement.classList.contains("trow"))){
+      try{document.activeElement.blur();}catch(_){}
+    }
+    if(S.sel >= 0){
+      S.sel = -1;
+      renderSel({skipScroll:true, skipFocus:true});
+    }
+  }
+
   function openSelected(){
     if(!S.items.length||S.sel<0)return;
     var a=S.items[S.sel];
@@ -1273,6 +1382,32 @@ var Tui = (function () {
         try{localStorage.setItem("tatap_ambient",nxt2);}catch(e){}
         document.body.classList.toggle("no-ambient",nxt2==="off");
         log("ambient "+(nxt2==="on"?"ON":"OFF"),"ok");break;
+      case "sfx":case "sound":case "suara":
+        if(window.TatapSfx){
+          var curSfx = TatapSfx.isEnabled();
+          var nxtSfx = !curSfx;
+          if(args === "on" || args === "aktif" || args === "1") nxtSfx = true;
+          else if(args === "off" || args === "mati" || args === "0") nxtSfx = false;
+          TatapSfx.setEnabled(nxtSfx);
+          if(nxtSfx) TatapSfx.play("select");
+          log("efek suara UI (PS5): " + (nxtSfx ? "AKTIF" : "MATI"), "ok");
+          toast("Efek Suara UI (PS5): " + (nxtSfx ? "Aktif" : "Mati"), 1400);
+        }
+        break;
+      case "safe":case "safemode":case "modeaman":
+        if(window.TatapSafeMode){
+          var curSafe = TatapSafeMode.isEnabled();
+          var nxtSafe = !curSafe;
+          if(args === "on" || args === "aktif" || args === "1") nxtSafe = true;
+          else if(args === "off" || args === "mati" || args === "0") nxtSafe = false;
+          TatapSafeMode.setEnabled(nxtSafe);
+          if(window.TatapSfx) TatapSfx.play("select");
+          var smLabel = nxtSafe ? "Aktif (Filter Dewasa)" : "Nonaktif (Semua Konten Non-Hentai)";
+          log("mode aman: " + smLabel, "ok");
+          toast("Mode Aman: " + smLabel, 1600);
+          loadView();
+        }
+        break;
       case "riwayat":case "history":
         if(args === "hapus" || args === "clear" || args === "delete"){
           try{
@@ -1360,6 +1495,9 @@ var Tui = (function () {
           }
         }
         break;
+      case "substyle":case "styler":case "subgaya":
+        if(window.openSubStyleModal) window.openSubStyleModal();
+        break;
       case "bantuan":case "help":case "?":
         $("help-overlay").classList.remove("hidden");
         $("help-body").textContent=cmdUsage();
@@ -1386,7 +1524,23 @@ var Tui = (function () {
   function onKey(e){
     var t=(e.target.tagName||"");
     var typing = t==="INPUT"||t==="SELECT"||t==="TEXTAREA";
+    if((e.metaKey || e.ctrlKey) && (e.key === "k" || e.key === "K")){
+      e.preventDefault();
+      if(typeof App !== "undefined"){
+        var sm = $("spotlight-modal");
+        if(sm && !sm.classList.contains("hidden")) App.closeSpotlight();
+        else App.openSpotlight();
+      }
+      return;
+    }
     if(e.key==="Escape"){
+      var sm = $("spotlight-modal");
+      if(sm && !sm.classList.contains("hidden")){
+        e.preventDefault();
+        if(typeof App !== "undefined" && App.closeSpotlight) App.closeSpotlight();
+        else sm.classList.add("hidden");
+        return;
+      }
       if(isModalOpen()){App.onKeyPlayer(e);return;}
       if(typing){$("cmd").blur();S.promptFoc=false;return;}
       if(S.sel>=0){S.sel=-1;renderSel();return;}
@@ -1401,32 +1555,150 @@ var Tui = (function () {
     if(isModalOpen()){App.onKeyPlayer(e);return;}
     if(e.key==="/"){e.preventDefault();focusPrompt();return;}
     if(typing){return;}
-    if(e.key==="Tab"){e.preventDefault();cycleView(e.shiftKey ? -1 : 1);return;}
+    lockKbNav();
 
-    var isTxt = S.view==="cari" || S.view==="terbaru";
-    var cols = isTxt ? 1 : getGridCols();
+    var isInteractiveTarget = e.target && (
+      e.target.tagName === "BUTTON" ||
+      e.target.tagName === "A" ||
+      e.target.tagName === "SELECT" ||
+      e.target.getAttribute("role") === "button" ||
+      (e.target.closest && (e.target.closest(".app-sidebar") || e.target.closest(".bottom-bar") || e.target.closest(".pager") || e.target.closest(".cf-sheet") || e.target.closest(".genre-sheet")))
+    );
+    var isCatalogCard = e.target && e.target.classList && (e.target.classList.contains("poster-card") || e.target.classList.contains("trow"));
+
+    // Quick View Switching via Number Keys 1 - 6
+    if(!e.ctrlKey && !e.metaKey && !e.altKey && e.key >= "1" && e.key <= "6"){
+      var viewMap = {"1":"katalog", "2":"musim", "3":"terbaru", "4":"lanjutan", "5":"riwayat", "6":"favorit"};
+      if(viewMap[e.key]){
+        e.preventDefault();
+        setView(viewMap[e.key]);
+        return;
+      }
+    }
+
+    if(e.key==="Tab"){
+      if(isInteractiveTarget && !isCatalogCard){
+        // Biarkan Tab menavigasi antar elemen sidebar / statusbar secara wajar
+        return;
+      }
+      e.preventDefault();
+      cycleView(e.shiftKey ? -1 : 1);
+      return;
+    }
+
+    var isTxt = false;
+    var cols = getGridCols();
+
+    // Grid Navigation Accelerators: Home, End, PageUp, PageDown
+    if(e.key==="Home"){
+      if(S.items.length){
+        e.preventDefault();
+        var firstValid = 0;
+        while(firstValid < S.items.length && S.items[firstValid] && S.items[firstValid].is_header) firstValid++;
+        S.sel = (firstValid < S.items.length) ? firstValid : 0;
+        renderSel();
+      }
+      return;
+    }
+    if(e.key==="End"){
+      if(S.items.length){
+        e.preventDefault();
+        var lastValid = S.items.length - 1;
+        while(lastValid >= 0 && S.items[lastValid] && S.items[lastValid].is_header) lastValid--;
+        S.sel = (lastValid >= 0) ? lastValid : (S.items.length - 1);
+        renderSel();
+      }
+      return;
+    }
+    if(e.key==="PageDown"){
+      if(S.items.length){ e.preventDefault(); moveSel(cols * 2); }
+      return;
+    }
+    if(e.key==="PageUp"){
+      if(S.items.length){ e.preventDefault(); moveSel(-cols * 2); }
+      return;
+    }
 
     if(e.key==="ArrowRight"){
+      if(isInteractiveTarget && !isCatalogCard) return;
       e.preventDefault();
-      if(S.items.length){moveSel(1);}
+      if(S.items.length){
+        var box = $("results");
+        var curCard = (box && S.sel >= 0) ? box.querySelector('.poster-card[data-idx="' + S.sel + '"]') : null;
+        var useTvSpatial = window.TvNavigationManager && window.TvNavigationManager.isTvMode && window.TvNavigationManager.isTvMode();
+        var rightTarget = null;
+        if(useTvSpatial && curCard && window.TvNavigationManager && window.TvNavigationManager.getSpatialTarget){
+          var allCards = Array.prototype.slice.call(box.querySelectorAll(".poster-card"));
+          rightTarget = window.TvNavigationManager.getSpatialTarget(curCard, allCards, "right");
+        } else {
+          var geoRight = spatialTarget(S.sel, "right");
+          if(geoRight) rightTarget = box ? box.querySelector('.poster-card[data-idx="' + geoRight.idx + '"]') : null;
+        }
+        if(rightTarget){
+          var rIdx = parseInt(rightTarget.getAttribute("data-idx"), 10);
+          if(!isNaN(rIdx) && S.items[rIdx] && !S.items[rIdx].is_header){
+            S.sel = rIdx;
+            renderSel();
+            return;
+          }
+        }
+        moveSel(1);
+      }
       return;
     }
     if(e.key==="ArrowLeft"){
-      e.preventDefault();
-      if(S.items.length){moveSel(-1);}
+      if(isInteractiveTarget && !isCatalogCard) return;
+      if(S.items.length){
+        var isLeftEdge = false;
+        var box = $("results");
+        var curCard = (box && S.sel >= 0) ? box.querySelector('.poster-card[data-idx="' + S.sel + '"]') : null;
+        var useTvSpatial = window.TvNavigationManager && window.TvNavigationManager.isTvMode && window.TvNavigationManager.isTvMode();
+        var leftTarget = null;
+        if(useTvSpatial && curCard && window.TvNavigationManager && window.TvNavigationManager.getSpatialTarget){
+          var allCards = Array.prototype.slice.call(box.querySelectorAll(".poster-card"));
+          leftTarget = window.TvNavigationManager.getSpatialTarget(curCard, allCards, "left");
+          if(!leftTarget) isLeftEdge = true;
+        } else {
+          // Cache geometri (tanpa rect read)
+          var geoLeft = spatialTarget(S.sel, "left");
+          if(geoLeft) leftTarget = box ? box.querySelector('.poster-card[data-idx="' + geoLeft.idx + '"]') : null;
+          else isLeftEdge = true;
+        }
+        if(isLeftEdge){
+          e.preventDefault();
+          var actSb = document.querySelector(".sidebar-nav-item.active") || document.querySelector(".sidebar-nav-item");
+          if(actSb){ blurCards(); actSb.focus(); return; }
+        } else if(leftTarget){
+          e.preventDefault();
+          var lIdx = parseInt(leftTarget.getAttribute("data-idx"), 10);
+          if(!isNaN(lIdx) && S.items[lIdx] && !S.items[lIdx].is_header){
+            S.sel = lIdx;
+            renderSel();
+            return;
+          }
+        }
+        e.preventDefault();
+        moveSel(-1);
+      }
       return;
     }
     if(e.key==="ArrowDown"){
+      if(isInteractiveTarget && !isCatalogCard) return;
       e.preventDefault();
       if(!S.items.length){cmdHistory(1);}else{moveSel(cols);}
       return;
     }
     if(e.key==="ArrowUp"){
+      if(isInteractiveTarget && !isCatalogCard) return;
       e.preventDefault();
       if(!S.items.length){cmdHistory(-1);}else{moveSel(-cols);}
       return;
     }
     if(e.key==="Enter"){
+      if(isInteractiveTarget && !isCatalogCard){
+        // Biarkan aksi klik asli browser pada tombol fokus berjalan
+        return;
+      }
       e.preventDefault();
       if(S.sel>=0){
         openSelected();
@@ -1438,6 +1710,10 @@ var Tui = (function () {
       return;
     }
     if(e.key===" "){
+      if(isInteractiveTarget && !isCatalogCard){
+        // Biarkan tombol fokus (misal toggle tema atau paginasi) tertekan normal
+        return;
+      }
       if(S.sel>=0){
         e.preventDefault();
         openSelected();
@@ -1446,17 +1722,25 @@ var Tui = (function () {
     }
     if(e.key==="["||e.key===","){e.preventDefault();pagePrev();return;}
     if(e.key==="]"||e.key==="."){e.preventDefault();pageNext();return;}
+    if(isInteractiveTarget && !isCatalogCard) return;
     if(!typing&&e.key.length===1&&!e.ctrlKey&&!e.metaKey){focusPrompt();}
   }
 
   function focusPrompt(){
     S.promptFoc=true;
-    var inp=$("cmd");inp.focus();
+    if(typeof App !== "undefined" && App.openSpotlight){
+      App.openSpotlight();
+    } else {
+      var inp=$("cmd");if(inp) inp.focus();
+    }
   }
   function submitPrompt(){
     var inp=$("cmd");var raw=inp.value.trim();
     if(!raw)return;
     log("tatap$ "+raw);
+    if(typeof App !== "undefined" && App.closeSpotlight){
+      App.closeSpotlight();
+    }
     if(raw.indexOf(":")===0){
       inp.value="";
       updateSearchClearBtn();
@@ -1596,9 +1880,37 @@ var Tui = (function () {
   function boot(){
     var inp=$("cmd");
     inp.addEventListener("keydown",function(e){
-      e.stopPropagation();
-      if(e.key==="Enter"){e.preventDefault();_hPos=loadCmdHist().length;submitPrompt();}
-      else if(e.key==="Escape"){inp.blur();S.promptFoc=false;}
+      var sm = $("spotlight-modal");
+      var isSpotlight = sm && !sm.classList.contains("hidden");
+
+      if(e.key==="Enter"){
+        e.stopPropagation();
+        e.preventDefault();
+        _hPos=loadCmdHist().length;
+        submitPrompt();
+      }
+      else if(e.key==="Escape"){
+        e.stopPropagation();
+        e.preventDefault();
+        if(isSpotlight && typeof App !== "undefined" && App.closeSpotlight){
+          App.closeSpotlight();
+        } else {
+          inp.blur();
+          S.promptFoc=false;
+        }
+      }
+      else if(isSpotlight && e.key==="Tab"){
+        e.stopPropagation();
+        e.preventDefault();
+        if(typeof App !== "undefined" && App.trapSpotlightFocus){
+          App.trapSpotlightFocus(e.shiftKey);
+        }
+      }
+      else if(isSpotlight && (e.key==="ArrowDown" || e.key==="ArrowUp")){
+        e.stopPropagation();
+        e.preventDefault();
+        cmdHistory(e.key==="ArrowDown" ? 1 : -1);
+      }
       else if(e.key==="ArrowDown"){
         if(S.items.length){
           e.preventDefault();
@@ -1619,7 +1931,11 @@ var Tui = (function () {
           e.preventDefault();cmdHistory(-1);
         }
       }
-      else if(e.key==="Tab"){e.preventDefault();cycleView(e.shiftKey ? -1 : 1);}
+      else if(!isSpotlight && e.key==="Tab"){
+        e.stopPropagation();
+        e.preventDefault();
+        cycleView(e.shiftKey ? -1 : 1);
+      }
     });
     inp.addEventListener("focus",onPromptFocus);
     inp.addEventListener("blur",onPromptBlur);
@@ -1628,6 +1944,10 @@ var Tui = (function () {
       if(inp.value.indexOf(":")===0){/* could show command hints */}
     });
     document.addEventListener("keydown",onKey);
+
+    // Modality pin: modus mouse kembali hanya saat cursor fisik bergerak / diklik.
+    document.addEventListener("mousemove",unlockKbNav,{passive:true});
+    document.addEventListener("mousedown",unlockKbNav,{passive:true});
 
     var clearBtn = $("search-clear-btn");
     if(clearBtn){
@@ -1754,7 +2074,30 @@ var Tui = (function () {
     $("help-overlay").addEventListener("click",function(e){if(e.target===$("help-overlay"))$("help-overlay").classList.add("hidden");});
     // Genre modal listeners
     $("genre-close").addEventListener("click",closeGenreModal);
-    $("genre-modal").addEventListener("click",function(e){if(e.target===$("genre-modal"))closeGenreModal();});
+    var genreModalEl = $("genre-modal");
+    if(genreModalEl){
+      genreModalEl.addEventListener("click",function(e){if(e.target===genreModalEl)closeGenreModal();});
+      genreModalEl.addEventListener("keydown", function(e){
+        if(e.key === "Escape"){
+          e.preventDefault();
+          e.stopPropagation();
+          closeGenreModal();
+        } else if(e.key === "Tab"){
+          var focusables = Array.prototype.slice.call(genreModalEl.querySelectorAll("input:not([disabled]), button:not([disabled])")).filter(function(el){ return el.offsetParent !== null; });
+          if(focusables.length > 0){
+            e.preventDefault();
+            var idx = focusables.indexOf(document.activeElement);
+            if(e.shiftKey){
+              var prevIdx = (idx <= 0) ? (focusables.length - 1) : (idx - 1);
+              focusables[prevIdx].focus();
+            } else {
+              var nextIdx = (idx < 0 || idx >= focusables.length - 1) ? 0 : (idx + 1);
+              focusables[nextIdx].focus();
+            }
+          }
+        }
+      });
+    }
     var btnGenreReset = $("genre-reset-btn");
     if(btnGenreReset){
       btnGenreReset.addEventListener("click", function(){
@@ -1778,9 +2121,41 @@ var Tui = (function () {
           e.preventDefault();
           var firstBtn = $("genre-list").querySelector("button");
           if(firstBtn) firstBtn.click();
+        } else if(e.key === "ArrowDown"){
+          e.preventDefault();
+          var firstBtn = $("genre-list").querySelector("button");
+          if(firstBtn) firstBtn.focus();
         } else if(e.key === "Escape"){
           e.preventDefault();
           closeGenreModal();
+        }
+      });
+    }
+
+    var genreListEl = $("genre-list");
+    if(genreListEl){
+      genreListEl.addEventListener("keydown", function(e){
+        var btns = Array.prototype.slice.call(genreListEl.querySelectorAll("button"));
+        var idx = btns.indexOf(document.activeElement);
+        if(idx < 0) return;
+        if(e.key === "ArrowRight"){
+          e.preventDefault();
+          btns[(idx + 1) % btns.length].focus();
+        } else if(e.key === "ArrowLeft"){
+          e.preventDefault();
+          btns[(idx - 1 + btns.length) % btns.length].focus();
+        } else if(e.key === "ArrowDown"){
+          e.preventDefault();
+          var nextIdx = Math.min(idx + 3, btns.length - 1);
+          btns[nextIdx].focus();
+        } else if(e.key === "ArrowUp"){
+          e.preventDefault();
+          if(idx <= 2){
+            var gInp = $("genre-search");
+            if(gInp) gInp.focus();
+          } else {
+            btns[Math.max(0, idx - 3)].focus();
+          }
         }
       });
     }
@@ -1789,7 +2164,44 @@ var Tui = (function () {
     var cfClose = $("cf-close");
     if(cfClose) cfClose.addEventListener("click", closeCatalogFilterModal);
     var cfModal = $("catalog-filter-modal");
-    if(cfModal) cfModal.addEventListener("click", function(e){ if(e.target === cfModal) closeCatalogFilterModal(); });
+    if(cfModal){
+      cfModal.addEventListener("click", function(e){ if(e.target === cfModal) closeCatalogFilterModal(); });
+      cfModal.addEventListener("keydown", function(e){
+        if(e.key === "Escape"){
+          e.preventDefault();
+          e.stopPropagation();
+          closeCatalogFilterModal();
+        } else if(e.key === "Tab"){
+          var focusables = Array.prototype.slice.call(cfModal.querySelectorAll("button:not([disabled]), .cf-chip, [tabindex='0']")).filter(function(el){ return el.offsetParent !== null; });
+          if(focusables.length > 0){
+            e.preventDefault();
+            var idx = focusables.indexOf(document.activeElement);
+            if(e.shiftKey){
+              var prevIdx = (idx <= 0) ? (focusables.length - 1) : (idx - 1);
+              focusables[prevIdx].focus();
+            } else {
+              var nextIdx = (idx < 0 || idx >= focusables.length - 1) ? 0 : (idx + 1);
+              focusables[nextIdx].focus();
+            }
+          }
+        } else if(e.key === "Enter" && e.target && !e.target.closest("#cf-reset-btn") && !e.target.closest("#cf-close") && !e.target.closest("#cf-btn-pick-genre")){
+          e.preventDefault();
+          var cfApply = $("cf-apply-btn");
+          if(cfApply) cfApply.click();
+        } else if(e.key === "ArrowRight" || e.key === "ArrowLeft"){
+          if(e.target && e.target.classList && e.target.classList.contains("cf-chip")){
+            e.preventDefault();
+            var parent = e.target.closest(".cf-chips");
+            if(!parent) return;
+            var chips = Array.prototype.slice.call(parent.querySelectorAll(".cf-chip"));
+            var idx = chips.indexOf(e.target);
+            var nextIdx = e.key === "ArrowRight" ? ((idx + 1) % chips.length) : ((idx - 1 + chips.length) % chips.length);
+            chips[nextIdx].click();
+            chips[nextIdx].focus();
+          }
+        }
+      });
+    }
     document.querySelectorAll("#catalog-filter-modal .cf-chip").forEach(function(chip){
       chip.addEventListener("click", function(){
         var parent = chip.closest(".cf-chips");
@@ -1869,5 +2281,5 @@ var Tui = (function () {
     setView("katalog");
   }
 
-  return {boot:boot,log:log,clearLog:clearLog,setView:setView,loadView:loadView,moveSel:moveSel,renderSel:renderSel,openSelected:openSelected,startSearch:startSearch,doSearch:doSearch,renderResults:renderResults,renderPager:renderPager,renderRecents:renderRecents,cmdUsage:cmdUsage,openGenreModal:openGenreModal,closeGenreModal:closeGenreModal,openCatalogFilterModal:openCatalogFilterModal,closeCatalogFilterModal:closeCatalogFilterModal,getGridCols:getGridCols,applyGenreFilter:function(genreOrSlug){applyGenreFilter(slugifyGenre(genreOrSlug));},slugifyGenre:slugifyGenre,view:function(){return S.view;},state:function(){return S;},updateSearchClearBtn:updateSearchClearBtn};
+  return {boot:boot,log:log,clearLog:clearLog,setView:setView,loadView:loadView,moveSel:moveSel,renderSel:renderSel,blurCards:blurCards,openSelected:openSelected,startSearch:startSearch,doSearch:doSearch,renderResults:renderResults,renderPager:renderPager,renderRecents:renderRecents,cmdUsage:cmdUsage,openGenreModal:openGenreModal,closeGenreModal:closeGenreModal,openCatalogFilterModal:openCatalogFilterModal,closeCatalogFilterModal:closeCatalogFilterModal,getGridCols:getGridCols,applyGenreFilter:function(genreOrSlug){applyGenreFilter(slugifyGenre(genreOrSlug));},slugifyGenre:slugifyGenre,view:function(){return S.view;},state:function(){return S;},updateSearchClearBtn:updateSearchClearBtn,pageNext:pageNext,pagePrev:pagePrev,cycleView:cycleView};
 })();

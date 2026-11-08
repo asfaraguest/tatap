@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tatap — Memulai Aplikasi</title>
+  <style>
+    :root {
+      --bg: #070a10;
+      --card-bg: rgba(13, 19, 31, 0.95);
+      --border: rgba(56, 189, 248, 0.22);
+      --accent: #38bdf8;
+      --text: #f8fafc;
+      --text-dim: #94a3b8;
+      --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+    }
+    body {
+      background: radial-gradient(circle at 50% 30%, #0e1726 0%, var(--bg) 70%);
+      color: var(--text);
+      font-family: var(--font);
+      height: 100vh;
+      width: 100vw;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      margin: 0;
+    }
+    .boot-container {
+      width: min(440px, 90vw);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      padding: 36px 28px;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      box-shadow: 0 24px 64px rgba(0, 0, 0, 0.75), 0 0 35px rgba(56, 189, 248, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+      animation: fadeIn 0.3s ease-out;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(8px) scale(0.98); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    .logo-wrapper {
+      position: relative;
+      width: 76px;
+      height: 76px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 20px;
+    }
+    .logo-pulse {
+      position: absolute;
+      inset: -10px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(56, 189, 248, 0.35) 0%, rgba(56, 189, 248, 0) 70%);
+      animation: pulseGlow 2s infinite ease-in-out;
+    }
+    @keyframes pulseGlow {
+      0%, 100% { transform: scale(0.9); opacity: 0.6; }
+      50% { transform: scale(1.15); opacity: 1; }
+    }
+    .brand-svg {
+      width: 58px;
+      height: 58px;
+      color: var(--accent);
+      filter: drop-shadow(0 0 12px rgba(56, 189, 248, 0.65));
+      position: relative;
+      z-index: 2;
+    }
+    .app-title {
+      font-size: 24px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      margin-bottom: 6px;
+      background: linear-gradient(135deg, #ffffff 40%, var(--accent) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .app-tagline {
+      font-size: 13px;
+      color: var(--text-dim);
+      margin-bottom: 26px;
+      font-weight: 500;
+    }
+    .progress-bar-wrap {
+      width: 100%;
+      height: 5px;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 999px;
+      overflow: hidden;
+      position: relative;
+      margin-bottom: 16px;
+    }
+    .progress-bar-fill {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 0;
+      width: 35%;
+      background: linear-gradient(90deg, transparent, var(--accent), #38bdf8);
+      border-radius: 999px;
+      animation: progressSweep 1.4s infinite ease-in-out;
+      box-shadow: 0 0 10px var(--accent);
+    }
+    @keyframes progressSweep {
+      0% { left: -35%; width: 35%; }
+      50% { width: 55%; }
+      100% { left: 100%; width: 35%; }
+    }
+    .status-text {
+      font-size: 13px;
+      color: var(--accent);
+      font-weight: 600;
+      min-height: 20px;
+      margin-bottom: 4px;
+    }
+    .sub-status {
+      font-size: 11.5px;
+      color: var(--text-dim);
+      min-height: 18px;
+    }
+    .error-actions {
+      display: none;
+      gap: 10px;
+      margin-top: 20px;
+      width: 100%;
+    }
+    .btn {
+      flex: 1;
+      padding: 9px 14px;
+      border-radius: 8px;
+      font-size: 12.5px;
+      font-weight: 600;
+      cursor: pointer;
+      text-decoration: none;
+      transition: all 0.15s ease;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-family: inherit;
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, #38bdf8 0%, #0284c7 100%);
+      color: #04101c;
+      border: 1px solid rgba(255, 255, 255, 0.35);
+      box-shadow: 0 4px 16px rgba(56, 189, 248, 0.35);
+    }
+    .btn-primary:hover {
+      filter: brightness(1.1);
+      transform: translateY(-1px);
+    }
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      color: var(--text);
+    }
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.14);
+      border-color: var(--accent);
+      transform: translateY(-1px);
+    }
+  </style>
+</head>
+<body>
+  <div class="boot-container">
+    <div class="logo-wrapper">
+      <div class="logo-pulse"></div>
+      <svg class="brand-svg" viewBox="0 0 24 24" fill="none">
+        <path d="M2 12C4.5 6.5 8 4 12 4s7.5 2.5 10 8c-2.5 5.5-6 8-10 8s-7.5-2.5-10-8z" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+        <circle cx="12" cy="12" r="3.5" fill="currentColor"/>
+      </svg>
+    </div>
+
+    <h1 class="app-title">Tatap Anime</h1>
+    <p class="app-tagline">Nonton Santai di Server Lokal</p>
+
+    <div class="progress-bar-wrap">
+      <div class="progress-bar-fill" id="progress-bar"></div>
+    </div>
+
+    <div class="status-text" id="status-text">Memulai Server Lokal...</div>
+    <div class="sub-status" id="sub-status">Menghubungkan ke 127.0.0.1:8767</div>
+
+    <div class="error-actions" id="error-actions">
+      <button type="button" class="btn btn-secondary" onclick="location.reload()">Coba Lagi</button>
+      <a href="http://127.0.0.1:8767" class="btn btn-primary">Buka Langsung</a>
+    </div>
+  </div>
+
+  <script>
+    (function(){
+      var targetUrl = "http://127.0.0.1:8767";
+      var pingUrl = targetUrl + "/api/ping";
+      var statusEl = document.getElementById("status-text");
+      var subEl = document.getElementById("sub-status");
+      var errActions = document.getElementById("error-actions");
+      var progressBar = document.getElementById("progress-bar");
+      var attempts = 0;
+      var maxAttempts = 80; // ~16 seconds (80 * 200ms)
+      var pollTimer = null;
+      var isReady = false;
+
+      function onServerReady() {
+        if (isReady) return;
+        isReady = true;
+        if (pollTimer) clearInterval(pollTimer);
+        statusEl.textContent = "Server Siap! Membuka Tatap...";
+        statusEl.style.color = "#4ade80";
+        subEl.textContent = "Mengalihkan ke pemutar...";
+        if (progressBar) {
+          progressBar.style.animation = "none";
+          progressBar.style.width = "100%";
+          progressBar.style.background = "#4ade80";
+        }
+        setTimeout(function(){
+          window.location.replace(targetUrl);
+        }, 120);
+      }
+
+      function checkPing() {
+        attempts++;
+        if (isReady) return;
+
+        // Coba via fetch dengan timeout pendek
+        var controller = window.AbortController ? new AbortController() : null;
+        var timeoutId = controller ? setTimeout(function(){ controller.abort(); }, 700) : null;
+
+        fetch(pingUrl, {
+          method: "GET",
+          mode: "cors",
+          cache: "no-store",
+          signal: controller ? controller.signal : undefined
+        }).then(function(res){
+          if (timeoutId) clearTimeout(timeoutId);
+          if (res.ok) {
+            onServerReady();
+          }
+        }).catch(function(){
+          if (timeoutId) clearTimeout(timeoutId);
+          // Fallback via Image probe jika browser membatasi CORS dari file://
+          var img = new Image();
+          img.onload = function(){ onServerReady(); };
+          img.onerror = function(){
+            // Jika status 404 tapi ada respons server, server sebenarnya hidup
+            if (img.width > 0 || img.height > 0) onServerReady();
+          };
+          img.src = targetUrl + "/favicon.ico?" + Date.now();
+        });
+
+        if (attempts >= maxAttempts && !isReady) {
+          if (pollTimer) clearInterval(pollTimer);
+          statusEl.textContent = "Backend Membutuhkan Waktu Lebih Lama";
+          statusEl.style.color = "#f87171";
+          subEl.textContent = "Server di 127.0.0.1:8767 belum merespons.";
+          if (errActions) errActions.style.display = "flex";
+        }
+      }
+
+      pollTimer = setInterval(checkPing, 200);
+      checkPing();
+    })();
+  </script>
+</body>
+</html>

@@ -10,7 +10,10 @@ from database import init_db
 @pytest.mark.asyncio
 async def test_episodes_caching(monkeypatch):
     await init_db()
-    await main.set_browse_cache("episodes_v1|test-long-anime-99999", None)
+    from database import _write_db
+    async with _write_db() as db:
+        await db.execute("DELETE FROM browse_cache WHERE key LIKE '%test-long-anime-99999%'")
+        await db.commit()
     # Mock hianime_episodes untuk kecepatan unit test offline yang konsisten
     fake_eps = [{"ep": i, "ep_id": str(i)} for i in range(1, 1101)]
     monkeypatch.setattr(main.hi, "hianime_episodes", lambda slug: fake_eps)

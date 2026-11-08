@@ -9,7 +9,7 @@
     document.documentElement.setAttribute("data-theme", t);
   })();
 </script>
-<link rel="stylesheet" href="/css/style.css?v=2.12.7">
+<link rel="stylesheet" href="/css/style.css?v=2.12.7.16">
 <link rel="icon" type="image/x-icon" href="/favicon.ico">
 <link rel="icon" type="image/png" sizes="192x192" href="/assets/icon-192.png">
 <link rel="apple-touch-icon" href="/assets/icon-512.png">
@@ -21,6 +21,24 @@
     <symbol id="icon-brand-mark" viewBox="0 0 24 24">
       <path d="M2 12C4.5 6.5 8 4 12 4s7.5 2.5 10 8c-2.5 5.5-6 8-10 8s-7.5-2.5-10-8z" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
       <circle cx="12" cy="12" r="3.5" fill="currentColor"/>
+    </symbol>
+    <!-- Grid / Catalog / Layout -->
+    <symbol id="icon-grid" viewBox="0 0 24 24">
+      <rect x="3" y="3" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="2" fill="none"/>
+      <rect x="14" y="3" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="2" fill="none"/>
+      <rect x="14" y="14" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="2" fill="none"/>
+      <rect x="3" y="14" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="2" fill="none"/>
+    </symbol>
+    <!-- Calendar / Season -->
+    <symbol id="icon-calendar" viewBox="0 0 24 24">
+      <rect x="3" y="4" width="18" height="18" rx="2" stroke="currentColor" stroke-width="2" fill="none"/>
+      <line x1="16" y1="2" x2="16" y2="6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      <line x1="8" y1="2" x2="8" y2="6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      <line x1="3" y1="10" x2="21" y2="10" stroke="currentColor" stroke-width="2"/>
+    </symbol>
+    <!-- Zap / Lightning / Latest Episodes -->
+    <symbol id="icon-zap" viewBox="0 0 24 24">
+      <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
     </symbol>
     <!-- Menu: 3 sleek horizontal bars -->
     <symbol id="icon-menu" viewBox="0 0 24 24">
@@ -101,6 +119,11 @@
     <!-- Prev / Chevron left -->
     <symbol id="icon-prev" viewBox="0 0 24 24">
       <polyline points="15 18 9 12 15 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+    </symbol>
+    <!-- Arrow Left / Kembali -->
+    <symbol id="icon-arrow-left" viewBox="0 0 24 24">
+      <line x1="19" y1="12" x2="5" y2="12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      <polyline points="12 19 5 12 12 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
     </symbol>
     <!-- Next / Chevron right -->
     <symbol id="icon-next" viewBox="0 0 24 24">
@@ -231,6 +254,31 @@
       <line x1="16" y1="16.5" x2="19" y2="18.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
       <line x1="19" y1="16.5" x2="16" y2="18.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
     </symbol>
+    <!-- Checkmark (Success) -->
+    <symbol id="icon-check" viewBox="0 0 24 24">
+      <polyline points="20 6 9 17 4 12" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+    </symbol>
+    <!-- Info (Information) -->
+    <symbol id="icon-info" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" fill="none"/>
+      <line x1="12" y1="16" x2="12" y2="12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      <line x1="12" y1="8" x2="12.01" y2="8" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+    </symbol>
+    <!-- Alert (Warning / Error) -->
+    <symbol id="icon-alert" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" fill="none"/>
+      <line x1="12" y1="8" x2="12" y2="12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      <line x1="12" y1="16" x2="12.01" y2="16" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+    </symbol>
+    <!-- Hourglass (Waiting / Processing) -->
+    <symbol id="icon-hourglass" viewBox="0 0 24 24">
+      <path d="M5 22h14M5 2h14m-2 20v-5l-5-5-5 5v5m10-20v5l-5 5-5-5V2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+    </symbol>
+    <!-- Shield Check (Safe Mode) -->
+    <symbol id="icon-shield-check" viewBox="0 0 24 24">
+      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+      <path d="m9 12 2 2 4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+    </symbol>
   </defs>
 </svg>
 <div id="crt" aria-hidden="true"></div>
@@ -249,6 +297,19 @@
         <stop offset="0%" stop-color="var(--mac-wave-3)" />
         <stop offset="100%" stop-color="transparent" />
       </linearGradient>
+      <!-- macOS Matte Grain Texture Pattern -->
+      <pattern id="macTextureGrain" width="96" height="96" patternUnits="userSpaceOnUse">
+        <circle cx="12" cy="14" r="0.8" fill="var(--mac-contour-1)" opacity="0.4" />
+        <circle cx="38" cy="28" r="0.7" fill="var(--mac-contour-2)" opacity="0.35" />
+        <circle cx="68" cy="18" r="0.8" fill="var(--mac-contour-1)" opacity="0.35" />
+        <circle cx="86" cy="42" r="0.75" fill="var(--mac-contour-3)" opacity="0.3" />
+        <circle cx="24" cy="58" r="0.7" fill="var(--mac-contour-2)" opacity="0.4" />
+        <circle cx="54" cy="74" r="0.8" fill="var(--mac-contour-1)" opacity="0.35" />
+        <circle cx="82" cy="62" r="0.75" fill="var(--mac-contour-3)" opacity="0.35" />
+        <circle cx="16" cy="88" r="0.8" fill="var(--mac-contour-1)" opacity="0.3" />
+        <circle cx="48" cy="94" r="0.7" fill="var(--mac-contour-2)" opacity="0.4" />
+        <circle cx="88" cy="90" r="0.8" fill="var(--mac-contour-3)" opacity="0.35" />
+      </pattern>
     </defs>
     <!-- macOS Fluid Ribbon Waves -->
     <path d="M0 340 C 380 180, 720 540, 1160 360 C 1520 220, 1740 380, 1920 290 L 1920 1080 L 0 1080 Z" fill="url(#macWaveGrad1)" />
@@ -260,10 +321,113 @@
     <path d="M0 700 C 460 560, 840 900, 1340 660 C 1680 500, 1820 620, 1920 540" stroke="var(--mac-contour-2)" stroke-width="1.2" stroke-linecap="round" />
     <path d="M0 740 C 460 600, 840 940, 1340 700 C 1680 540, 1820 660, 1920 580" stroke="var(--mac-contour-2)" stroke-width="1" stroke-dasharray="5 5" opacity="0.6" />
     <path d="M0 220 C 220 140, 480 400, 880 280 C 1260 160, 1580 340, 1920 200" stroke="var(--mac-contour-3)" stroke-width="1" stroke-linecap="round" />
+    <!-- Fine Tactile Grain Overlay -->
+    <rect width="100%" height="100%" fill="url(#macTextureGrain)" />
   </svg>
 </div>
 
-<header class="tui-head">
+<div class="app-shell" id="app-shell">
+  <!-- FLUID COLLAPSIBLE / EXPANDABLE LEFT SIDEBAR -->
+  <aside class="app-sidebar" id="app-sidebar" aria-label="Navigasi Utama">
+    <!-- Header Brand & Collapse Toggle Button -->
+    <div class="sidebar-header">
+      <div class="sidebar-brand" id="sidebar-brand" title="Kembali ke Beranda (Katalog Anime)" role="button" tabindex="0" aria-label="Tatap Beranda">
+        <svg class="brand-logo-mark" viewBox="0 0 24 24" aria-hidden="true">
+          <use href="#icon-brand-mark"/>
+        </svg>
+        <div class="brand-text-wrap">
+          <span class="brand-name">TATAP</span>
+          <span class="brand-ver">v2.12.7</span>
+        </div>
+      </div>
+      <button type="button" class="sidebar-toggle-btn" id="btn-toggle-sidebar" title="Perkecil / Perluas Sidebar (⌘B)" aria-label="Toggle Sidebar">
+        <svg class="ui-icon sidebar-icon-collapse"><use href="#icon-prev"/></svg>
+        <svg class="ui-icon sidebar-icon-expand"><use href="#icon-next"/></svg>
+      </button>
+    </div>
+
+    <!-- Search Shortcut (Mac Spotlight Trigger) -->
+    <div class="sidebar-search-box">
+      <button type="button" class="sidebar-search-btn" id="sidebar-search-btn" title="Cari Anime &amp; Perintah (⌘K)">
+        <svg class="ui-icon"><use href="#icon-search"/></svg>
+        <span class="sidebar-search-label">Cari anime...</span>
+        <kbd class="sidebar-search-kbd">⌘K</kbd>
+      </button>
+    </div>
+
+    <!-- Scrollable Navigation and Utilities Menu -->
+    <div class="sidebar-scroll-area">
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">JELAJAH</div>
+        <div class="sidebar-nav-list" role="navigation" aria-label="Jelajah Anime">
+          <button class="sidebar-nav-item nav-tab-btn active" data-view="katalog" id="sidebar-tab-katalog" title="Katalog Anime">
+            <svg class="ui-icon"><use href="#icon-grid"/></svg>
+            <span class="sidebar-nav-label">Katalog</span>
+          </button>
+          <button class="sidebar-nav-item nav-tab-btn" data-view="musim" id="sidebar-tab-musim" title="Anime Musim Ini">
+            <svg class="ui-icon"><use href="#icon-calendar"/></svg>
+            <span class="sidebar-nav-label">Musim Ini</span>
+          </button>
+          <button class="sidebar-nav-item nav-tab-btn" data-view="terbaru" id="sidebar-tab-terbaru" title="Episode Terbaru">
+            <svg class="ui-icon"><use href="#icon-zap"/></svg>
+            <span class="sidebar-nav-label">Terbaru</span>
+          </button>
+          <button class="sidebar-nav-item nav-tab-btn" data-view="lanjutan" id="sidebar-tab-lanjutan" title="Anime Masih Tayang">
+            <svg class="ui-icon"><use href="#icon-circle-dot"/></svg>
+            <span class="sidebar-nav-label">Masih Tayang</span>
+          </button>
+          <button class="sidebar-nav-item nav-tab-btn" data-view="riwayat" id="sidebar-tab-riwayat" title="Riwayat Tontonan">
+            <svg class="ui-icon"><use href="#icon-clock"/></svg>
+            <span class="sidebar-nav-label">Riwayat</span>
+          </button>
+          <button class="sidebar-nav-item nav-tab-btn" data-view="favorit" id="sidebar-tab-favorit" title="Anime Favorit">
+            <svg class="ui-icon"><use href="#icon-star"/></svg>
+            <span class="sidebar-nav-label">Favorit</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="sidebar-divider" aria-hidden="true"></div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">KONTROL &amp; FILTER</div>
+        <div class="sidebar-nav-list">
+          <button class="sidebar-nav-item" id="sidebar-catalog-filter" title="Filter Status, Urutan, dan Tahun (:filter)">
+            <svg class="ui-icon"><use href="#icon-filter"/></svg>
+            <span class="sidebar-nav-label">Filter Katalog</span>
+          </button>
+          <button class="sidebar-nav-item" id="sidebar-genre-filter" title="Filter Berdasarkan Genre (:genre)">
+            <svg class="ui-icon"><use href="#icon-tag"/></svg>
+            <span class="sidebar-nav-label">Filter Genre</span>
+          </button>
+          <button class="sidebar-nav-item" id="sidebar-switch-source" title="Ganti Sumber Provider Stream (:switch)">
+            <svg class="ui-icon"><use href="#icon-switch"/></svg>
+            <span class="sidebar-nav-label">Sumber: <b id="sidebar-src-val">HiAnime</b></span>
+          </button>
+          <button class="sidebar-nav-item" id="sidebar-ai-fansub" title="Pengaturan AI Fansub BYOK LLM (:ai)">
+            <svg class="ui-icon"><use href="#icon-cpu"/></svg>
+            <span class="sidebar-nav-label">AI Fansub</span>
+          </button>
+          <button class="sidebar-nav-item" id="sidebar-toggle-theme" title="Ganti Mode Gelap / Terang (:tema)">
+            <svg class="ui-icon" id="sidebar-theme-icon"><use href="#icon-sun"/></svg>
+            <span class="sidebar-nav-label" id="sidebar-theme-label">Mode Terang</span>
+          </button>
+          <button class="sidebar-nav-item" id="sidebar-update" title="Periksa Pembaruan Aplikasi (:update)">
+            <svg class="ui-icon"><use href="#icon-update"/></svg>
+            <span class="sidebar-nav-label">Cek Update</span>
+          </button>
+          <button class="sidebar-nav-item" id="sidebar-help" title="Daftar Perintah Terminal &amp; Shortcut (:bantuan)">
+            <svg class="ui-icon"><use href="#icon-help"/></svg>
+            <span class="sidebar-nav-label">Bantuan</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN APP CONTAINER -->
+  <div class="app-main-layout" id="app-main-layout">
+    <header class="tui-head">
   <div class="head-brand" id="head-brand" title="Kembali ke Beranda (Katalog Anime)" role="button" tabindex="0" aria-label="Tatap Beranda">
     <svg class="brand-logo-mark" viewBox="0 0 24 24" aria-hidden="true">
       <use href="#icon-brand-mark"/>
@@ -300,6 +464,11 @@
       <span class="popover-item-label">Filter Genre</span>
       <span class="popover-shortcut">⌘G</span>
     </button>
+    <button class="popover-item" id="pop-toggle-safemode" role="menuitem" tabindex="0">
+      <svg class="ui-icon"><use href="#icon-shield-check"/></svg>
+      <span class="popover-item-label">Mode Aman (Dewasa)</span>
+      <span class="popover-value" id="pop-safemode-badge">Aktif</span>
+    </button>
   </div>
   <div class="popover-divider"></div>
   <div class="popover-section">
@@ -312,11 +481,21 @@
   </div>
   <div class="popover-divider"></div>
   <div class="popover-section">
-    <div class="popover-section-label">TAMPILAN</div>
+    <div class="popover-section-label">TAMPILAN &amp; SUARA</div>
     <button class="popover-item" id="pop-toggle-theme" role="menuitem" tabindex="0">
       <svg class="ui-icon" id="pop-theme-icon"><use href="#icon-sun"/></svg>
       <span class="popover-item-label" id="pop-theme-label">Mode Terang</span>
       <span class="popover-shortcut">⌘T</span>
+    </button>
+    <button class="popover-item" id="pop-toggle-sfx" role="menuitem" tabindex="0">
+      <svg class="ui-icon" id="pop-sfx-icon"><use href="#icon-volume-high"/></svg>
+      <span class="popover-item-label">Efek Suara UI (PS5)</span>
+      <span class="popover-value" id="pop-sfx-badge">Aktif</span>
+    </button>
+    <button class="popover-item" id="pop-sub-style" role="menuitem" tabindex="0">
+      <svg class="ui-icon"><use href="#icon-subtitles"/></svg>
+      <span class="popover-item-label">Gaya Subtitle (Styler)</span>
+      <span class="popover-shortcut">:styler</span>
     </button>
   </div>
   <div class="popover-divider"></div>
@@ -367,6 +546,117 @@
     <div id="empty-state" class="empty">
       <div class="empty-art"><svg class="ui-icon empty-icon" viewBox="0 0 24 24" style="width:36px;height:36px;color:var(--accent);opacity:0.85;"><use href="#icon-brand-mark"/></svg></div>
       <p>Ketik judul anime lalu tekan <b>Enter</b> atau <b>/</b> untuk mencari. <span class="dim">(:bantuan untuk daftar perintah)</span></p>
+    </div>
+  </section>
+
+  <!-- DEDICATED ANIME DETAIL PAGE -->
+  <section id="detail-page" class="detail-page hidden" role="region" aria-label="Detail Anime">
+    <!-- 1. Fullscreen Backdrop Cover Background -->
+    <div class="detail-hero-banner detail-page-bg" id="detail-hero-banner">
+      <img id="detail-banner-img" class="detail-banner-img hidden" alt="Cover Banner" loading="eager">
+      <div id="detail-banner-ambient" class="detail-banner-ambient" aria-hidden="true"></div>
+      <div class="detail-banner-overlay" aria-hidden="true"></div>
+    </div>
+
+    <!-- 3. Compact Main Layout (Screen-Fit Grid) -->
+    <div class="detail-stage-wrap">
+      <!-- Sticky Top Navigation Bar (Symmetrically aligned with detail grid) -->
+      <div class="detail-top-nav">
+        <button type="button" id="detail-btn-back" class="detail-btn-back" title="Kembali ke Katalog (Esc / Backspace)">
+          <svg class="ui-icon"><use href="#icon-arrow-left"/></svg> <span>Kembali</span>
+        </button>
+        <div class="detail-nav-breadcrumbs">
+          <span class="dim">KATALOG</span>
+          <span class="sep">/</span>
+          <span id="detail-nav-title" class="title-crumb">–</span>
+        </div>
+        <div class="detail-nav-actions">
+          <button type="button" class="icon-btn big detail-close-btn" id="tm-close" title="Kembali ke Katalog (Esc)"><svg class="ui-icon"><use href="#icon-close"/></svg></button>
+        </div>
+      </div>
+
+      <div class="detail-compact-grid">
+        <!-- Kolom Kiri: Poster Thumbnail, Meta, Hero Actions, Sinopsis -->
+        <div class="detail-info-panel">
+          <div class="detail-summary-header">
+            <div class="detail-poster-column">
+              <div class="detail-poster-card" id="detail-poster-card">
+                <img id="detail-poster-img" class="detail-poster-img" src="" alt="Poster" loading="eager">
+              </div>
+            </div>
+
+            <div class="detail-summary-text">
+              <div class="detail-eyebrow-row">
+                <span id="tm-eyebrow" class="eyebrow-tag">DETAIL ANIME</span>
+                <span id="tm-score" class="badge-score hidden">⭐ <b id="tm-score-val">--</b></span>
+                <span id="tm-status" class="badge-status hidden">TAMAT</span>
+                <span id="tm-info-line" class="detail-info-line dim small"></span>
+              </div>
+              <h1 id="tm-title" class="detail-main-title">–</h1>
+              <div id="tm-sub" class="detail-sub-title dim">–</div>
+            </div>
+          </div>
+
+          <!-- Hero Action Buttons (Full Width Melintang di Bawah Header) -->
+          <div class="detail-hero-actions">
+            <button type="button" id="btn-quick-play" class="btn-quick-play" title="Mulai tonton anime">
+              <svg class="ui-icon"><use href="#icon-play"/></svg> <span id="quick-play-label">Putar Sekarang</span>
+            </button>
+            <button type="button" id="tm-bookmark-btn" class="tm-bookmark-btn detail-action-btn" title="Simpan ke Favorit">
+              <svg class="ui-icon"><use href="#icon-star"/></svg> <span id="tm-bookmark-label">+ FAVORIT</span>
+            </button>
+            <button type="button" id="tm-source-btn" class="tm-source-badge detail-action-btn" title="Klik untuk beralih sumber stream">
+              SRC: HIANIME <svg class="ui-icon" style="margin-left:3px;"><use href="#icon-switch"/></svg>
+            </button>
+          </div>
+
+          <div class="detail-info-scrollable">
+            <!-- Detail Meta Box for Badges & Info -->
+            <div id="tm-detail-meta" class="detail-meta-box hidden"></div>
+
+            <!-- Genre Tags -->
+            <div id="tm-genres" class="detail-genres-row hidden"></div>
+
+            <!-- Synopsis Box -->
+            <div id="tm-synopsis-box" class="tm-synopsis-box hidden">
+              <div class="tm-synopsis-header">
+                <span class="tm-synopsis-label">SINOPSIS</span>
+              </div>
+              <p id="tm-synopsis" class="tm-synopsis-text clamped"></p>
+              <button type="button" id="tm-synopsis-toggle" class="tm-synopsis-toggle">Selengkapnya ▼</button>
+            </div>
+
+            <!-- Related Seasons / Franchises -->
+            <div id="tm-seasons" class="seasons-bar hidden">
+              <span class="seasons-label">SEASON / TERKAIT:</span>
+              <div id="tm-seasons-chips" class="seasons-chips"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Kolom Kanan: Dedicated Episodes Section -->
+        <div class="detail-episodes-section">
+          <div class="detail-episodes-head">
+            <div class="detail-episodes-title-wrap">
+              <h2 class="detail-episodes-title">DAFTAR EPISODE</h2>
+              <span id="tm-count" class="detail-episodes-count badge-counter">Memuat...</span>
+            </div>
+
+            <div class="sheet-controls detail-episodes-controls">
+              <div class="seg" id="mode-seg">
+                <button type="button" data-mode="sub" class="active">SUB</button><button type="button" data-mode="dub">DUB</button>
+              </div>
+              <div class="seg" id="quality-seg">
+                <button type="button" data-q="best" class="active">BEST</button><button type="button" data-q="1080p">1080p</button><button type="button" data-q="720p">720p</button><button type="button" data-q="480p">480p</button>
+              </div>
+              <input id="ep-filter" class="detail-ep-filter" placeholder="Cari episode… cth: 12" inputmode="numeric">
+            </div>
+          </div>
+
+          <div id="tm-ep-ranges" class="ep-ranges hidden"></div>
+          <div id="tm-eps" class="ep-grid detail-ep-grid"></div>
+        </div>
+      </div>
     </div>
   </section>
 </main>
@@ -450,14 +740,29 @@
           <span class="drawer-item-label">Daftar Perintah Terminal</span>
           <span class="drawer-item-badge">:bantuan</span>
         </button>
+        <button class="drawer-item" id="drawer-toggle-safemode">
+          <span class="drawer-item-icon"><svg class="ui-icon"><use href="#icon-shield-check"/></svg></span>
+          <span class="drawer-item-label">Mode Aman (Filter Dewasa)</span>
+          <span class="drawer-item-badge" id="drawer-safemode-badge">Aktif</span>
+        </button>
       </div>
 
       <div class="drawer-group">
-        <div class="drawer-group-label">TAMPILAN &amp; TEMA</div>
+        <div class="drawer-group-label">TAMPILAN &amp; SUARA</div>
         <button class="drawer-item" id="drawer-toggle-theme">
           <span class="drawer-item-icon"><svg class="ui-icon" id="drawer-theme-icon"><use href="#icon-sun"/></svg></span>
           <span class="drawer-item-label" id="drawer-theme-label">Mode Terang</span>
           <span class="drawer-item-badge" id="drawer-theme-badge">Gelap</span>
+        </button>
+        <button class="drawer-item" id="drawer-toggle-sfx">
+          <span class="drawer-item-icon"><svg class="ui-icon" id="drawer-sfx-icon"><use href="#icon-volume-high"/></svg></span>
+          <span class="drawer-item-label">Efek Suara UI (PS5)</span>
+          <span class="drawer-item-badge" id="drawer-sfx-badge">Aktif</span>
+        </button>
+        <button class="drawer-item" id="drawer-sub-style">
+          <span class="drawer-item-icon"><svg class="ui-icon"><use href="#icon-subtitles"/></svg></span>
+          <span class="drawer-item-label">Styler Gaya Subtitle</span>
+          <span class="drawer-item-badge">:styler</span>
         </button>
       </div>
 
@@ -591,6 +896,169 @@
         <button type="button" id="ai-btn-cancel" class="btn-secondary">Batal</button>
         <button type="button" id="ai-btn-save" class="btn-primary">Simpan Pengaturan</button>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- SUBTITLE STYLER MODAL (Apple Flat Glassmorphism Dialog) -->
+<div id="sub-style-modal" class="overlay hidden" role="dialog" aria-modal="true" aria-label="Penata Gaya Subtitle">
+  <div class="sheet sub-style-sheet">
+    <div class="sheet-head sub-style-head">
+      <div>
+        <div class="sub-style-badge"><svg class="ui-icon inline-icon"><use href="#icon-subtitles"/></svg> SUBTITLE STYLER</div>
+        <h2>Gaya Tipografi &amp; Background Subtitle</h2>
+        <div class="dim small">Sesuaikan tampilan subtitle pemutar video secara langsung</div>
+      </div>
+      <button class="icon-btn big sub-style-close-btn" id="sub-style-close" title="Tutup (Esc)"><svg class="ui-icon"><use href="#icon-close"/></svg></button>
+    </div>
+
+    <div class="sub-style-body">
+      <!-- Live Real-Time Subtitle Preview Box -->
+      <div class="sub-preview-card">
+        <div class="sub-preview-card-header">
+          <span class="sub-preview-title">PRATINJAU LANGSUNG (LIVE PREVIEW)</span>
+          <span class="sub-preview-hint">Teks ter-update seketika</span>
+        </div>
+        <div class="sub-preview-box" id="sub-preview-box">
+          <div class="sub-preview-backdrop"></div>
+          <div class="sub-preview-stage">
+            <div class="sub-preview-text" id="sub-preview-text">
+              Ore wa Kaizoku Ou ni naru otoko da!<br>
+              <span class="sub-preview-translation">Aku adalah pria yang akan menjadi Raja Bajak Laut!</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Controls Sections -->
+      <!-- 1. Font Family -->
+      <div class="sub-control-card">
+        <label class="sub-section-label">
+          <span class="sub-label-text">Jenis Huruf (Font Family)</span>
+        </label>
+        <div class="sub-chip-grid sub-chip-grid-3">
+          <button type="button" class="sub-styler-opt" data-sub-font="sans">
+            <span class="sub-font-sample sample-sans">Aa</span>
+            <span class="sub-chip-name">Modern Sans</span>
+            <span class="sub-chip-desc">Sistem Default</span>
+          </button>
+          <button type="button" class="sub-styler-opt" data-sub-font="rounded">
+            <span class="sub-font-sample sample-rounded">Aa</span>
+            <span class="sub-chip-name">Clean Rounded</span>
+            <span class="sub-chip-desc">Nunito / Trebuchet</span>
+          </button>
+          <button type="button" class="sub-styler-opt" data-sub-font="tahoma">
+            <span class="sub-font-sample sample-tahoma">Aa</span>
+            <span class="sub-chip-name">Fansub Tahoma</span>
+            <span class="sub-chip-desc">Anime Classic</span>
+          </button>
+          <button type="button" class="sub-styler-opt" data-sub-font="serif">
+            <span class="sub-font-sample sample-serif">Aa</span>
+            <span class="sub-chip-name">Cinematic Serif</span>
+            <span class="sub-chip-desc">Georgia / Mincho</span>
+          </button>
+          <button type="button" class="sub-styler-opt" data-sub-font="mono">
+            <span class="sub-font-sample sample-mono">Aa</span>
+            <span class="sub-chip-name">Cyber Mono</span>
+            <span class="sub-chip-desc">Fira / Cascadia</span>
+          </button>
+          <button type="button" class="sub-styler-opt" data-sub-font="impact">
+            <span class="sub-font-sample sample-impact">Aa</span>
+            <span class="sub-chip-name">Action Impact</span>
+            <span class="sub-chip-desc">Bold Display</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- 2. Background Style -->
+      <div class="sub-control-card">
+        <label class="sub-section-label">
+          <span class="sub-label-text">Gaya Kotak Latar Belakang (Background)</span>
+        </label>
+        <div class="sub-chip-grid sub-chip-grid-3">
+          <button type="button" class="sub-styler-opt" data-sub-bg="medium">
+            <span class="sub-bg-swatch swatch-medium"></span>
+            <span class="sub-chip-name">Transparan (55%)</span>
+            <span class="sub-chip-desc">Standar Seimbang</span>
+          </button>
+          <button type="button" class="sub-styler-opt" data-sub-bg="dark">
+            <span class="sub-bg-swatch swatch-dark"></span>
+            <span class="sub-chip-name">Gelap Pekat (85%)</span>
+            <span class="sub-chip-desc">Maksimal Kontras</span>
+          </button>
+          <button type="button" class="sub-styler-opt" data-sub-bg="light">
+            <span class="sub-bg-swatch swatch-light"></span>
+            <span class="sub-chip-name">Tipis Halus (22%)</span>
+            <span class="sub-chip-desc">Minimalis Elegan</span>
+          </button>
+          <button type="button" class="sub-styler-opt" data-sub-bg="frosted">
+            <span class="sub-bg-swatch swatch-frosted"></span>
+            <span class="sub-chip-name">Frosted Blur</span>
+            <span class="sub-chip-desc">Glassmorphism</span>
+          </button>
+          <button type="button" class="sub-styler-opt" data-sub-bg="none">
+            <span class="sub-bg-swatch swatch-none"></span>
+            <span class="sub-chip-name">Tanpa Kotak</span>
+            <span class="sub-chip-desc">Text Shadow Murni</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- 3. Size, Color, & Position Dual Columns -->
+      <div class="sub-controls-row">
+        <!-- Size -->
+        <div class="sub-control-card flex-1">
+          <label class="sub-section-label">
+            <span class="sub-label-text">Ukuran Teks</span>
+          </label>
+          <div class="sub-chip-grid sub-chip-grid-2">
+            <button type="button" class="sub-styler-opt" data-sub-size="s">Kecil (S)</button>
+            <button type="button" class="sub-styler-opt" data-sub-size="m">Sedang (M)</button>
+            <button type="button" class="sub-styler-opt" data-sub-size="l">Besar (L)</button>
+            <button type="button" class="sub-styler-opt" data-sub-size="xl">Ekstra (XL)</button>
+          </div>
+        </div>
+
+        <!-- Color -->
+        <div class="sub-control-card flex-1">
+          <label class="sub-section-label">
+            <span class="sub-label-text">Warna Teks</span>
+          </label>
+          <div class="sub-color-row">
+            <button type="button" class="sub-styler-opt sub-color-dot" data-sub-color="#ffffff" title="Putih Bersih" style="--dot-color: #ffffff"></button>
+            <button type="button" class="sub-styler-opt sub-color-dot" data-sub-color="#facc15" title="Kuning Emas" style="--dot-color: #facc15"></button>
+            <button type="button" class="sub-styler-opt sub-color-dot" data-sub-color="#38bdf8" title="Cyan Cyber" style="--dot-color: #38bdf8"></button>
+            <button type="button" class="sub-styler-opt sub-color-dot" data-sub-color="#4ade80" title="Hijau Lembut" style="--dot-color: #4ade80"></button>
+            <button type="button" class="sub-styler-opt sub-color-dot" data-sub-color="#f472b6" title="Sakura Pink" style="--dot-color: #f472b6"></button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 4. Position -->
+      <div class="sub-control-card">
+        <label class="sub-section-label">
+          <span class="sub-label-text">Elevasi Vertikal (Posisi)</span>
+        </label>
+        <div class="sub-chip-grid sub-chip-grid-4">
+          <button type="button" class="sub-styler-opt" data-sub-pos="low">Sangat Bawah (10px)</button>
+          <button type="button" class="sub-styler-opt" data-sub-pos="normal">Bawah Normal (28px)</button>
+          <button type="button" class="sub-styler-opt" data-sub-pos="medium">Sedang (48px)</button>
+          <button type="button" class="sub-styler-opt" data-sub-pos="high">Tinggi (72px)</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="sheet-foot sub-style-foot">
+      <button type="button" class="btn-danger sub-reset-btn" id="btn-sub-reset-style" title="Kembalikan semua gaya ke pengaturan bawaan">
+        <svg class="ui-icon inline-icon"><use href="#icon-update"/></svg> Reset Default
+      </button>
+      <div style="flex:1"></div>
+      <button type="button" class="btn-secondary sub-cancel-btn" id="btn-sub-cancel-style" title="Batalkan perubahan dan tutup">
+        Batal
+      </button>
+      <button type="button" class="btn-primary sub-save-btn" id="btn-sub-apply-style" title="Terapkan dan simpan gaya subtitle">
+        <svg class="ui-icon inline-icon"><use href="#icon-check"/></svg> Terapkan Gaya
+      </button>
     </div>
   </div>
 </div>
@@ -781,78 +1249,65 @@
 </div>
 
 <footer class="bottom-bar">
-  <div class="bottom-search-row">
-    <div class="search-input-wrap" id="search-input-wrap" role="search" aria-label="Cari anime">
-      <svg class="ui-icon search-lead-icon" aria-hidden="true"><use href="#icon-search"/></svg>
-      <input id="cmd" autocomplete="off" spellcheck="false" autocapitalize="off" placeholder="Cari anime, genre, atau tekan ⌘K untuk perintah..." readonly>
-      <button type="button" id="search-clear-btn" class="search-clear-btn hidden" title="Hapus pencarian (Esc)" aria-label="Hapus teks">
-        <svg class="ui-icon"><use href="#icon-close"/></svg>
-      </button>
-      <kbd class="search-kbd-hint" title="Pintasan keyboard: ⌘K atau /">⌘K</kbd>
-    </div>
-  </div>
+  <div class="bottom-search-row" style="display:none;" aria-hidden="true"></div>
   <div class="statusbar">
     <div class="sb-shortcuts">
-      <span><b>⌘K</b> cari</span>
+      <span class="sb-shortcut-btn" id="sb-hint-search" style="cursor:pointer;" tabindex="0" role="button" aria-label="Buka Pencarian" title="Buka Pencarian Spotlight (⌘K / /)"><b>⌘K</b> cari</span>
+      <span class="sb-shortcut-btn" id="sb-hint-sidebar" style="cursor:pointer;" tabindex="0" role="button" aria-label="Buka/Tutup Sidebar" title="Buka/Tutup Sidebar (⌘B)"><b>⌘B</b> sidebar</span>
+      <span class="sb-shortcut-btn" id="sb-hint-theme" style="cursor:pointer;" tabindex="0" role="button" aria-label="Ganti Tema" title="Ganti Mode Tema (⌘T)"><b>⌘T</b> tema</span>
       <span><b>↑↓←→</b> pilih</span>
       <span><b>enter</b> buka</span>
-      <span><b>[ ]</b> halaman</span>
-      <span><b>esc</b> reset</span>
+      <span class="sb-shortcut-btn" id="sb-hint-pager" style="cursor:pointer;" tabindex="0" role="button" aria-label="Ganti Halaman" title="Ganti Halaman ([ / ])"><b>[ ]</b> halaman</span>
+      <span><b>esc</b> kembali</span>
+      <span class="sb-shortcut-btn" id="sb-hint-help" style="cursor:pointer;" tabindex="0" role="button" aria-label="Bantuan" title="Bantuan &amp; Daftar Perintah Terminal (:bantuan)"><b>?</b> bantuan</span>
     </div>
     <div class="sb-meta">
       <button id="sb-source" class="sb-source" title="Sumber streaming aktif. Klik atau ketik :switch untuk beralih">src: hianime <svg class="ui-icon" style="margin-left:3px;"><use href="#icon-switch"/></svg></button>
-      <span id="sb-view" class="sb-view"></span>
+      <button id="sb-view" class="sb-view-btn" tabindex="0" title="Ganti Tampilan (Tab / 1-6)"></button>
     </div>
   </div>
 </footer>
+  </div> <!-- /.app-main-layout -->
+</div> <!-- /.app-shell -->
 
-<!-- TITLE / EPISODE MODAL -->
-<div id="title-modal" class="overlay hidden" role="dialog" aria-modal="true">
-  <div class="sheet">
-    <div class="sheet-head">
-      <div>
-        <div class="eyebrow"><span id="tm-eyebrow">DETAIL ANIME</span> <button id="tm-source-btn" class="tm-source-badge" title="Klik untuk beralih sumber stream">SRC: HIANIME <svg class="ui-icon" style="margin-left:3px;"><use href="#icon-switch"/></svg></button></div>
-        <h2 id="tm-title">–</h2>
-        <div class="dim small" id="tm-sub">–</div>
+<!-- MAC SPOTLIGHT SEARCH MODAL POP-UP -->
+<div id="spotlight-modal" class="spotlight-overlay hidden" role="dialog" aria-modal="true" aria-label="Pencarian Anime Spotlight">
+  <div class="spotlight-backdrop" id="spotlight-backdrop"></div>
+  <div class="spotlight-card">
+    <div class="spotlight-search-row">
+      <svg class="ui-icon search-lead-icon spotlight-lead-icon" aria-hidden="true"><use href="#icon-search"/></svg>
+      <div class="search-input-wrap spotlight-input-wrap" id="search-input-wrap" role="search" aria-label="Cari anime">
+        <input id="cmd" class="spotlight-input" autocomplete="off" spellcheck="false" autocapitalize="off" placeholder="Cari anime, genre, atau tekan :bantuan..." readonly>
+        <button type="button" id="search-clear-btn" class="search-clear-btn hidden" title="Hapus pencarian (Esc)" aria-label="Hapus teks">
+          <svg class="ui-icon"><use href="#icon-close"/></svg>
+        </button>
       </div>
-      <div class="sheet-head-actions">
-        <button id="tm-bookmark-btn" class="tm-bookmark-btn" title="Simpan ke Favorit"><svg class="ui-icon"><use href="#icon-star"/></svg> <span id="tm-bookmark-label">+ FAVORIT</span></button>
-        <button class="icon-btn big" id="tm-close" title="Tutup (Esc)"><svg class="ui-icon"><use href="#icon-close"/></svg></button>
-      </div>
+      <kbd class="search-kbd-hint spotlight-esc-btn" id="spotlight-esc-btn" title="Tutup Pencarian (Esc)" tabindex="0" role="button" aria-label="Tutup pencarian (Esc)">ESC</kbd>
     </div>
-    <div id="tm-detail-meta" class="detail-meta-box hidden">
-      <div class="detail-badges-row">
-        <span id="tm-score" class="badge-score hidden">⭐ <b id="tm-score-val">8.4</b></span>
-        <span id="tm-status" class="badge-status hidden">TAMAT</span>
-        <span id="tm-info-line" class="detail-info-line dim small"></span>
-      </div>
-      <div id="tm-genres" class="detail-genres-row hidden"></div>
-      <div id="tm-synopsis-box" class="tm-synopsis-box hidden">
-        <div class="tm-synopsis-header">
-          <span class="tm-synopsis-label">SINOPSIS</span>
-        </div>
-        <p id="tm-synopsis" class="tm-synopsis-text clamped"></p>
-        <button id="tm-synopsis-toggle" class="tm-synopsis-toggle">Selengkapnya ▼</button>
-      </div>
+
+    <!-- Quick filter chips / tags -->
+    <div class="spotlight-quick-tags">
+      <span class="spotlight-tag-hint">Pintasan:</span>
+      <button type="button" class="spotlight-tag" data-cmd=":katalog">Katalog</button>
+      <button type="button" class="spotlight-tag" data-cmd=":musim">Musim Ini</button>
+      <button type="button" class="spotlight-tag" data-cmd=":terbaru">Terbaru</button>
+      <button type="button" class="spotlight-tag" data-cmd=":airing">Airing</button>
+      <button type="button" class="spotlight-tag" data-cmd=":genre">Genre</button>
+      <button type="button" class="spotlight-tag" data-cmd=":filter">Filter</button>
+      <button type="button" class="spotlight-tag" data-cmd=":bantuan">Bantuan</button>
     </div>
-    <div id="tm-seasons" class="seasons-bar hidden">
-      <span class="seasons-label">SEASON / TERKAIT:</span>
-      <div id="tm-seasons-chips" class="seasons-chips"></div>
+
+    <!-- Status / Nav Hint inside Spotlight -->
+    <div class="spotlight-footer">
+      <span class="spotlight-footer-hint"><kbd>↵</kbd> buka/cari</span>
+      <span class="spotlight-footer-hint"><kbd>ESC</kbd> tutup</span>
+      <span class="spotlight-footer-hint"><kbd>↑↓</kbd> riwayat query</span>
     </div>
-    <div class="sheet-controls">
-      <div class="seg" id="mode-seg">
-        <button data-mode="sub" class="active">SUB</button><button data-mode="dub">DUB</button>
-      </div>
-      <div class="seg" id="quality-seg">
-        <button data-q="best" class="active">BEST</button><button data-q="1080p">1080p</button><button data-q="720p">720p</button><button data-q="480p">480p</button>
-      </div>
-      <input id="ep-filter" placeholder="Filter ep… cth: 12" inputmode="numeric">
-      <span id="tm-count" class="dim small"></span>
-    </div>
-    <div id="tm-ep-ranges" class="ep-ranges hidden"></div>
-    <div id="tm-eps" class="ep-grid"></div>
   </div>
 </div>
+
+<!-- TITLE MODAL COMPATIBILITY ANCHOR -->
+<div id="title-modal" class="hidden" style="display:none;" aria-hidden="true"></div>
 
 <!-- PLAYER MODAL -->
 <div id="player-modal" class="overlay hidden" role="dialog" aria-modal="true">
@@ -890,6 +1345,19 @@
         </div>
       </div>
       <div id="pm-subs-overlay" class="subs-overlay sz-m" aria-hidden="true"><span></span></div>
+      <!-- Picture-in-Picture Focus Overlay (Dim & Blur pada Window Utama saat PiP Aktif) -->
+      <div id="pip-focus-overlay" class="pip-focus-overlay hidden" aria-hidden="true">
+        <div class="pip-focus-card">
+          <div class="pip-focus-icon-wrap">
+            <svg class="ui-icon pip-focus-icon"><use href="#icon-fullscreen"/></svg>
+          </div>
+          <h3 class="pip-focus-title">Memutar di Picture-in-Picture</h3>
+          <p class="pip-focus-sub">Fokus visual dialihkan ke jendela mengambang PiP OS.</p>
+          <button type="button" id="pip-focus-restore-btn" class="pip-focus-restore-btn">
+            <svg class="ui-icon"><use href="#icon-arrow-left"/></svg> <span>Kembalikan ke Jendela Ini</span>
+          </button>
+        </div>
+      </div>
       <!-- Floating Skip Opening / Ending Button -->
       <button id="pm-skip-btn" class="pm-skip-btn hidden" title="Lewati (Tekan S)">
         <svg class="ui-icon"><use href="#icon-skip"/></svg>
@@ -961,10 +1429,10 @@
 
 <div id="toast" class="toast hidden"><span id="toast-msg"></span></div>
 
-<script src="/js/vendor/artplayer.js?v=2.12.7"></script>
-<script src="/js/vendor/hls.min.js?v=2.12.7"></script>
-<script src="/js/api.js?v=2.12.7"></script>
-<script src="/js/term.js?v=2.12.7"></script>
-<script src="/js/app.js?v=2.12.7"></script>
+<script src="/js/vendor/artplayer.js?v=2.12.7.8"></script>
+<script src="/js/vendor/hls.min.js?v=2.12.7.8"></script>
+<script src="/js/api.js?v=2.12.7.12"></script>
+<script src="/js/term.js?v=2.12.7.13"></script>
+<script src="/js/app.js?v=2.12.7.16"></script>
 </body>
 </html>

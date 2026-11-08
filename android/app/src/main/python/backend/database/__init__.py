@@ -399,6 +399,24 @@ async def set_episode_cache(slug, ep, mode, master, variants, sub, sub_lang, ref
              referer or "", server or "", subs_json, intro_json, outro_json, _now()))
         await db.commit()
 
+async def update_episode_cache_skip_times(slug: str, ep: int, intro: dict, outro: dict) -> int:
+    """Perbarui interval intro dan outro di episode_cache untuk slug dan ep tertentu."""
+    if not slug:
+        return 0
+    clean = slug.strip()
+    clean_no_prefix = clean.split(":", 1)[1] if ":" in clean else clean
+    intro_json = json.dumps(intro or {"start": 0, "end": 0})
+    outro_json = json.dumps(outro or {"start": 0, "end": 0})
+    async with _write_db() as db:
+        cur = await db.execute("""UPDATE episode_cache 
+                                  SET intro = ?, outro = ?
+                                  WHERE (slug = ? OR slug = ? OR slug LIKE ? OR slug LIKE ?)
+                                    AND ep = ?""",
+                               (intro_json, outro_json, clean, clean_no_prefix,
+                                f"%:{clean_no_prefix}", f"{clean_no_prefix}:%", ep))
+        await db.commit()
+        return cur.rowcount
+
 async def clear_episode_cache_for_slug(slug: str) -> int:
     """Hapus seluruh entri di episode_cache yang berkaitan dengan slug tersebut."""
     if not slug:

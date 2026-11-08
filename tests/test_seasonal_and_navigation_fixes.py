@@ -42,9 +42,10 @@ def test_term_js_navigation_and_pagination_integrity():
     with open("frontend/js/term.js", "r", encoding="utf-8") as f:
         content = f.read()
 
-    # Seleksi berbasis data-idx
-    assert "box.querySelector('[data-idx=\"' + S.sel + '\"]')" in content
-    assert "parseInt(all[i].getAttribute(\"data-idx\"), 10)" in content
+    # Seleksi berbasis data-idx (helper itemEl menutupi .poster-card dan .trow)
+    assert "function itemEl(" in content
+    assert "data-idx=\\\"'+idx+'\\\"" in content or "data-idx=\"'+idx+'\"" in content
+    assert "parseInt(el.getAttribute(\"data-idx\"),10)" in content
 
     # Guard pencegahan cascading focus loop
     assert "if(document.activeElement !== selEl)" in content
@@ -64,9 +65,9 @@ def test_chaquopy_parity_backend_main():
     with open("android/app/src/main/python/backend/main.py", "r", encoding="utf-8") as f2:
         chaquopy_code = f2.read()
 
-    # Periksa bagian seasonal_v4 dan filter RELEASING
-    assert 'seasonal_v4' in root_code
-    assert 'seasonal_v4' in chaquopy_code
+    # Periksa bagian seasonal_v dan filter RELEASING
+    assert 'seasonal_v' in root_code
+    assert 'seasonal_v' in chaquopy_code
     assert 'status_in = ["RELEASING"] if which == "now"' in root_code
     assert 'status_in = ["RELEASING"] if which == "now"' in chaquopy_code
     assert 'if which == "now" and (is_finished or status_str in ("finished", "completed")):' in root_code

@@ -347,6 +347,7 @@ func main() {
 	appDir := filepath.Dir(exePath)
 	appURL := "http://127.0.0.1:8767"
 	pingURL := appURL + "/api/ping"
+	startURL := appURL
 
 	var pyCmd *exec.Cmd
 
@@ -410,35 +411,61 @@ func main() {
 			procDone <- pyCmd.Wait()
 		}()
 
-		// 5. Polling hingga /api/ping merespons (maksimal 15 detik)
-		ready := false
-		for i := 0; i < 75; i++ {
-			time.Sleep(200 * time.Millisecond)
-			if isServerRunning(pingURL) {
-				ready = true
-				break
-			}
-
-			select {
-			case <-procDone:
-				i = 75 // Proses backend keluar lebih awal (crash)
-			default:
-			}
+		// Tentukan URL awal: gunakan bootscreen jika tersedia untuk respons visual instan
+		bootscreenPath := filepath.Join(appDir, "frontend", "bootscreen.html")
+		useBootscreen := false
+		if _, err := os.Stat(bootscreenPath); err == nil {
+			startURL = "file:///" + filepath.ToSlash(bootscreenPath)
+			useBootscreen = true
 		}
 
-		if !ready {
-			if pyCmd.Process != nil {
-				_ = pyCmd.Process.Kill()
-				pidFile := filepath.Join(cacheDir, "server.pid")
-				_ = os.Remove(pidFile)
+		if useBootscreen {
+			// Pantau kemungkinan backend crash di latar belakang selama inisialisasi awal
+			go func() {
+				select {
+				case err := <-procDone:
+					if err != nil {
+						logSnippet := getLastLogLines(logPath, 10)
+						msg := "Server backend tidak dapat berjalan atau gagal merespons."
+						if strings.TrimSpace(logSnippet) != "" {
+							msg += "\n\nLog Kesalahan Terakhir:\n" + logSnippet
+						}
+						showMessage("Tatap - Kesalahan Backend", msg, MB_OK|MB_ICONERROR)
+					}
+				case <-time.After(15 * time.Second):
+				}
+			}()
+		} else {
+			// Fallback: Polling hingga /api/ping merespons jika bootscreen tidak ditemukan
+			ready := false
+			for i := 0; i < 75; i++ {
+				time.Sleep(200 * time.Millisecond)
+				if isServerRunning(pingURL) {
+					ready = true
+					break
+				}
+
+				select {
+				case <-procDone:
+					i = 75 // Proses backend keluar lebih awal (crash)
+				default:
+				}
 			}
-			logSnippet := getLastLogLines(logPath, 10)
-			msg := "Server backend tidak dapat berjalan atau gagal merespons dalam 15 detik."
-			if strings.TrimSpace(logSnippet) != "" {
-				msg += "\n\nLog Kesalahan Terakhir:\n" + logSnippet
+
+			if !ready {
+				if pyCmd.Process != nil {
+					_ = pyCmd.Process.Kill()
+					pidFile := filepath.Join(cacheDir, "server.pid")
+					_ = os.Remove(pidFile)
+				}
+				logSnippet := getLastLogLines(logPath, 10)
+				msg := "Server backend tidak dapat berjalan atau gagal merespons dalam 15 detik."
+				if strings.TrimSpace(logSnippet) != "" {
+					msg += "\n\nLog Kesalahan Terakhir:\n" + logSnippet
+				}
+				showMessage("Tatap - Gagal Memulai", msg, MB_OK|MB_ICONERROR)
+				return
 			}
-			showMessage("Tatap - Gagal Memulai", msg, MB_OK|MB_ICONERROR)
-			return
 		}
 	}
 
@@ -460,5 +487,5 @@ func main() {
 	// 7. Jendela native WebView2
 	dataPath := filepath.Join(appDir, "cache", "webview2-data")
 	_ = os.MkdirAll(dataPath, 0755)
-	runWebView(appURL, dataPath)
+	runWebView(startURL, dataPath)
 }

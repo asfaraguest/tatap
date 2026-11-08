@@ -265,6 +265,36 @@ def test_pre_normalize_en_slang():
     assert T._pre_normalize_en_slang("Don't sweat it.") == "do not worry about it."
     assert T._pre_normalize_en_slang("Hold your horses.") == "wait a minute and be patient."
     assert T._pre_normalize_en_slang("Defeating the boss is a piece of cake.") == "Defeating the boss is a very easy task."
+    assert T._pre_normalize_en_slang("I got this, step back.") == "I will handle this myself, step back."
+    assert T._pre_normalize_en_slang("Give me a break already.") == "give me peace and be serious already."
+    assert T._pre_normalize_en_slang("Surrendering is out of the question.") == "Surrendering is completely impossible to allow."
+    assert T._pre_normalize_en_slang("What a drag, another exam.") == "how very troublesome, another exam."
+    assert T._pre_normalize_en_slang("Are you serious, for real?") == "Are you serious, seriously?"
+
+
+def test_enhanced_smartsub_fansub_rules():
+    # 1. Dialog lisan kasual & partikel fansub
+    assert T._sanitize_gtxplus_id("Apa katamu?!") == "Kamu bilang apa?!"
+    assert T._sanitize_gtxplus_id("Tidak ada gunanya melawan mereka.") == "Percuma aja melawan mereka."
+    assert T._sanitize_gtxplus_id("Jangan khawatirkan aku, cepat lari!") == "Nggak usah khawatirin aku, cepat lari!"
+    assert T._sanitize_gtxplus_id("Terserah padamu mau pilih yang mana.") == "Terserah kamu aja mau pilih yang mana."
+    assert T._sanitize_gtxplus_id("Apa yang harus kita lakukan sekarang?") == "Gimana nih sekarang?"
+    assert T._sanitize_gtxplus_id("Lepaskan aku sekarang juga!") == "Lepasin aku sekarang juga!"
+    assert T._sanitize_gtxplus_id("Jangan sentuh aku dengan tangan kotormu!") == "Jangan pegang-pegang dengan tangan kotormu!"
+    assert T._sanitize_gtxplus_id("Aku baik-baik saja, tenang saja.") == "Aku nggak apa-apa kok, tenang aja."
+    assert T._sanitize_gtxplus_id("Semuanya akan baik-baik saja.") == "Semuanya bakal baik-baik aja."
+    assert T._sanitize_gtxplus_id("Tidak salah lagi, dia pelakunya.") == "Nggak salah lagi, dia pelakunya."
+    assert T._sanitize_gtxplus_id("Bukan masalah besar, santai saja.") == "Nggak masalah kok, santai aja."
+    assert T._sanitize_gtxplus_id("Kamu cantik sekali hari ini, benarkah?") == "Kamu cantik banget hari ini, beneran?"
+    assert T._sanitize_gtxplus_id("Jangan menyerah, kamu pasti bisa melakukannya!") == "Jangan nyerah, kamu pasti bisa!"
+    assert T._sanitize_gtxplus_id("Terima kasih atas bantuannya.") == "Makasih atas bantuannya."
+
+    # 2. Pembersihan calque Melayu
+    assert T._sanitize_gtxplus_id("Jangan bimbang, kita pasti selamat.") == "Tenang aja, kita pasti selamat."
+    assert T._sanitize_gtxplus_id("Rencana ini tak guna sama sekali.") == "Rencana ini tidak berguna sama sekali."
+    assert T._sanitize_gtxplus_id("Tengok tu, ada monster raksasa!") == "Lihat deh itu, ada monster raksasa!"
+    assert T._sanitize_gtxplus_id("Senang je menaklukkan dungeon ini.") == "Gampang banget menaklukkan dungeon ini."
+    assert T._sanitize_gtxplus_id("Padan muka kau, penjahat.") == "Rasakan itu kau, penjahat."
 
 
 def test_smart_scene_military_protection():
