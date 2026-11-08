@@ -1482,10 +1482,11 @@ video::cue {
   white-space: pre-line !important;
 }
 
-/* Sembunyikan native cue HANYA di browser player utama agar tidak tumpang tindih dengan overlay Artplayer */
-body:not(.is-pip):not(.mobile-native-sub) .artplayer-app:not(.in-pip) video::cue,
-body:not(.is-pip):not(.mobile-native-sub) #artplayer-container:not(.in-pip) video::cue,
-body:not(.is-pip):not(.mobile-native-sub) #vid::cue {
+/* Sembunyikan native cue HANYA di browser player utama saat TIDAK dalam PiP agar tidak tumpang tindih dengan overlay Artplayer */
+body:not(.is-pip):not(.mobile-native-sub) video:not(:picture-in-picture)::cue,
+body:not(.is-pip):not(.mobile-native-sub) .artplayer-app:not(.in-pip) video:not(:picture-in-picture)::cue,
+body:not(.is-pip):not(.mobile-native-sub) #artplayer-container:not(.in-pip) video:not(:picture-in-picture)::cue,
+body:not(.is-pip):not(.mobile-native-sub) #vid:not(:picture-in-picture)::cue {
   visibility: hidden !important;
   opacity: 0 !important;
   font-size: 0px !important;
@@ -1499,13 +1500,15 @@ video:picture-in-picture::cue,
 body.mobile-native-sub video::cue {
   visibility: visible !important;
   opacity: 1 !important;
+  font-size: 1.15rem !important;
+  line-height: 1.4 !important;
   color: #ffffff !important;
   background: rgba(0, 0, 0, 0.78) !important;
 }
 
 /* ---- PICTURE-IN-PICTURE (PiP) SINGLE-WINDOW FOCUS & BLUR ---- */
 body.is-pip #artplayer-container,
-body.is-pip .ambient-stage video:not(#tatap-pip-video) {
+body.is-pip .ambient-stage video {
   filter: blur(18px) brightness(0.22) saturate(0.5) !important;
   pointer-events: none !important;
   transition: filter 0.35s cubic-bezier(0.16, 1, 0.3, 1) !important;

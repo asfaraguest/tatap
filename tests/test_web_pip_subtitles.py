@@ -5,15 +5,13 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 
 def test_web_pip_subtitles_in_app_js():
-    """Memastikan app.js memiliki mekanisme True Native PiP via Canvas Stream Compositing dengan WebVTT Captions fallback."""
+    """Memastikan app.js memiliki mekanisme Direct Native Video PiP hardware-accelerated dengan sinkronisasi WebVTT Subtitles."""
     app_js = (ROOT / "frontend" / "js" / "app.js").read_text(encoding="utf-8")
 
-    # 1. Pastikan True Native Picture-in-Picture dengan Canvas Stream diimplementasikan
+    # 1. Pastikan Direct Native Picture-in-Picture diimplementasikan tanpa overhead canvas
     assert "async function toggleSmartPip()" in app_js
-    assert "captureStream" in app_js
-    assert "drawCanvasSubtitles" in app_js
-    assert "tatap-pip-video" in app_js
-    assert "tatap-pip-canvas" in app_js
+    assert "sourceVideo.requestPictureInPicture()" in app_js
+    assert "syncNativeTextTrack" in app_js
 
     # 2. Pastikan generateVttWithOffset memformat nomor urut cue
     assert "function generateVttWithOffset(" in app_js
@@ -34,22 +32,17 @@ def test_web_pip_subtitles_in_app_js():
     assert "pip-focus-overlay" in app_js
     assert "pip-focus-restore-btn" in app_js
 
-    # 6. Pastikan Document PiP dan Direct Native Video PiP diprioritaskan
+    # 6. Pastikan Direct Native Video PiP dipanggil langsung untuk efisiensi CPU 0%
     pip_fn_start = app_js.find("async function toggleSmartPip()")
     pip_fn_end = app_js.find("function syncFullscreenSubtitles()")
     assert pip_fn_start > 0 and pip_fn_end > pip_fn_start
     pip_fn = app_js[pip_fn_start:pip_fn_end]
-    doc_pip_pos = pip_fn.find("window.documentPictureInPicture")
     direct_req_pos = pip_fn.find("sourceVideo.requestPictureInPicture()")
-    canvas_cap_pos = pip_fn.find("pipCanvas.captureStream(")
-    assert doc_pip_pos > 0, "Document Picture-in-Picture API must be present"
     assert direct_req_pos > 0, "Direct sourceVideo.requestPictureInPicture must be present"
-    assert canvas_cap_pos > 0, "Canvas captureStream fallback must be present"
-    assert doc_pip_pos < direct_req_pos < canvas_cap_pos, "Doc PiP -> Direct PiP -> Canvas Fallback hierarchy must be maintained"
 
 
-def test_player_buffering_loading_animation():
-    """Memastikan animasi loading/buffering aktif saat Artplayer inisiasi sampai video buffer siap."""
+def test_player_loading_animation_hides_on_artplayer_ready():
+    """Memastikan animasi loading aktif saat inisiasi dan langsung hilang begitu Artplayer muncul/siap."""
     app_js = (ROOT / "frontend" / "js" / "app.js").read_text(encoding="utf-8")
     style_css = (ROOT / "frontend" / "css" / "style.css").read_text(encoding="utf-8")
 
@@ -58,10 +51,9 @@ def test_player_buffering_loading_animation():
     assert ".ring{" in style_css.replace(" ", "") or ".ring {" in style_css
     assert "animation:spin" in style_css.replace(" ", "")
 
-    # 2. Pastikan app.js menangani video:waiting untuk buffering
-    assert 'art.on("video:waiting"' in app_js
-    assert "buffering video..." in app_js or "buffering" in app_js
-    assert 'showBufferSpinner("memuat video & buffer...")' in app_js
+    # 2. Pastikan animasi loading hilang begitu Artplayer muncul / siap
+    assert 'art.on("ready", hideSpinner)' in app_js
+    assert 'hideSpinner();' in app_js
     assert 'art.once("video:canplay"' in app_js
 
 

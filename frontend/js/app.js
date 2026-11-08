@@ -2628,7 +2628,7 @@ function getActiveVideos(){
 }
 
 function isPipActive(){
-  return !!(document.pictureInPictureElement || (window.art && window.art.pip) || window.tatapPipWindow || document.body.classList.contains("is-pip"));
+  return !!(document.pictureInPictureElement || (window.art && window.art.pip) || document.body.classList.contains("is-pip"));
 }
 
 function syncPipSubtitles(isPip){
@@ -2638,11 +2638,7 @@ function syncPipSubtitles(isPip){
   document.body.classList.toggle("is-pip", !!isPip);
   var focusOverlay = $("pip-focus-overlay");
   if(focusOverlay){
-    if(window.tatapPipWindow){
-      focusOverlay.classList.add("hidden");
-    } else {
-      focusOverlay.classList.toggle("hidden", !isPip);
-    }
+    focusOverlay.classList.toggle("hidden", !isPip);
   }
   var vids = getActiveVideos();
   var isVidFs = isVideoFullscreen();
@@ -2707,89 +2703,8 @@ function getActiveSubtitleLines(currentTime){
   return lines;
 }
 
-function drawCanvasSubtitles(ctx, lines, w, h){
-  if(!lines || !lines.length) return;
-  var sz = cur.subSize || "m";
-  var szMultiplier = sz === "s" ? 0.036 : (sz === "l" ? 0.058 : (sz === "xl" ? 0.070 : 0.046));
-  var fontSize = Math.max(14, Math.min(56, Math.round(h * szMultiplier)));
-  var lineHeight = Math.round(fontSize * 1.35);
-  var outlineWidth = Math.max(3, Math.round(fontSize * 0.14));
-
-  var posMap = { "low": 0.035, "normal": 0.075, "medium": 0.13, "high": 0.19 };
-  var posMult = posMap[cur.subPos || "normal"] || 0.075;
-  var bottomMargin = Math.round(h * posMult);
-
-  var bgMap = {
-    "medium": "rgba(0, 0, 0, 0.65)",
-    "dark": "rgba(0, 0, 0, 0.88)",
-    "light": "rgba(0, 0, 0, 0.28)",
-    "frosted": "rgba(13, 17, 26, 0.82)",
-    "none": "transparent"
-  };
-  var bgFill = bgMap[cur.subBg || "medium"] || bgMap["medium"];
-  var textColor = cur.subColor || "#ffffff";
-  var fontVal = FONT_MAP[cur.subFont || "sans"] || FONT_MAP["sans"];
-
-  ctx.save();
-  ctx.font = "bold " + fontSize + "px " + fontVal;
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.lineJoin = "round";
-  ctx.miterLimit = 2;
-
-  var totalHeight = lines.length * lineHeight;
-  var startY = h - bottomMargin - totalHeight + (lineHeight / 2);
-
-  for(var i = 0; i < lines.length; i++){
-    var line = lines[i];
-    var y = startY + (i * lineHeight);
-    var x = w / 2;
-
-    if(bgFill !== "transparent"){
-      var textMetrics = ctx.measureText(line);
-      var padX = Math.round(fontSize * 0.4);
-      var padY = Math.round(fontSize * 0.18);
-      ctx.fillStyle = bgFill;
-      var rectX = x - (textMetrics.width / 2) - padX;
-      var rectY = y - (lineHeight / 2) + padY;
-      var rectW = textMetrics.width + (padX * 2);
-      var rectH = lineHeight - (padY * 2);
-      var radius = Math.min(6, rectH / 2);
-
-      ctx.beginPath();
-      ctx.moveTo(rectX + radius, rectY);
-      ctx.lineTo(rectX + rectW - radius, rectY);
-      ctx.quadraticCurveTo(rectX + rectW, rectY, rectX + rectW, rectY + radius);
-      ctx.lineTo(rectX + rectW, rectY + rectH - radius);
-      ctx.quadraticCurveTo(rectX + rectW, rectY + rectH, rectX + rectW - radius, rectY + rectH);
-      ctx.lineTo(rectX + radius, rectY + rectH);
-      ctx.quadraticCurveTo(rectX, rectY + rectH, rectX, rectY + rectH - radius);
-      ctx.lineTo(rectX, rectY + radius);
-      ctx.quadraticCurveTo(rectX, rectY, rectX + radius, rectY);
-      ctx.closePath();
-      ctx.fill();
-    }
-
-    // Dark stroke outline
-    ctx.strokeStyle = "#000000";
-    ctx.lineWidth = outlineWidth;
-    ctx.strokeText(line, x, y);
-
-    // Text fill with custom color
-    ctx.fillStyle = textColor;
-    ctx.fillText(line, x, y);
-  }
-  ctx.restore();
-}
-
 async function toggleSmartPip(){
   // 1. Jika PiP aktif, tutup
-  if(window.tatapPipWindow){
-    try{ window.tatapPipWindow.close(); }catch(_){}
-    window.tatapPipWindow = null;
-    syncPipSubtitles(false);
-    return;
-  }
   if(document.pictureInPictureElement){
     try{ await document.exitPictureInPicture(); }catch(_){}
     syncPipSubtitles(false);
@@ -2804,15 +2719,6 @@ async function toggleSmartPip(){
   var sourceVideo = (window.art && window.art.video) || $("vid");
   if(!sourceVideo) return;
 
-  // Bersihkan sisa loop canvas terdahulu jika ada
-  if(window._tatapPipRaf){
-    cancelAnimationFrame(window._tatapPipRaf);
-    window._tatapPipRaf = null;
-  }
-  if(window._tatapPipVideo){
-    try{ window._tatapPipVideo.srcObject = null; }catch(_){}
-  }
-
   // Inisialisasi tombol kembalikan fokus dari PiP
   var restoreBtn = $("pip-focus-restore-btn");
   if(restoreBtn && !restoreBtn._tatapInit){
@@ -2820,10 +2726,6 @@ async function toggleSmartPip(){
     restoreBtn.addEventListener("click", async function(e){
       e.preventDefault();
       e.stopPropagation();
-      if(window.tatapPipWindow){
-        try{ window.tatapPipWindow.close(); }catch(_){}
-        window.tatapPipWindow = null;
-      }
       if(document.pictureInPictureElement){
         try{ await document.exitPictureInPicture(); }catch(_){}
       }
@@ -2836,10 +2738,6 @@ async function toggleSmartPip(){
     focusOverlay._tatapInit = true;
     focusOverlay.addEventListener("click", async function(e){
       if(e.target === focusOverlay){
-        if(window.tatapPipWindow){
-          try{ window.tatapPipWindow.close(); }catch(_){}
-          window.tatapPipWindow = null;
-        }
         if(document.pictureInPictureElement){
           try{ await document.exitPictureInPicture(); }catch(_){}
         }
@@ -2848,216 +2746,20 @@ async function toggleSmartPip(){
     });
   }
 
-  var hasActiveSub = !!(cur.cues && cur.cues.length && cur.activeSub && cur.activeSub !== "off");
-
-  // 2. Prioritas 1: Document Picture-in-Picture API (Chrome 116+, Edge WebView2)
-  // Menampilkan video hardware accelerated dengan subtitle DOM kustom (#pm-subs-overlay),
-  // font kustom, translasi, dan styling penuh tanpa beban GPU berlebih (0% readback overhead).
-  if(window.documentPictureInPicture && typeof window.documentPictureInPicture.requestWindow === "function"){
-    try{
-      var stage = document.querySelector(".ambient-stage");
-      if(stage){
-        var pipWidth = Math.min(640, window.innerWidth || 640);
-        var pipHeight = Math.round(pipWidth * 9 / 16);
-        var pipWindow = await window.documentPictureInPicture.requestWindow({
-          width: pipWidth,
-          height: pipHeight
-        });
-
-        // Kloning seluruh link css dan tag style ke dokumen PiP
-        [].forEach.call(document.querySelectorAll("link[rel='stylesheet'], style"), function(sheet){
-          try{ pipWindow.document.head.appendChild(sheet.cloneNode(true)); }catch(_){}
-        });
-
-        var stageParent = stage.parentNode;
-        var stageSibling = stage.nextSibling;
-
-        // Pasang placeholder di window utama agar tata letak tetap rapi
-        var placeholder = document.getElementById("pip-stage-placeholder");
-        if(!placeholder){
-          placeholder = document.createElement("div");
-          placeholder.id = "pip-stage-placeholder";
-          placeholder.className = "pip-focus-placeholder";
-          placeholder.innerHTML = '<div class="pip-focus-card">' +
-            '<div class="pip-focus-icon-wrap"><svg class="ui-icon pip-focus-icon"><use href="#icon-fullscreen"/></svg></div>' +
-            '<h3 class="pip-focus-title">Memutar di Picture-in-Picture</h3>' +
-            '<p class="pip-focus-sub">Fokus visual dan subtitle dialihkan ke jendela mengambang PiP OS.</p>' +
-            '<button type="button" class="pip-focus-restore-btn"><svg class="ui-icon"><use href="#icon-arrow-left"/></svg> <span>Kembalikan ke Jendela Ini</span></button>' +
-            '</div>';
-          var phBtn = placeholder.querySelector(".pip-focus-restore-btn");
-          if(phBtn){
-            phBtn.onclick = function(){
-              if(window.tatapPipWindow){
-                try{ window.tatapPipWindow.close(); }catch(_){}
-              }
-            };
-          }
-        }
-        if(stageParent){
-          stageParent.insertBefore(placeholder, stageSibling || null);
-        }
-
-        pipWindow.document.body.style.margin = "0";
-        pipWindow.document.body.style.padding = "0";
-        pipWindow.document.body.style.width = "100vw";
-        pipWindow.document.body.style.height = "100vh";
-        pipWindow.document.body.style.overflow = "hidden";
-        pipWindow.document.body.style.background = "#000";
-
-        var inStageOverlay = stage.querySelector("#pip-focus-overlay");
-        if(inStageOverlay) inStageOverlay.classList.add("hidden");
-
-        pipWindow.document.body.appendChild(stage);
-        window.tatapPipWindow = pipWindow;
-        syncPipSubtitles(true);
-
-        var restoreFromDocPip = function(){
-          if(placeholder && placeholder.parentNode){
-            placeholder.parentNode.removeChild(placeholder);
-          }
-          if(stageParent){
-            if(stageSibling) stageParent.insertBefore(stage, stageSibling);
-            else stageParent.appendChild(stage);
-          }
-          window.tatapPipWindow = null;
-          syncPipSubtitles(false);
-          if(window.art && typeof window.art.resize === "function"){
-            window.art.resize();
-          }
-        };
-
-        pipWindow.addEventListener("pagehide", restoreFromDocPip, { once: true });
-        pipWindow.addEventListener("unload", restoreFromDocPip, { once: true });
-        pipWindow.addEventListener("resize", function(){
-          if(window.art && typeof window.art.resize === "function"){
-            window.art.resize();
-          }
-        });
-
-        if(window.art && typeof window.art.resize === "function"){
-          window.art.resize();
-        }
-        toast("Mode PiP Aktif (Subtitle Lengkap & Presisi)", 1500);
-        return;
-      }
-    }catch(docPipErr){
-      console.warn("Document Picture-in-Picture gagal, mencoba fallback:", docPipErr);
-    }
-  }
-
-  // 3. Jika pengguna tidak menyalakan subtitle (Off/Raw), gunakan Direct Native Video PiP
-  // Zero GPU Readback, 100% Hardware Accelerated DXVA/D3D11
-  if(!hasActiveSub && typeof sourceVideo.requestPictureInPicture === "function"){
-    try{
-      await sourceVideo.requestPictureInPicture();
-      syncPipSubtitles(true);
-      toast("Mode PiP Aktif (Hardware Accelerated)", 1500);
-      return;
-    }catch(err){
-      console.warn("Direct Native PiP request gagal, mencoba fallback canvas:", err);
-    }
-  }
-
-  // 4. Fallback: True Native PiP via Canvas Stream (Subtitle di-burn langsung ke frame PiP dengan 640x360 @ 30fps)
-  if(window.HTMLCanvasElement && typeof HTMLCanvasElement.prototype.captureStream === "function" && typeof document.createElement("video").requestPictureInPicture === "function"){
-    try{
-      if(!window._tatapPipCanvas){
-        window._tatapPipCanvas = document.createElement("canvas");
-        window._tatapPipCanvas.id = "tatap-pip-canvas";
-        window._tatapPipCanvas.style.display = "none";
-        document.body.appendChild(window._tatapPipCanvas);
-      }
-      if(!window._tatapPipVideo){
-        window._tatapPipVideo = document.createElement("video");
-        window._tatapPipVideo.id = "tatap-pip-video";
-        window._tatapPipVideo.style.display = "none";
-        window._tatapPipVideo.muted = true;
-        window._tatapPipVideo.playsInline = true;
-        document.body.appendChild(window._tatapPipVideo);
-      }
-
-      var pipCanvas = window._tatapPipCanvas;
-      var pipVid = window._tatapPipVideo;
-
-      // Downsampled target resolution 640x360 agar rendering sangat ringan di GPU/CPU
-      var targetW = 640;
-      var targetH = 360;
-      if(sourceVideo.videoWidth && sourceVideo.videoHeight){
-        var ratio = sourceVideo.videoWidth / sourceVideo.videoHeight;
-        targetW = 640;
-        targetH = Math.round(640 / ratio);
-        if(targetH % 2 !== 0) targetH += 1;
-      }
-      pipCanvas.width = targetW;
-      pipCanvas.height = targetH;
-
-      var ctx = pipCanvas.getContext("2d");
-      var pipRunning = true;
-      var lastDraw = 0;
-      var fpsInterval = 1000 / 30; // 30 FPS cap
-
-      function drawPipLoop(now){
-        if(!pipRunning) return;
-        window._tatapPipRaf = requestAnimationFrame(drawPipLoop);
-        if(now - lastDraw < fpsInterval) return;
-        lastDraw = now;
-        if(sourceVideo && sourceVideo.readyState >= 2){
-          try{
-            ctx.drawImage(sourceVideo, 0, 0, targetW, targetH);
-            var lines = getActiveSubtitleLines(sourceVideo.currentTime);
-            if(lines && lines.length){
-              drawCanvasSubtitles(ctx, lines, targetW, targetH);
-            }
-          }catch(e){
-            console.warn("Canvas PiP frame warning:", e);
-          }
-        }
-      }
-
-      drawPipLoop(performance.now());
-
-      var stream = pipCanvas.captureStream(30);
-      pipVid.srcObject = stream;
-      await pipVid.play();
-
-      var onLeavePip = function(){
-        pipRunning = false;
-        if(window._tatapPipRaf){
-          cancelAnimationFrame(window._tatapPipRaf);
-          window._tatapPipRaf = null;
-        }
-        try{ pipVid.srcObject = null; }catch(_){}
-        syncPipSubtitles(false);
-        pipVid.removeEventListener("leavepictureinpicture", onLeavePip);
-      };
-      pipVid.addEventListener("leavepictureinpicture", onLeavePip);
-
-      pipVid.onplay = function(){
-        if(sourceVideo && sourceVideo.paused) sourceVideo.play();
-      };
-      pipVid.onpause = function(){
-        if(sourceVideo && !sourceVideo.paused) sourceVideo.pause();
-      };
-
-      await pipVid.requestPictureInPicture();
-      syncPipSubtitles(true);
-      toast("Mode PiP Aktif (Subtitle Burn-In)", 2000);
-      return;
-    }catch(err){
-      console.warn("Canvas PiP fallback gagal:", err);
-    }
-  }
-
-  // 5. Fallback terakhir: Direct Native Video PiP
+  // 2. Direct Native Video PiP (Ringan, Zero GPU Readback, 100% Hardware Accelerated DXVA/D3D11, Always on Top OS)
   if(typeof sourceVideo.requestPictureInPicture === "function"){
     try{
-      syncNativeTextTrack(cur._rawVtt, cur.cues, cur.subLang, true);
+      if(typeof syncNativeTextTrack === "function"){
+        syncNativeTextTrack(cur._rawVtt, cur.cues, cur.subLang, true);
+      }
       await sourceVideo.requestPictureInPicture();
       syncPipSubtitles(true);
       toast("Mode PiP Aktif (Hardware Accelerated)", 1500);
       return;
     }catch(err){
-      console.warn("Final Direct Native PiP request gagal:", err);
+      console.warn("Direct Native PiP request gagal:", err);
+      toast("Gagal membuka PiP: " + (err && err.message || err), 2500);
+      return;
     }
   }
 
@@ -4596,25 +4298,15 @@ function playUrl(url,referrer,sub,subRef,resumeTime,token){
       syncNativeTextTrack(cur._rawVtt, cur.cues, cur.subLang);
     }
 
-    var showBufferSpinner = function(msg){
-      var sp = $("pm-spinner");
-      var st = $("pm-status");
-      if(st && msg) st.textContent = msg;
-      if(sp) sp.classList.remove("hidden");
-    };
     var hideSpinner = function(){
       var sp = $("pm-spinner");
       if(sp) sp.classList.add("hidden");
     };
 
-    // Tampilkan animasi pemuatan & buffering saat Artplayer inisiasi sampai video buffer siap berputar
-    showBufferSpinner("memuat video & buffer...");
+    // Hilangkan animasi loading begitu Artplayer muncul / siap
+    art.on("ready", hideSpinner);
+    hideSpinner();
 
-    art.on("video:waiting", function(){
-      showBufferSpinner("buffering video...");
-    });
-    art.on("video:playing", hideSpinner);
-    art.on("video:canplaythrough", hideSpinner);
     art.once("video:canplay", function(){
       hideSpinner();
       if(resumeTime && resumeTime > 0){
@@ -4624,8 +4316,6 @@ function playUrl(url,referrer,sub,subRef,resumeTime,token){
     });
 
     art.once("video:loadedmetadata", function(){
-      // Catatan: Jangan panggil hideSpinner di sini agar animasi loading tetap aktif
-      // sampai frame video dan buffer pertama benar-benar siap diputar (canplay/playing).
       if((!cur.intro || !cur.outro) && window.Tatap && window.Tatap.skipTimes && art.duration > 0){
         var dur = Math.round(art.duration);
         var skipMal = (cur.res && cur.res.mal_id) || cur.mal_id || "";
