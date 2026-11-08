@@ -10,7 +10,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"sync"
 	"syscall"
 	"time"
 	"unsafe"
@@ -60,6 +59,7 @@ const (
 	SWP_SHOWWINDOW           = 0x0040
 	MONITOR_DEFAULTTONEAREST = 0x00000002
 	HWND_TOPMOST             = ^uintptr(0) // (HWND)-1: Always On Top
+	HWND_NOTOPMOST           = ^uintptr(1) // (HWND)-2: Normal Z-Order (Unpin Topmost)
 	SM_CXSCREEN              = 0
 	SM_CYSCREEN              = 1
 )
@@ -96,9 +96,77 @@ var (
 	isNativeFullscreen bool
 	prevPlacement      WINDOWPLACEMENT
 	prevStyle          uint32
-	pipCmd             *exec.Cmd
-	pipCmdLock         sync.Mutex
+
+	isPinnedMini      bool
+	prevMiniPlacement WINDOWPLACEMENT
 )
+
+func setPinnedMiniPlayer(hwnd uintptr, enable bool) {
+	if hwnd == 0 {
+		return
+	}
+	if enable == isPinnedMini {
+		return
+	}
+
+	if enable {
+		// Simpan posisi & ukuran normal jendela saat ini
+		prevMiniPlacement.Length = uint32(unsafe.Sizeof(prevMiniPlacement))
+		ret, _, _ := procGetWindowPlacement.Call(hwnd, uintptr(unsafe.Pointer(&prevMiniPlacement)))
+		if ret == 0 {
+			return
+		}
+
+		// Cari monitor tempat jendela berada untuk mengambil ukuran area kerja (RcWork)
+		hMon, _, _ := procMonitorFromWindow.Call(hwnd, MONITOR_DEFAULTTONEAREST)
+		pipW := int32(560)
+		pipH := int32(315)
+		posX := int32(100)
+		posY := int32(100)
+
+		if hMon != 0 {
+			var mi MONITORINFO
+			mi.CbSize = uint32(unsafe.Sizeof(mi))
+			if ret, _, _ := procGetMonitorInfoW.Call(hMon, uintptr(unsafe.Pointer(&mi))); ret != 0 {
+				workW := mi.RcWork.Right - mi.RcWork.Left
+				workH := mi.RcWork.Bottom - mi.RcWork.Top
+				posX = mi.RcWork.Left + workW - pipW - 24
+				posY = mi.RcWork.Top + workH - pipH - 24
+				if posX < mi.RcWork.Left {
+					posX = mi.RcWork.Left
+				}
+				if posY < mi.RcWork.Top {
+					posY = mi.RcWork.Top
+				}
+			}
+		}
+
+		// Terapkan HWND_TOPMOST (Always On Top) dan resize jendela utama menjadi mini player
+		procSetWindowPos.Call(
+			hwnd,
+			HWND_TOPMOST,
+			uintptr(posX),
+			uintptr(posY),
+			uintptr(pipW),
+			uintptr(pipH),
+			SWP_SHOWWINDOW|SWP_FRAMECHANGED,
+		)
+		isPinnedMini = true
+	} else {
+		// Pulihkan posisi & ukuran jendela semula
+		if prevMiniPlacement.Length != 0 {
+			procSetWindowPlacement.Call(hwnd, uintptr(unsafe.Pointer(&prevMiniPlacement)))
+		}
+		// Lepaskan HWND_TOPMOST -> HWND_NOTOPMOST
+		procSetWindowPos.Call(
+			hwnd,
+			HWND_NOTOPMOST,
+			0, 0, 0, 0,
+			SWP_NOMOVE|SWP_NOSIZE|SWP_FRAMECHANGED|SWP_SHOWWINDOW,
+		)
+		isPinnedMini = false
+	}
+}
 
 func setNativeFullscreen(hwnd uintptr, fullscreen bool) {
 	if hwnd == 0 {
@@ -299,86 +367,7 @@ func setWindowIcons(hwnd uintptr) {
 	procSendMessageW.Call(hwnd, 0x00000080 /*WM_SETICON*/, 1, hIcon)
 }
 
-func runPipWebView(pipURL, dataPath string) {
-	pipWidth := uint(560)
-	pipHeight := uint(315)
-
-	w := webview2.NewWithOptions(webview2.WebViewOptions{
-		Debug:     false,
-		AutoFocus: true,
-		DataPath:  dataPath,
-		WindowOptions: webview2.WindowOptions{
-			Title:  "Tatap - Picture in Picture",
-			Width:  pipWidth,
-			Height: pipHeight,
-			Center: false,
-			IconId: 1,
-		},
-	})
-	if w == nil {
-		return
-	}
-	defer w.Destroy()
-
-	hwnd := uintptr(w.Window())
-	setDarkMode(hwnd, true)
-	setWindowIcons(hwnd)
-
-	// Hitung posisi sudut kanan bawah layar monitor kerja (menghindari taskbar)
-	hMon, _, _ := procMonitorFromWindow.Call(hwnd, MONITOR_DEFAULTTONEAREST)
-	if hMon != 0 {
-		var mi MONITORINFO
-		mi.CbSize = uint32(unsafe.Sizeof(mi))
-		if ret, _, _ := procGetMonitorInfoW.Call(hMon, uintptr(unsafe.Pointer(&mi))); ret != 0 {
-			workW := mi.RcWork.Right - mi.RcWork.Left
-			workH := mi.RcWork.Bottom - mi.RcWork.Top
-			pipW := int32(pipWidth)
-			pipH := int32(pipHeight)
-			posX := mi.RcWork.Left + workW - pipW - 24
-			posY := mi.RcWork.Top + workH - pipH - 24
-			if posX < mi.RcWork.Left {
-				posX = mi.RcWork.Left
-			}
-			if posY < mi.RcWork.Top {
-				posY = mi.RcWork.Top
-			}
-
-			procSetWindowPos.Call(
-				hwnd,
-				HWND_TOPMOST,
-				uintptr(posX),
-				uintptr(posY),
-				uintptr(pipW),
-				uintptr(pipH),
-				SWP_SHOWWINDOW|SWP_FRAMECHANGED,
-			)
-		} else {
-			procSetWindowPos.Call(
-				hwnd,
-				HWND_TOPMOST,
-				0, 0, 0, 0,
-				SWP_NOMOVE|SWP_NOSIZE|SWP_SHOWWINDOW,
-			)
-		}
-	} else {
-		procSetWindowPos.Call(
-			hwnd,
-			HWND_TOPMOST,
-			0, 0, 0, 0,
-			SWP_NOMOVE|SWP_NOSIZE|SWP_SHOWWINDOW,
-		)
-	}
-
-	_ = w.Bind("tatap_exit_pip", func() error {
-		w.Destroy()
-		return nil
-	})
-
-	w.Navigate(pipURL)
-	w.Run()
-}
-
-func runWebView(appURL, dataPath, appDir, exePath string) {
+func runWebView(appURL, dataPath string) {
 	w := webview2.NewWithOptions(webview2.WebViewOptions{
 		Debug:     false,
 		AutoFocus: true,
@@ -413,53 +402,14 @@ func runWebView(appURL, dataPath, appDir, exePath string) {
 		return nil
 	})
 
-	// Bridge JS tatap_open_pip untuk membuka jendela PiP native Always on Top (Opsi B)
-	_ = w.Bind("tatap_open_pip", func(pipURL string) error {
-		pipCmdLock.Lock()
-		if pipCmd != nil && pipCmd.Process != nil {
-			_ = pipCmd.Process.Kill()
-			pipCmd = nil
-		}
-
-		cmd := exec.Command(exePath, "--pip", pipURL)
-		cmd.Dir = appDir
-		pipCmd = cmd
-		pipCmdLock.Unlock()
-
-		if err := cmd.Start(); err != nil {
-			return err
-		}
-
-		go func() {
-			_ = cmd.Wait()
-			pipCmdLock.Lock()
-			if pipCmd == cmd {
-				pipCmd = nil
-			}
-			pipCmdLock.Unlock()
-
-			w.Dispatch(func() {
-				w.Eval("if(typeof window.tatap_on_pip_closed === 'function'){ window.tatap_on_pip_closed(); }")
-			})
-		}()
-
+	// Bridge JS tatap_set_pinned_mini untuk mode Pinned Mini Player Always On Top
+	_ = w.Bind("tatap_set_pinned_mini", func(enable bool) error {
+		setPinnedMiniPlayer(hwnd, enable)
 		return nil
 	})
 
-	_ = w.Bind("tatap_close_pip", func() error {
-		pipCmdLock.Lock()
-		defer pipCmdLock.Unlock()
-		if pipCmd != nil && pipCmd.Process != nil {
-			_ = pipCmd.Process.Kill()
-			pipCmd = nil
-		}
-		return nil
-	})
-
-	_ = w.Bind("tatap_is_pip_active", func() bool {
-		pipCmdLock.Lock()
-		defer pipCmdLock.Unlock()
-		return pipCmd != nil && pipCmd.Process != nil
+	_ = w.Bind("tatap_is_pinned_mini", func() bool {
+		return isPinnedMini
 	})
 
 	w.Navigate(appURL)
@@ -469,26 +419,17 @@ func runWebView(appURL, dataPath, appDir, exePath string) {
 func main() {
 	log.SetOutput(os.Stderr)
 
-	exePath, err := os.Executable()
-	if err != nil {
-		exePath, _ = filepath.Abs(os.Args[0])
-	}
-	appDir := filepath.Dir(exePath)
-
-	// Mode Picture-in-Picture: buka jendela PiP Always on Top mandiri tanpa backend baru (Opsi B)
-	if len(os.Args) > 2 && os.Args[1] == "--pip" {
-		pipURL := os.Args[2]
-		dataPath := filepath.Join(appDir, "cache", "webview2-pip")
-		_ = os.MkdirAll(dataPath, 0755)
-		runPipWebView(pipURL, dataPath)
-		return
-	}
-
 	release, single := acquireSingleInstance()
 	if !single {
 		return
 	}
 	defer release()
+
+	exePath, err := os.Executable()
+	if err != nil {
+		exePath, _ = filepath.Abs(os.Args[0])
+	}
+	appDir := filepath.Dir(exePath)
 
 	appURL := "http://127.0.0.1:8767"
 	pingURL := appURL + "/api/ping"
@@ -617,13 +558,6 @@ func main() {
 	// 6. Window close -> matikan backend secara bersih lalu kill proses jika masih tersisa
 	if pyCmd != nil && pyCmd.Process != nil {
 		defer func() {
-			pipCmdLock.Lock()
-			if pipCmd != nil && pipCmd.Process != nil {
-				_ = pipCmd.Process.Kill()
-				pipCmd = nil
-			}
-			pipCmdLock.Unlock()
-
 			client := http.Client{Timeout: 600 * time.Millisecond}
 			resp, err := client.Post(appURL+"/api/shutdown", "application/json", nil)
 			if err == nil {
@@ -642,5 +576,5 @@ func main() {
 	}
 	dataPath := filepath.Join(appDir, "cache", "webview2-data")
 	_ = os.MkdirAll(dataPath, 0755)
-	runWebView(startURL, dataPath, appDir, exePath)
+	runWebView(startURL, dataPath)
 }

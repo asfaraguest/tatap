@@ -3962,17 +3962,6 @@ async def root():
         return FileResponse(idx_path)
     return ok({"status": "running", "app": "Tatap Native Android Backend"})
 
-@app.get("/pip")
-@app.get("/pip.html")
-async def pip_page():
-    pip_path = os.path.join(frontend_dir, "pip.html")
-    if os.path.isfile(pip_path):
-        return FileResponse(pip_path)
-    idx_path = os.path.join(frontend_dir, "index.html")
-    if os.path.isfile(idx_path):
-        return FileResponse(idx_path)
-    return ok({"status": "running", "page": "pip"})
-
 if __name__ == "__main__":
     import uvicorn
     # Otomatis gunakan uvloop (libuv C-extension) dan httptools jika tersedia di Linux / desktop,

@@ -1628,6 +1628,216 @@ body.is-pip .art-mask {
   width: 14px;
   height: 14px;
 }
+
+/* ---- PINNED ALWAYS-ON-TOP MINI PLAYER (CLEAN PIP MODE) ---- */
+body.is-pinned-mini #app-header,
+body.is-pinned-mini .app-sidebar,
+body.is-pinned-mini #main-content,
+body.is-pinned-mini #bg-glow,
+body.is-pinned-mini .nav-tab-bar,
+body.is-pinned-mini .player-foot,
+body.is-pinned-mini #pip-focus-overlay,
+body.is-pinned-mini #ambient,
+body.is-pinned-mini #ambient-fallback,
+body.is-pinned-mini #pm-speed-select,
+body.is-pinned-mini #pm-quality-select,
+body.is-pinned-mini #pm-mpv,
+body.is-pinned-mini #pm-fs,
+body.is-pinned-mini .art-control-setting,
+body.is-pinned-mini .art-control-fullscreen,
+body.is-pinned-mini .art-control-pip,
+body.is-pinned-mini .art-control-quality,
+body.is-pinned-mini .art-control-playbackRate,
+body.is-pinned-mini .art-control-aspectRatio,
+body.is-pinned-mini .art-control-screenshot,
+body.is-pinned-mini .art-control-subtitle,
+body.is-pinned-mini .art-control-drawer,
+body.is-pinned-mini .art-aniskip-btn,
+body.is-pinned-mini .pm-skip-btn {
+  display: none !important;
+}
+
+body.is-pinned-mini {
+  overflow: hidden !important;
+  background: #000 !important;
+}
+
+body.is-pinned-mini #player-modal {
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  max-width: 100vw !important;
+  max-height: 100vh !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border-radius: 0 !important;
+  border: none !important;
+  background: #000 !important;
+  z-index: 999999 !important;
+  display: block !important;
+}
+
+body.is-pinned-mini .player-shell {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  max-width: 100% !important;
+  max-height: 100% !important;
+  border-radius: 0 !important;
+  border: none !important;
+  box-shadow: none !important;
+  display: flex !important;
+  flex-direction: column !important;
+  background: #000 !important;
+}
+
+body.is-pinned-mini .ambient-stage {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  border-radius: 0 !important;
+  border: none !important;
+  background: #000 !important;
+}
+
+body.is-pinned-mini #artplayer-container {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  filter: none !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}
+
+body.is-pinned-mini .ambient-stage video {
+  filter: none !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}
+
+/* Floating clean topbar in pinned mini mode */
+body.is-pinned-mini .player-head {
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  height: 40px !important;
+  z-index: 120 !important;
+  background: linear-gradient(to bottom, rgba(7, 8, 10, 0.94) 0%, rgba(7, 8, 10, 0.45) 75%, transparent 100%) !important;
+  border: none !important;
+  border-radius: 0 !important;
+  padding: 0 10px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.22s ease !important;
+}
+
+body.is-pinned-mini .player-shell:hover .player-head,
+body.is-pinned-mini.show-mini-controls .player-head {
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}
+
+body.is-pinned-mini .player-title {
+  font-size: 11.5px !important;
+  font-weight: 700 !important;
+  color: #f1f5f9 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  max-width: 65% !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+}
+
+body.is-pinned-mini .pinned-mini-badge {
+  display: inline-block !important;
+  background: rgba(14, 165, 233, 0.25) !important;
+  color: #38bdf8 !important;
+  border: 1px solid rgba(56, 189, 248, 0.5) !important;
+  font-size: 9px !important;
+  font-weight: 800 !important;
+  padding: 1px 5px !important;
+  border-radius: 4px !important;
+  letter-spacing: 0.5px !important;
+  flex-shrink: 0 !important;
+}
+
+body.is-pinned-mini #pm-btn-unpin {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 5px !important;
+  padding: 4px 10px !important;
+  background: rgba(15, 23, 42, 0.75) !important;
+  border: 1px solid rgba(56, 189, 248, 0.45) !important;
+  color: #e0f2fe !important;
+  border-radius: 6px !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  cursor: pointer !important;
+  backdrop-filter: blur(8px) !important;
+  transition: all 0.15s ease !important;
+}
+
+body.is-pinned-mini #pm-btn-unpin:hover {
+  background: rgba(14, 165, 233, 0.45) !important;
+  color: #ffffff !important;
+  border-color: #38bdf8 !important;
+  box-shadow: 0 0 10px rgba(14, 165, 233, 0.35) !important;
+}
+
+body.is-pinned-mini #pm-btn-unpin .ui-icon {
+  width: 12px !important;
+  height: 12px !important;
+}
+
+body.is-pinned-mini #pm-close {
+  width: 28px !important;
+  height: 28px !important;
+  padding: 0 !important;
+  border-radius: 6px !important;
+}
+
+/* Floating clean bottombar in pinned mini mode */
+body.is-pinned-mini .art-bottom {
+  position: absolute !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  height: 44px !important;
+  background: linear-gradient(to top, rgba(7, 8, 10, 0.95) 0%, rgba(7, 8, 10, 0.3) 80%, transparent 100%) !important;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.22s ease !important;
+  z-index: 80 !important;
+}
+
+body.is-pinned-mini .player-shell:hover .art-bottom,
+body.is-pinned-mini.show-mini-controls .art-bottom {
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}
+
+/* Subtitle styling in pinned mini mode */
+body.is-pinned-mini #pm-subs-overlay,
+body.is-pinned-mini .art-subtitle {
+  opacity: 1 !important;
+  visibility: visible !important;
+  bottom: 18px !important;
+  font-size: clamp(14px, 3.2vw, 19px) !important;
+  line-height: 1.35 !important;
+  font-weight: 700 !important;
+  color: #ffffff !important;
+  text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000, 0 2px 6px rgba(0, 0, 0, 0.98) !important;
+}
 .player-foot{padding:8px 4px}
 .player-foot>.variants{flex:0 1 auto;max-width:55%}
 .player-foot>.sub-picker{flex:0 0 auto}

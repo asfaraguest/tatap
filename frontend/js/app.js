@@ -2707,17 +2707,89 @@ function getActiveSubtitleLines(currentTime){
   return lines;
 }
 
+var miniControlsTimer = null;
+function handleMiniMouseMove(){
+  document.body.classList.add("show-mini-controls");
+  if(miniControlsTimer) clearTimeout(miniControlsTimer);
+  miniControlsTimer = setTimeout(function(){
+    document.body.classList.remove("show-mini-controls");
+  }, 2200);
+}
+
+async function enterPinnedMini(){
+  document.body.classList.add("is-pinned-mini");
+  var titleEl = $("pm-title");
+  if(titleEl && !titleEl.querySelector(".pinned-mini-badge")){
+    var badge = document.createElement("span");
+    badge.className = "pinned-mini-badge";
+    badge.textContent = "PINNED";
+    titleEl.insertBefore(badge, titleEl.firstChild);
+  }
+  var unpinBtn = $("pm-btn-unpin");
+  if(unpinBtn){
+    unpinBtn.classList.remove("hidden");
+    if(!unpinBtn._tatapInit){
+      unpinBtn._tatapInit = true;
+      unpinBtn.addEventListener("click", function(e){
+        e.preventDefault();
+        e.stopPropagation();
+        exitPinnedMini();
+      });
+    }
+  }
+
+  if(typeof window.tatap_set_pinned_mini === "function"){
+    try{ await window.tatap_set_pinned_mini(true); }catch(_){}
+  }
+
+  window.addEventListener("mousemove", handleMiniMouseMove);
+  handleMiniMouseMove();
+
+  if(window.art && typeof window.art.resize === "function"){
+    window.art.resize();
+  }
+  toast("Mode Pinned Mini Player (Always On Top)", 1800);
+}
+
+async function exitPinnedMini(){
+  document.body.classList.remove("is-pinned-mini");
+  document.body.classList.remove("show-mini-controls");
+  if(miniControlsTimer) clearTimeout(miniControlsTimer);
+  window.removeEventListener("mousemove", handleMiniMouseMove);
+
+  var badge = document.querySelector(".pinned-mini-badge");
+  if(badge && badge.parentNode) badge.parentNode.removeChild(badge);
+
+  var unpinBtn = $("pm-btn-unpin");
+  if(unpinBtn) unpinBtn.classList.add("hidden");
+
+  if(typeof window.tatap_set_pinned_mini === "function"){
+    try{ await window.tatap_set_pinned_mini(false); }catch(_){}
+  }
+
+  if(window.art && typeof window.art.resize === "function"){
+    window.art.resize();
+  }
+  toast("Kembali ke Tampilan Normal", 1500);
+}
+
 async function toggleSmartPip(){
-  // 1. Jika PiP aktif, tutup
-  if(window.tatapIsPipActive){
-    if(typeof window.tatap_close_pip === "function"){
-      try{ window.tatap_close_pip(); }catch(_){}
-    }
-    if(typeof window.tatap_on_pip_closed === "function"){
-      window.tatap_on_pip_closed();
-    }
+  // 1. Jika mode Pinned Mini Player sedang aktif, keluar ke normal
+  if(document.body.classList.contains("is-pinned-mini")){
+    await exitPinnedMini();
     return;
   }
+
+  // 2. Jika di Windows Portable Launcher (Go), gunakan Pinned Mini Player Always On Top
+  if(typeof window.tatap_set_pinned_mini === "function"){
+    await enterPinnedMini();
+    return;
+  }
+
+  // 3. Fallback: Browser Web / Linux biasa (Direct Native Video PiP)
+  var sourceVideo = (window.art && window.art.video) || $("vid");
+  if(!sourceVideo) return;
+
   if(document.pictureInPictureElement){
     try{ await document.exitPictureInPicture(); }catch(_){}
     syncPipSubtitles(false);
@@ -2729,118 +2801,6 @@ async function toggleSmartPip(){
     return;
   }
 
-  var sourceVideo = (window.art && window.art.video) || $("vid");
-  if(!sourceVideo) return;
-
-  // Inisialisasi tombol kembalikan fokus dari PiP
-  var restoreBtn = $("pip-focus-restore-btn");
-  if(restoreBtn && !restoreBtn._tatapInit){
-    restoreBtn._tatapInit = true;
-    restoreBtn.addEventListener("click", async function(e){
-      e.preventDefault();
-      e.stopPropagation();
-      if(window.tatapIsPipActive){
-        if(typeof window.tatap_close_pip === "function"){
-          try{ window.tatap_close_pip(); }catch(_){}
-        }
-        if(typeof window.tatap_on_pip_closed === "function"){
-          window.tatap_on_pip_closed();
-        }
-      }
-      if(document.pictureInPictureElement){
-        try{ await document.exitPictureInPicture(); }catch(_){}
-      }
-      syncPipSubtitles(false);
-    });
-  }
-
-  var focusOverlay = $("pip-focus-overlay");
-  if(focusOverlay && !focusOverlay._tatapInit){
-    focusOverlay._tatapInit = true;
-    focusOverlay.addEventListener("click", async function(e){
-      if(e.target === focusOverlay){
-        if(window.tatapIsPipActive){
-          if(typeof window.tatap_close_pip === "function"){
-            try{ window.tatap_close_pip(); }catch(_){}
-          }
-          if(typeof window.tatap_on_pip_closed === "function"){
-            window.tatap_on_pip_closed();
-          }
-        }
-        if(document.pictureInPictureElement){
-          try{ await document.exitPictureInPicture(); }catch(_){}
-        }
-        syncPipSubtitles(false);
-      }
-    });
-  }
-
-  // 2. Prioritas 1: Native Go Launcher Floating PiP Window (Opsi B: WS_EX_TOPMOST Always On Top + Full Subtitle Rendering)
-  if(typeof window.tatap_open_pip === "function"){
-    try{
-      if(window.art) window.art.pause();
-      else if(sourceVideo) sourceVideo.pause();
-
-      var streamUrl = (window.art && window.art.url) || (sourceVideo && sourceVideo.src) || "";
-      var curTime = (window.art && window.art.currentTime) || (sourceVideo && sourceVideo.currentTime) || 0;
-      var subUrl = cur._rawSubUrl || cur.activeSub || cur.subUrl || "";
-      var title = (cur.animeTitle ? cur.animeTitle + " - " : "") + (cur.title || ("Episode " + (cur.epNum || "")));
-      var slug = cur.slug || "";
-      var ep = cur.epNum || "";
-
-      var pipParams = new URLSearchParams({
-        src: streamUrl,
-        t: curTime.toFixed(2),
-        sub: subUrl,
-        title: title,
-        slug: slug,
-        ep: ep
-      });
-      var pipFullUrl = "http://127.0.0.1:8767/pip.html?" + pipParams.toString();
-
-      window.tatapIsPipActive = true;
-      document.body.classList.add("is-pip");
-      var focusOverlayEl = $("pip-focus-overlay");
-      if(focusOverlayEl) focusOverlayEl.classList.remove("hidden");
-
-      window.tatap_on_pip_closed = async function(){
-        window.tatapIsPipActive = false;
-        document.body.classList.remove("is-pip");
-        var ov = $("pip-focus-overlay");
-        if(ov) ov.classList.add("hidden");
-
-        // Sinkronisasi posisi tonton terakhir dari /api/history jika ada
-        if(cur && cur.slug && window.art){
-          try{
-            var res = await fetch("/api/history");
-            if(res.ok){
-              var histList = await res.json();
-              if(Array.isArray(histList)){
-                var item = histList.find(function(h){ return h.slug === cur.slug; });
-                if(item && item.current_time > 0 && Math.abs(item.current_time - window.art.currentTime) > 1){
-                  window.art.currentTime = item.current_time;
-                }
-              }
-            }
-          }catch(_){}
-          window.art.play().catch(function(){});
-        }
-        toast("Kembali ke jendela utama", 1500);
-      };
-
-      await window.tatap_open_pip(pipFullUrl);
-      toast("Mode PiP Aktif (Always On Top)", 1800);
-      return;
-    }catch(goPipErr){
-      console.warn("Go launcher native PiP gagal, mencoba fallback direct native:", goPipErr);
-      window.tatapIsPipActive = false;
-      document.body.classList.remove("is-pip");
-      var ov = $("pip-focus-overlay");
-      if(ov) ov.classList.add("hidden");
-    }
-  }
-
-  // 3. Fallback: Direct Native Video PiP (Hardware Accelerated DXVA/D3D11)
   if(typeof sourceVideo.requestPictureInPicture === "function"){
     try{
       if(typeof syncNativeTextTrack === "function"){
@@ -4734,6 +4694,9 @@ function stepEp(d){
   else toast(d>0 ? "Sudah berada di episode terakhir" : "Sudah berada di episode pertama", 1500);
 }
 function closePlayer(){
+  if(document.body.classList.contains("is-pinned-mini")){
+    exitPinnedMini();
+  }
   if(window.TatapSfx) TatapSfx.play("back");
   // 1. Invalidate all pending async playback tokens immediately
   cur.playToken = ++_playTokenCounter;
@@ -5242,6 +5205,11 @@ function onKeyPlayer(e){
     }
     if(window._isTatapDesktopFs){
       toggleFullscreen();
+      return;
+    }
+    if(document.body.classList.contains("is-pinned-mini")){
+      e.preventDefault();
+      exitPinnedMini();
       return;
     }
     if(!$("player-modal").classList.contains("hidden")){

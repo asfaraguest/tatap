@@ -25,23 +25,24 @@ def test_web_pip_subtitles_in_app_js():
     assert 'trackEl.kind = "captions"' in app_js
     assert "VTTCue" in app_js
 
-    # 5. Pastikan shortcut i dan event listener PiP terpasang
+    # 5. Pastikan shortcut i dan event listener PiP/Pin terpasang
     assert 'e.key==="i"||e.key==="I"' in app_js
     assert "toggleSmartPip()" in app_js
     assert 'art.on("pip"' in app_js
-    assert "pip-focus-overlay" in app_js
-    assert "pip-focus-restore-btn" in app_js
+    assert "enterPinnedMini" in app_js
+    assert "exitPinnedMini" in app_js
+    assert "pm-btn-unpin" in app_js
 
-    # 6. Pastikan Native Go Launcher Floating PiP (Opsi B) dan Direct Native Video PiP diprioritaskan
+    # 6. Pastikan Pinned Mini Player (Go Launcher) dan Direct Native Video PiP diprioritaskan
     pip_fn_start = app_js.find("async function toggleSmartPip()")
     pip_fn_end = app_js.find("function syncFullscreenSubtitles()")
     assert pip_fn_start > 0 and pip_fn_end > pip_fn_start
     pip_fn = app_js[pip_fn_start:pip_fn_end]
-    go_pip_pos = pip_fn.find("window.tatap_open_pip")
+    pinned_mini_pos = pip_fn.find("window.tatap_set_pinned_mini")
     direct_req_pos = pip_fn.find("sourceVideo.requestPictureInPicture()")
-    assert go_pip_pos > 0, "Native Go tatap_open_pip API must be present"
+    assert pinned_mini_pos > 0, "Native Go tatap_set_pinned_mini API must be present"
     assert direct_req_pos > 0, "Direct sourceVideo.requestPictureInPicture must be present"
-    assert go_pip_pos < direct_req_pos, "Go PiP -> Direct PiP hierarchy must be maintained"
+    assert pinned_mini_pos < direct_req_pos, "Pinned Mini -> Direct PiP hierarchy must be maintained"
 
 
 def test_player_loading_animation_hides_on_artplayer_ready():
@@ -60,30 +61,28 @@ def test_player_loading_animation_hides_on_artplayer_ready():
     assert 'art.once("video:canplay"' in app_js
 
 
-def test_webview2_hardware_acceleration_and_native_pip():
-    """Memastikan launcher Windows Go menyetel argumen browser WebView2 hardware accelerated dan bridge PiP native Always on Top (Opsi B)."""
+def test_webview2_hardware_acceleration_and_pinned_mini_player():
+    """Memastikan launcher Windows Go menyetel argumen browser WebView2 hardware accelerated dan bridge Pinned Mini Player Always On Top."""
     main_go = (ROOT / "launcher" / "main.go").read_text(encoding="utf-8")
     assert "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS" in main_go
     assert "--enable-gpu-rasterization" in main_go
     assert "--enable-zero-copy" in main_go
-    assert "runPipWebView" in main_go
+    assert "setPinnedMiniPlayer" in main_go
     assert "HWND_TOPMOST" in main_go
-    assert "tatap_open_pip" in main_go
-    assert "tatap_close_pip" in main_go
-    assert "tatap_exit_pip" in main_go
+    assert "HWND_NOTOPMOST" in main_go
+    assert "tatap_set_pinned_mini" in main_go
+    assert "tatap_is_pinned_mini" in main_go
 
 
-def test_pip_html_page_and_route():
-    """Memastikan frontend/pip.html ada dan terkonfigurasi dengan Artplayer, subtitle, dan restore button."""
-    pip_html = (ROOT / "frontend" / "pip.html").read_text(encoding="utf-8")
-    assert "pip-player" in pip_html
-    assert "art.subtitle" in pip_html
-    assert "pip-restore-btn" in pip_html
-    assert "Always On Top" in pip_html
+def test_pinned_mini_player_ui_and_css():
+    """Memastikan elemen UI dan CSS untuk mode Pinned Mini Player terdefinisi lengkap."""
+    index_html = (ROOT / "frontend" / "index.html").read_text(encoding="utf-8")
+    style_css = (ROOT / "frontend" / "css" / "style.css").read_text(encoding="utf-8")
 
-    main_py = (ROOT / "backend" / "main.py").read_text(encoding="utf-8")
-    assert '@app.get("/pip")' in main_py
-    assert '@app.get("/pip.html")' in main_py
+    assert 'id="pm-btn-unpin"' in index_html
+    assert "body.is-pinned-mini" in style_css
+    assert ".pinned-mini-badge" in style_css
+    assert "show-mini-controls" in style_css
 
 
 def test_web_pip_subtitles_css_rule():
