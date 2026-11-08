@@ -32,13 +32,16 @@ def test_web_pip_subtitles_in_app_js():
     assert "pip-focus-overlay" in app_js
     assert "pip-focus-restore-btn" in app_js
 
-    # 6. Pastikan Direct Native Video PiP dipanggil langsung untuk efisiensi CPU 0%
+    # 6. Pastikan Document PiP dan Direct Native Video PiP diprioritaskan
     pip_fn_start = app_js.find("async function toggleSmartPip()")
     pip_fn_end = app_js.find("function syncFullscreenSubtitles()")
     assert pip_fn_start > 0 and pip_fn_end > pip_fn_start
     pip_fn = app_js[pip_fn_start:pip_fn_end]
+    doc_pip_pos = pip_fn.find("window.documentPictureInPicture")
     direct_req_pos = pip_fn.find("sourceVideo.requestPictureInPicture()")
+    assert doc_pip_pos > 0, "Document Picture-in-Picture API must be present"
     assert direct_req_pos > 0, "Direct sourceVideo.requestPictureInPicture must be present"
+    assert doc_pip_pos < direct_req_pos, "Doc PiP -> Direct PiP hierarchy must be maintained"
 
 
 def test_player_loading_animation_hides_on_artplayer_ready():
@@ -59,11 +62,12 @@ def test_player_loading_animation_hides_on_artplayer_ready():
 
 
 def test_webview2_hardware_acceleration_flags():
-    """Memastikan launcher Windows Go menyetel argumen browser WebView2 hardware accelerated."""
+    """Memastikan launcher Windows Go menyetel argumen browser WebView2 hardware accelerated dan DocumentPictureInPictureAPI."""
     main_go = (ROOT / "launcher" / "main.go").read_text(encoding="utf-8")
     assert "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS" in main_go
     assert "--enable-gpu-rasterization" in main_go
     assert "--enable-zero-copy" in main_go
+    assert "--enable-features=DocumentPictureInPictureAPI" in main_go
 
 
 def test_web_pip_subtitles_css_rule():

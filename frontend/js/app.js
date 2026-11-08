@@ -2628,7 +2628,7 @@ function getActiveVideos(){
 }
 
 function isPipActive(){
-  return !!(document.pictureInPictureElement || (window.art && window.art.pip) || document.body.classList.contains("is-pip"));
+  return !!(document.pictureInPictureElement || (window.art && window.art.pip) || window.tatapPipWindow || document.body.classList.contains("is-pip"));
 }
 
 function syncPipSubtitles(isPip){
@@ -2638,7 +2638,11 @@ function syncPipSubtitles(isPip){
   document.body.classList.toggle("is-pip", !!isPip);
   var focusOverlay = $("pip-focus-overlay");
   if(focusOverlay){
-    focusOverlay.classList.toggle("hidden", !isPip);
+    if(window.tatapPipWindow){
+      focusOverlay.classList.add("hidden");
+    } else {
+      focusOverlay.classList.toggle("hidden", !isPip);
+    }
   }
   var vids = getActiveVideos();
   var isVidFs = isVideoFullscreen();
@@ -2705,6 +2709,12 @@ function getActiveSubtitleLines(currentTime){
 
 async function toggleSmartPip(){
   // 1. Jika PiP aktif, tutup
+  if(window.tatapPipWindow){
+    try{ window.tatapPipWindow.close(); }catch(_){}
+    window.tatapPipWindow = null;
+    syncPipSubtitles(false);
+    return;
+  }
   if(document.pictureInPictureElement){
     try{ await document.exitPictureInPicture(); }catch(_){}
     syncPipSubtitles(false);
@@ -2726,6 +2736,10 @@ async function toggleSmartPip(){
     restoreBtn.addEventListener("click", async function(e){
       e.preventDefault();
       e.stopPropagation();
+      if(window.tatapPipWindow){
+        try{ window.tatapPipWindow.close(); }catch(_){}
+        window.tatapPipWindow = null;
+      }
       if(document.pictureInPictureElement){
         try{ await document.exitPictureInPicture(); }catch(_){}
       }
@@ -2738,6 +2752,10 @@ async function toggleSmartPip(){
     focusOverlay._tatapInit = true;
     focusOverlay.addEventListener("click", async function(e){
       if(e.target === focusOverlay){
+        if(window.tatapPipWindow){
+          try{ window.tatapPipWindow.close(); }catch(_){}
+          window.tatapPipWindow = null;
+        }
         if(document.pictureInPictureElement){
           try{ await document.exitPictureInPicture(); }catch(_){}
         }
@@ -2746,7 +2764,102 @@ async function toggleSmartPip(){
     });
   }
 
-  // 2. Direct Native Video PiP (Ringan, Zero GPU Readback, 100% Hardware Accelerated DXVA/D3D11, Always on Top OS)
+  // 2. Prioritas 1: Document Picture-in-Picture API (Chromium / Edge 116+ & WebView2 dengan --enable-features=DocumentPictureInPictureAPI)
+  // Membuka floating window OS asli yang memuat video hardware accelerated dan layer subtitle DOM kustom (#pm-subs-overlay / .art-subtitle)
+  // dengan 0% readback GPU (tanpa transcoding canvas).
+  if(window.documentPictureInPicture && typeof window.documentPictureInPicture.requestWindow === "function"){
+    try{
+      var stage = document.querySelector(".ambient-stage");
+      if(stage){
+        var pipWidth = Math.min(640, window.innerWidth || 640);
+        var pipHeight = Math.round(pipWidth * 9 / 16);
+        var pipWindow = await window.documentPictureInPicture.requestWindow({
+          width: pipWidth,
+          height: pipHeight
+        });
+
+        // Salin seluruh stylesheet dan styling ke dokumen PiP
+        [].forEach.call(document.querySelectorAll("link[rel='stylesheet'], style"), function(sheet){
+          try{ pipWindow.document.head.appendChild(sheet.cloneNode(true)); }catch(_){}
+        });
+
+        var stageParent = stage.parentNode;
+        var stageSibling = stage.nextSibling;
+
+        // Pasang placeholder di window utama agar tata letak tetap rapi
+        var placeholder = document.getElementById("pip-stage-placeholder");
+        if(!placeholder){
+          placeholder = document.createElement("div");
+          placeholder.id = "pip-stage-placeholder";
+          placeholder.className = "pip-focus-placeholder";
+          placeholder.innerHTML = '<div class="pip-focus-card">' +
+            '<div class="pip-focus-icon-wrap"><svg class="ui-icon pip-focus-icon"><use href="#icon-fullscreen"/></svg></div>' +
+            '<h3 class="pip-focus-title">Memutar di Picture-in-Picture</h3>' +
+            '<p class="pip-focus-sub">Fokus video dan subtitle dialihkan ke jendela mengambang PiP OS.</p>' +
+            '<button type="button" class="pip-focus-restore-btn"><svg class="ui-icon"><use href="#icon-arrow-left"/></svg> <span>Kembalikan ke Jendela Ini</span></button>' +
+            '</div>';
+          var phBtn = placeholder.querySelector(".pip-focus-restore-btn");
+          if(phBtn){
+            phBtn.onclick = function(){
+              if(window.tatapPipWindow){
+                try{ window.tatapPipWindow.close(); }catch(_){}
+              }
+            };
+          }
+        }
+        if(stageParent){
+          stageParent.insertBefore(placeholder, stageSibling || null);
+        }
+
+        pipWindow.document.body.style.margin = "0";
+        pipWindow.document.body.style.padding = "0";
+        pipWindow.document.body.style.width = "100vw";
+        pipWindow.document.body.style.height = "100vh";
+        pipWindow.document.body.style.overflow = "hidden";
+        pipWindow.document.body.style.background = "#000";
+
+        var inStageOverlay = stage.querySelector("#pip-focus-overlay");
+        if(inStageOverlay) inStageOverlay.classList.add("hidden");
+
+        pipWindow.document.body.appendChild(stage);
+        window.tatapPipWindow = pipWindow;
+        syncPipSubtitles(true);
+
+        var restoreFromDocPip = function(){
+          if(placeholder && placeholder.parentNode){
+            placeholder.parentNode.removeChild(placeholder);
+          }
+          if(stageParent){
+            if(stageSibling) stageParent.insertBefore(stage, stageSibling);
+            else stageParent.appendChild(stage);
+          }
+          window.tatapPipWindow = null;
+          syncPipSubtitles(false);
+          if(window.art && typeof window.art.resize === "function"){
+            window.art.resize();
+          }
+        };
+
+        pipWindow.addEventListener("pagehide", restoreFromDocPip, { once: true });
+        pipWindow.addEventListener("unload", restoreFromDocPip, { once: true });
+        pipWindow.addEventListener("resize", function(){
+          if(window.art && typeof window.art.resize === "function"){
+            window.art.resize();
+          }
+        });
+
+        if(window.art && typeof window.art.resize === "function"){
+          window.art.resize();
+        }
+        toast("Mode PiP Aktif (Subtitle Lengkap & Presisi)", 1500);
+        return;
+      }
+    }catch(docPipErr){
+      console.warn("Document Picture-in-Picture gagal, mencoba fallback direct native:", docPipErr);
+    }
+  }
+
+  // 3. Fallback: Direct Native Video PiP (Ringan, Zero GPU Readback, 100% Hardware Accelerated DXVA/D3D11, Always on Top OS)
   if(typeof sourceVideo.requestPictureInPicture === "function"){
     try{
       if(typeof syncNativeTextTrack === "function"){
