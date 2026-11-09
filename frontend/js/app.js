@@ -1801,9 +1801,6 @@ function openPlayer(ep, resumeTime, forceRefresh){
     }
     cur.activeSub = pickSubtitleUrl(subs, cur.subLang);
     renderSubtitles(subs, cur.activeSub);
-    if(cur.activeSub){
-      prefetchSubtitleTrack(cur.activeSub, r.data.referer);
-    }
     var streamUrl = (r.data.master && (r.data.master.indexOf(".m3u8") >= 0 || r.data.master.indexOf("/hls") >= 0)) ? r.data.master : (picked ? picked.url : "");
     playUrl(streamUrl,r.data.referer,cur.activeSub,r.data.referer,resumeTime,token);
     window.Tatap.saveHist({
@@ -3014,7 +3011,10 @@ function paintCue(){
     var activeParts=[];
     for(var i=0;i<cur.cues.length;i++){
       if(subTime>=cur.cues[i].start&&subTime<=cur.cues[i].end){
-        var h=cur.cues[i].html;
+        var c = cur.cues[i];
+        var h = (c && c.translated === false)
+          ? "<span class='sub-translating'>[Menerjemahkan...]</span>"
+          : (c && c.html ? c.html : "");
         if(h && activeParts.indexOf(h)===-1) activeParts.push(h);
       }
     }
@@ -3203,6 +3203,236 @@ function prefetchSubtitleTrack(url, ref, langCode){
   return p;
 }
 
+function prioritizeChunkForTime(currentTime){
+  if(!cur._subChunkState || cur._subChunkState.aborted) return;
+  var cues = cur.cues || [];
+  var chunks = cur._subChunkState.chunks || [];
+  if(!chunks.length) return;
+
+  var targetCueIdx = -1;
+  for(var i = 0; i < cues.length; i++){
+    if(cues[i].start >= currentTime){
+      targetCueIdx = i;
+      break;
+    }
+  }
+  if(targetCueIdx < 0 && cues.length > 0) targetCueIdx = cues.length - 1;
+  if(targetCueIdx < 0) return;
+
+  for(var j = 0; j < chunks.length; j++){
+    if(targetCueIdx >= chunks[j].lo && targetCueIdx < chunks[j].hi){
+      if(chunks[j].status === "pending"){
+        var targetChunk = chunks.splice(j, 1)[0];
+        var firstPending = -1;
+        for(var p = 0; p < chunks.length; p++){
+          if(chunks[p].status === "pending"){
+            firstPending = p;
+            break;
+          }
+        }
+        if(firstPending >= 0){
+          chunks.splice(firstPending, 0, targetChunk);
+        } else {
+          chunks.push(targetChunk);
+        }
+      }
+      break;
+    }
+  }
+}
+
+function startProgressiveChunkTranslate(sourceUrl, originalTrackUrl, mode, token){
+  var ref = (cur.res && cur.res.referer) || "";
+  var modeLabel = (mode === "ai") ? "AI Fansub" : "GTX+";
+
+  // 1. Cek SQLite Cache terlebih dahulu (0 detik jika sudah pernah diterjemahkan)
+  var checkQs = "url=" + encodeURIComponent(sourceUrl) + "&referer=" + encodeURIComponent(ref) +
+                "&lang=id&mode=" + encodeURIComponent(mode) + "&check_cache=true";
+
+  fetch("/api/player/sub?" + checkQs).then(function(r){
+    if(r.ok){
+      return r.text().then(function(t){
+        var tier = r.headers.get("X-Translate-Tier") || "cached";
+        return {text: t, tier: tier, cached: true};
+      });
+    }
+    return null;
+  }).then(function(cachedRes){
+    if(cur.playToken !== token) return;
+    if(cachedRes && cachedRes.text){
+      clearOverlay();
+      cur.cues = parseVtt(cachedRes.text);
+      paintCue();
+      syncNativeTextTrack(cachedRes.text, cur.cues, "id");
+      toast("Subtitle Indonesia (" + modeLabel + ", tersimpan) siap! (" + cur.cues.length + " baris)", 2500);
+      return;
+    }
+
+    // 2. Cache Miss: Ambil teks sumber asli (English)
+    var rawQs = "url=" + encodeURIComponent(sourceUrl) + "&referer=" + encodeURIComponent(ref) + "&lang=en&src=en";
+    fetch("/api/player/sub?" + rawQs).then(function(r){
+      if(!r.ok) throw new Error("Gagal mengunduh subtitle sumber (HTTP " + r.status + ")");
+      return r.text();
+    }).then(function(rawVttText){
+      if(cur.playToken !== token) return;
+      var rawCues = parseVtt(rawVttText);
+      if(!rawCues || !rawCues.length){
+        toast("Subtitle sumber kosong", 3000);
+        return;
+      }
+
+      // Tandai semua cue belum diterjemahkan (akan menampilkan '[Menerjemahkan...]')
+      for(var i = 0; i < rawCues.length; i++){
+        rawCues[i].translated = false;
+        rawCues[i].origHtml = rawCues[i].html;
+        rawCues[i].origPlain = rawCues[i].plain;
+      }
+      cur.cues = rawCues;
+      paintCue();
+
+      // Bagi menjadi chunk ukuran 25 cue
+      var CHUNK_SIZE = 25;
+      var chunks = [];
+      for(var cIdx = 0; cIdx < cur.cues.length; cIdx += CHUNK_SIZE){
+        chunks.push({
+          index: chunks.length,
+          lo: cIdx,
+          hi: Math.min(cur.cues.length, cIdx + CHUNK_SIZE),
+          status: "pending"
+        });
+      }
+
+      var chunkState = {
+        token: token,
+        url: sourceUrl,
+        ref: ref,
+        mode: mode,
+        chunks: chunks,
+        aborted: false,
+        activeWorkers: 0,
+        maxWorkers: 2,
+        completedCount: 0
+      };
+      cur._subChunkState = chunkState;
+
+      function checkAllFinished(){
+        if(chunkState.aborted || cur.playToken !== token) return;
+        if(chunkState.completedCount >= chunks.length){
+          var fullVtt = generateVttWithOffset(cur.cues, 0);
+          syncNativeTextTrack(fullVtt, cur.cues, "id");
+          fetch("/api/player/sub_cache_save", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({
+              url: sourceUrl,
+              referer: ref,
+              lang: "id",
+              mode: mode,
+              vtt_text: fullVtt
+            })
+          }).catch(function(){});
+          toast("✨ Seluruh subtitle Indonesia (" + modeLabel + ") selesai diterjemahkan!", 3500);
+        }
+      }
+
+      function processQueue(){
+        if(chunkState.aborted || cur.playToken !== token) return;
+        if(chunkState.completedCount >= chunks.length) return;
+
+        while(chunkState.activeWorkers < chunkState.maxWorkers){
+          var nextChunk = null;
+          for(var j = 0; j < chunks.length; j++){
+            if(chunks[j].status === "pending"){
+              nextChunk = chunks[j];
+              break;
+            }
+          }
+          if(!nextChunk) break;
+
+          nextChunk.status = "translating";
+          chunkState.activeWorkers++;
+
+          (function(chk){
+            var slice = cur.cues.slice(chk.lo, chk.hi).map(function(c){
+              return {start: c.start, end: c.end, text: c.origPlain || c.plain};
+            });
+
+            fetch("/api/player/sub_chunk", {
+              method: "POST",
+              headers: {"Content-Type": "application/json"},
+              body: JSON.stringify({
+                cues: slice,
+                mode: mode,
+                src: "en",
+                tgt: "id"
+              })
+            }).then(function(res){
+              return res.json();
+            }).then(function(resData){
+              chunkState.activeWorkers--;
+              if(chunkState.aborted || cur.playToken !== token) return;
+
+              if(resData && resData.success && resData.data && resData.data.cues){
+                var translatedList = resData.data.cues;
+                for(var k = 0; k < translatedList.length; k++){
+                  var idx = chk.lo + k;
+                  if(idx < cur.cues.length){
+                    var trText = translatedList[k].text || "";
+                    cur.cues[idx].html = esc(trText).replace(/\n/g, "<br>");
+                    cur.cues[idx].plain = trText;
+                    cur.cues[idx].translated = true;
+                  }
+                }
+                chk.status = "done";
+                chunkState.completedCount++;
+                paintCue();
+
+                if(chk.index === 0){
+                  toast("Subtitle Indonesia (" + modeLabel + ") siap! Memuat lanjutan di latar...", 3000);
+                }
+              } else {
+                // Fallback error untuk chunk ini: tampilkan teks asli daripada freeze
+                chk.status = "done";
+                chunkState.completedCount++;
+                for(var f = chk.lo; f < chk.hi; f++){
+                  cur.cues[f].html = cur.cues[f].origHtml;
+                  cur.cues[f].plain = cur.cues[f].origPlain;
+                  cur.cues[f].translated = true;
+                }
+                paintCue();
+              }
+              checkAllFinished();
+              processQueue();
+            }).catch(function(){
+              chunkState.activeWorkers--;
+              if(chunkState.aborted || cur.playToken !== token) return;
+              chk.status = "done";
+              chunkState.completedCount++;
+              for(var f = chk.lo; f < chk.hi; f++){
+                cur.cues[f].html = cur.cues[f].origHtml;
+                cur.cues[f].plain = cur.cues[f].origPlain;
+                cur.cues[f].translated = true;
+              }
+              paintCue();
+              checkAllFinished();
+              processQueue();
+            });
+          })(nextChunk);
+        }
+      }
+
+      // Mulai proses antrean chunking
+      processQueue();
+    }).catch(function(err){
+      if(cur.playToken !== token) return;
+      toast("Gagal menyiapkan subtitle: " + (err && err.message || err), 4000);
+    });
+  }).catch(function(err){
+    if(cur.playToken !== token) return;
+    toast("Gagal memeriksa cache: " + (err && err.message || err), 3000);
+  });
+}
+
 function switchSubtitleTrack(url, langCode){
   // Render subtitle milik app (overlay div), bukan <track> native.
   // Style tidak lagi mengikuti setting caption Windows.
@@ -3217,6 +3447,10 @@ function switchSubtitleTrack(url, langCode){
   if(cur._subUpgradeTimer){
     clearTimeout(cur._subUpgradeTimer);
     cur._subUpgradeTimer = null;
+  }
+  if(cur._subChunkState){
+    cur._subChunkState.aborted = true;
+    cur._subChunkState = null;
   }
   if(!url || typeof url !== "string") return;
   var cleanSubUrl = url.trim();
@@ -3251,6 +3485,12 @@ function switchSubtitleTrack(url, langCode){
     url=url.slice(4);
     if(!langCode) langCode="id";
     trackMode = "gtx";
+  }
+
+  // Progressive Chunking untuk translasi Bahasa Indonesia (GTX+, AI, GTX)
+  if(langCode === "id" && (trackMode === "gtx+" || trackMode === "ai" || trackMode === "gtx" || trackMode === "aigtx")){
+    startProgressiveChunkTranslate(url, originalUrl, trackMode, token);
+    return;
   }
   if(langCode==="id"){
     var waitMsg = "Menerjemahkan subtitle AI ke bahasa Indonesia...";
@@ -4396,6 +4636,10 @@ function playUrl(url,referrer,sub,subRef,resumeTime,token){
     });
 
     art.on("video:seeked", function(){
+      if(typeof prioritizeChunkForTime === "function"){
+        var t = (window.art && !isNaN(window.art.currentTime)) ? window.art.currentTime : 0;
+        prioritizeChunkForTime(t);
+      }
       paintCue();
     });
 
@@ -6665,7 +6909,12 @@ function init(){
       closePlayer();
       toast("Episode " + endedEp + " selesai diputar");
     });
-    v.addEventListener("seeked",paintCue);
+    v.addEventListener("seeked", function(){
+      if(typeof prioritizeChunkForTime === "function"){
+        prioritizeChunkForTime(v.currentTime || 0);
+      }
+      paintCue();
+    });
     v.addEventListener("loadedmetadata",function(){
       if(currentPlaybackSpeed && v.playbackRate !== currentPlaybackSpeed){
         try{ v.playbackRate = currentPlaybackSpeed; }catch(e){}

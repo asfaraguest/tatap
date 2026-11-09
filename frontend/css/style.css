@@ -2606,6 +2606,19 @@ body.is-pinned-mini .art-subtitle {
 }
 
 /* Standalone Subtitles Styling - Anti Windows Closed Caption Overrides */
+.sub-translating {
+  opacity: 0.65;
+  font-style: italic;
+  font-size: 0.9em;
+  color: #e0f2fe;
+  letter-spacing: 0.5px;
+  animation: subPulse 1.8s ease-in-out infinite;
+}
+@keyframes subPulse {
+  0%, 100% { opacity: 0.45; }
+  50% { opacity: 0.85; }
+}
+
 .art-video-player .art-subtitle {
   display: flex !important;
   justify-content: center !important;

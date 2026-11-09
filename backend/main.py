@@ -1936,8 +1936,7 @@ async def resolve(slug: str = Query(""), ep: int = Query(1), mode: str = Query("
                         sub_l = (ep_data.get("sub_lang") or "").lower().strip()
                         if not any(k in sub_l for k in hi._NON_ENGLISH_KEYWORDS):
                             en_url = ep_data.get("sub") or ""
-                    if en_url:
-                        _spawn_background(_prewarm_sub_translation(en_url, ep_data.get("referer") or "", "en", "id"))
+                    # Progressive lazy load: tidak melakukan prewarm otomatis saat hanya resolve stream
             except Exception:
                 pass
 
@@ -2822,6 +2821,7 @@ async def proxy_sub(url: str = Query(""),
                    season: str = Query(""),
                    alt_title: str = Query(""),
                    os_file_id: str = Query(""),
+                   check_cache: bool = Query(False),
                    refresh: bool = Query(False)):
     """Proxy subtitle VTT. Menjalankan translasi Smart Lexicon atau Smart Fansub & Merge
     dengan deduplikasi inflight dan proteksi cache poisoning."""
@@ -2967,6 +2967,9 @@ async def proxy_sub(url: str = Query(""),
                     resp.headers["X-Translate-Tier"] = label
                     return resp
 
+    if check_cache:
+        return JSONResponse(status_code=404, content={"cached": False, "detail": "Cache miss"})
+
     # Satukan eksekusi translasi agar tidak menduplikasi request bersamaan untuk mode yang sama
     job_key = f"{base_hash}|{lang}|{req_mode}|{prompt_tag}|dual=0"
     fut = _SUB_INFLIGHT.get(job_key)
@@ -3010,6 +3013,80 @@ async def proxy_sub(url: str = Query(""),
         clean_err = re.sub(r"[\r\n]+", " ", str(tier["error"])).strip()
         resp.headers["X-Translate-Error"] = clean_err.encode("latin-1", "replace").decode("latin-1")[:200]
     return resp
+
+
+@app.post("/api/player/sub_chunk")
+async def api_translate_sub_chunk(body: dict = None):
+    """Menerjemahkan potongan cues subtitle secara progresif (progressive lazy chunk)."""
+    body = body or {}
+    raw_cues = body.get("cues") or []
+    if not isinstance(raw_cues, list) or not raw_cues:
+        return fail("Daftar cues kosong")
+
+    src = str(body.get("src") or "en").strip().lower()
+    tgt = str(body.get("tgt") or body.get("lang") or "id").strip().lower()
+    mode = str(body.get("mode") or "gtx+").strip().lower()
+    clean_mode = "gtx+" if mode in ("gtx", "gtx+", "gtx+_dual", "aigtx") else (mode or "gtx+")
+
+    norm_cues = []
+    for c in raw_cues:
+        if isinstance(c, dict):
+            s = float(c.get("start") or 0.0)
+            e = float(c.get("end") or 0.0)
+            txt = str(c.get("text") or c.get("html") or c.get("plain") or "").strip()
+            norm_cues.append({"start": s, "end": e, "text": txt})
+
+    if not norm_cues:
+        return fail("Tidak ada cues valid untuk diterjemahkan")
+
+    try:
+        tier = await _translate_with_fallback(norm_cues, src, tgt, requested_mode=clean_mode)
+        out_cues = tier.get("cues") or norm_cues
+        return ok({
+            "cues": out_cues,
+            "tier": str(tier.get("level") or clean_mode),
+            "engine": str(tier.get("engine") or clean_mode),
+            "model": str(tier.get("model") or ""),
+            "count": len(out_cues)
+        })
+    except Exception as exc:
+        return fail(f"Gagal menerjemahkan chunk: {exc}")
+
+
+@app.post("/api/player/sub_cache_save")
+async def api_save_subtitle_cache(body: dict = None):
+    """Menyimpan berkas WebVTT hasil perakitan seluruh chunk ke SQLite cache."""
+    body = body or {}
+    url = str(body.get("url") or "").strip()
+    referer = str(body.get("referer") or "").strip()
+    lang = str(body.get("lang") or "id").strip().lower()
+    mode = str(body.get("mode") or "gtx+").strip().lower()
+    vtt_text = str(body.get("vtt_text") or "").strip()
+
+    if not url or not vtt_text:
+        return fail("url dan vtt_text wajib diisi")
+
+    clean_mode = "gtx+" if mode in ("gtx", "gtx+", "gtx+_dual", "aigtx") else (mode or "gtx+")
+    import hashlib
+    base_hash = hashlib.sha1((url + "|" + (referer or "") + "|" + lang).encode("utf-8")).hexdigest()
+    key_gtx = "sub2|gtx|" + base_hash
+    key_gtxplus = "sub2|gtx+|" + base_hash
+
+    custom_prompt = (await get_setting("translate_custom_prompt", "")).strip()
+    active_model = (await get_setting("translate_model", "gemini-2.0-flash")).strip()
+    prompt_tag = hashlib.sha1(f"{active_model}|{custom_prompt}".encode("utf-8")).hexdigest()[:8] if custom_prompt else "def"
+    key_llm = f"sub2|llm|{base_hash}|{prompt_tag}"
+
+    if lang != "id" or _is_valid_id_subtitle(vtt_text):
+        if clean_mode == "ai":
+            await set_subtitle_cache(key_llm, vtt_text)
+            await set_subtitle_cache(key_gtxplus, vtt_text)
+        else:
+            await set_subtitle_cache(key_gtxplus, vtt_text)
+            await set_subtitle_cache(key_gtx, vtt_text)
+        return ok({"cached": True, "key": key_llm if clean_mode == "ai" else key_gtxplus})
+
+    return fail("Format subtitle tidak valid atau terindikasi gagal")
 
 
 async def _llm_enabled():
