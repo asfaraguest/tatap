@@ -1841,6 +1841,8 @@ async def episode_skip_times(mal_id: str = Query(""), title: str = Query(""), sl
     """Ambil skip times (intro/outro) on-demand tanpa menghalangi stream playback."""
     try:
         eff_mal = mal_id.strip()
+        if eff_mal in ("0", "None", "null", "undefined"):
+            eff_mal = ""
         eff_title = title.strip() or slug.strip()
         if not eff_mal and eff_title:
             eff_mal = await _resolve_mal_id(slug=slug, title=eff_title)
@@ -1989,6 +1991,8 @@ async def resolve(slug: str = Query(""), ep: int = Query(1), mode: str = Query("
             raw_title_hit = clean_slug_hit.replace("-sub-indo", "").replace("-episode", "").replace("-", " ").strip() if (active_source == "otakudesu" or clean_slug_hit.startswith("otakudesu")) else ""
             eff_title_hit = title or raw_title_hit or clean_slug_hit
             eff_mal_id = str(hit.get("mal_id") or mal_id or "").strip()
+            if eff_mal_id in ("0", "None", "null", "undefined"):
+                eff_mal_id = ""
             if not eff_mal_id:
                 eff_mal_id = await _resolve_mal_id(slug=slug, title=eff_title_hit, anilist_id=anilist_id)
                 if eff_mal_id:
@@ -2006,7 +2010,7 @@ async def resolve(slug: str = Query(""), ep: int = Query(1), mode: str = Query("
                     loop = asyncio.get_running_loop()
                     sk = await asyncio.wait_for(
                         loop.run_in_executor(None, lambda: aniskip.get_skip_times(eff_mal_id, ep, episode_length=0)),
-                        timeout=0.35
+                        timeout=1.2
                     )
                     has_updated_sk = False
                     if sk.get("intro", {}).get("end", 0) > 0 and hit["intro"].get("end", 0) == 0:
@@ -2145,6 +2149,8 @@ async def resolve(slug: str = Query(""), ep: int = Query(1), mode: str = Query("
         # Resolusi mal_id jika belum tersedia
         eff_title = title or raw_title or clean_slug
         eff_mal_id = str(got.get("mal_id") or mal_id or "").strip()
+        if eff_mal_id in ("0", "None", "null", "undefined"):
+            eff_mal_id = ""
         if not eff_mal_id:
             eff_mal_id = await _resolve_mal_id(slug=slug, title=eff_title, anilist_id=anilist_id)
             if eff_mal_id:
@@ -2164,7 +2170,7 @@ async def resolve(slug: str = Query(""), ep: int = Query(1), mode: str = Query("
             try:
                 sk = await asyncio.wait_for(
                     loop.run_in_executor(None, lambda: aniskip.get_skip_times(eff_mal_id, ep, episode_length=0)),
-                    timeout=0.35
+                    timeout=1.2
                 )
                 if sk.get("intro", {}).get("end", 0) > 0 and got["intro"].get("end", 0) == 0:
                     got["intro"] = sk["intro"]
@@ -2832,7 +2838,13 @@ async def proxy_sub(url: str = Query(""),
     is_os_mode = mode in ("os_merge", "os_dual", "smart_merge")
     # Hapus mode bilingual dan opsi terjemahan mentah sesuai direktif
     is_dual = False
-    clean_mode = "gtx+" if mode in ("gtx", "gtx+", "gtx+_dual", "aigtx") else (mode or "gtx+")
+    clean_m = (mode or "").strip().lower()
+    if clean_m in ("ai", "indonesian (ai)", "tier3", "llm"):
+        clean_mode = "ai"
+    elif clean_m in ("gtx", "gtx+", "gtx+_dual", "aigtx", "tier2", "indonesian (smart fansub & merge)", "indonesian (gtx+)"):
+        clean_mode = "gtx+"
+    else:
+        clean_mode = clean_m or "gtx+"
 
     # Lang kosong atau sama dengan sumber (dan bukan mode Smart Merge) -> return source apa adanya
     if (not lang or lang == src) and not is_os_mode:
@@ -2935,7 +2947,7 @@ async def proxy_sub(url: str = Query(""),
             resp.headers["X-OpenSubtitles-Merge"] = f"os={st.get('os_count',0)},snapped={st.get('snapped',0)},gaps={st.get('gap_filled',0)},offset={st.get('offset',0.0)}s"
         return resp
 
-    req_mode = "gtx+" if clean_mode in ("gtx+", "aigtx") else (clean_mode or "gtx+")
+    req_mode = clean_mode
 
     # Periksa cache lokal jika tidak dalam mode refresh
     if not refresh:
@@ -3026,7 +3038,13 @@ async def api_translate_sub_chunk(body: dict = None):
     src = str(body.get("src") or "en").strip().lower()
     tgt = str(body.get("tgt") or body.get("lang") or "id").strip().lower()
     mode = str(body.get("mode") or "gtx+").strip().lower()
-    clean_mode = "gtx+" if mode in ("gtx", "gtx+", "gtx+_dual", "aigtx") else (mode or "gtx+")
+    clean_m = mode.strip().lower()
+    if clean_m in ("ai", "indonesian (ai)", "tier3", "llm"):
+        clean_mode = "ai"
+    elif clean_m in ("gtx", "gtx+", "gtx+_dual", "aigtx", "tier2", "indonesian (smart fansub & merge)", "indonesian (gtx+)"):
+        clean_mode = "gtx+"
+    else:
+        clean_mode = clean_m or "gtx+"
 
     norm_cues = []
     for c in raw_cues:
@@ -3066,7 +3084,13 @@ async def api_save_subtitle_cache(body: dict = None):
     if not url or not vtt_text:
         return fail("url dan vtt_text wajib diisi")
 
-    clean_mode = "gtx+" if mode in ("gtx", "gtx+", "gtx+_dual", "aigtx") else (mode or "gtx+")
+    clean_m = mode.strip().lower()
+    if clean_m in ("ai", "indonesian (ai)", "tier3", "llm"):
+        clean_mode = "ai"
+    elif clean_m in ("gtx", "gtx+", "gtx+_dual", "aigtx", "tier2", "indonesian (smart fansub & merge)", "indonesian (gtx+)"):
+        clean_mode = "gtx+"
+    else:
+        clean_mode = clean_m or "gtx+"
     import hashlib
     base_hash = hashlib.sha1((url + "|" + (referer or "") + "|" + lang).encode("utf-8")).hexdigest()
     key_gtx = "sub2|gtx|" + base_hash
@@ -3080,7 +3104,6 @@ async def api_save_subtitle_cache(body: dict = None):
     if lang != "id" or _is_valid_id_subtitle(vtt_text):
         if clean_mode == "ai":
             await set_subtitle_cache(key_llm, vtt_text)
-            await set_subtitle_cache(key_gtxplus, vtt_text)
         else:
             await set_subtitle_cache(key_gtxplus, vtt_text)
             await set_subtitle_cache(key_gtx, vtt_text)
@@ -3134,12 +3157,7 @@ async def _translate_sub_job(url, referer, src, lang, key_llm, key_gtxplus, fetc
                 await set_subtitle_cache(key_gtxplus, new_text)
                 await set_subtitle_cache(key_gtx, new_text)
             elif lvl in ("tier3", "ai"):
-                total = max(1, tier.get("total") or len(cues))
-                if tier.get("llm_lines", 0) / total >= 0.8:
-                    await set_subtitle_cache(key_llm, new_text)
-                else:
-                    await set_subtitle_cache(key_gtxplus, new_text)
-                    await set_subtitle_cache(key_gtx, new_text)
+                await set_subtitle_cache(key_llm, new_text)
     return new_text, tier
 
 

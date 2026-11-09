@@ -109,6 +109,53 @@ async def test_sub_cache_save_and_check_cache():
         assert "cached" in hit_res.headers.get("X-Translate-Tier", "").lower()
 
 
+@pytest.mark.asyncio
+async def test_ai_and_gtxplus_cache_isolation():
+    """Memastikan cache subtitle mode AI Fansub (key_llm) dan mode GTX+ (key_gtxplus)
+    terisolasi secara mutlak dan tidak saling menimpa saat check_cache=true."""
+    import time
+    unique_id = time.time()
+    test_url = f"https://example.com/subs/isolation_test_{unique_id}.vtt"
+    gtx_content = "WEBVTT\n\n1\n00:00:01.000 --> 00:00:02.500\nIni terjemahan teks dari mesin GTX+ dan siap tayang\n"
+    ai_content = "WEBVTT\n\n1\n00:00:01.000 --> 00:00:02.500\nIni terjemahan teks dari model AI Fansub dan siap tayang\n"
+
+    transport = ASGITransport(app=main.app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        # 1. Simpan terjemahan GTX+
+        r1 = await client.post("/api/player/sub_cache_save", json={
+            "url": test_url,
+            "lang": "id",
+            "mode": "gtx+",
+            "vtt_text": gtx_content
+        })
+        assert r1.status_code == 200
+
+        # 2. Periksa cache untuk mode AI -> WAJIB 404 (tidak boleh terisi teks GTX+!)
+        r2 = await client.get(f"/api/player/sub?url={test_url}&lang=id&mode=ai&check_cache=true")
+        assert r2.status_code == 404
+
+        # 3. Simpan terjemahan AI
+        r3 = await client.post("/api/player/sub_cache_save", json={
+            "url": test_url,
+            "lang": "id",
+            "mode": "ai",
+            "vtt_text": ai_content
+        })
+        assert r3.status_code == 200
+
+        # 4. Periksa cache mode AI -> WAJIB 200 dengan konten AI
+        r4 = await client.get(f"/api/player/sub?url={test_url}&lang=id&mode=ai&check_cache=true")
+        assert r4.status_code == 200
+        assert "model AI Fansub" in r4.text
+        assert "cached-llm" in r4.headers.get("X-Translate-Tier", "").lower()
+
+        # 5. Periksa cache mode GTX+ -> WAJIB tetap 200 dengan konten GTX+ asli (tidak tertimpa AI!)
+        r5 = await client.get(f"/api/player/sub?url={test_url}&lang=id&mode=gtx+&check_cache=true")
+        assert r5.status_code == 200
+        assert "mesin GTX+" in r5.text
+        assert "cached-gtx+" in r5.headers.get("X-Translate-Tier", "").lower()
+
+
 def test_frontend_progressive_chunk_components():
     """Memastikan fungsi dan styling progressive chunking terpasang lengkap di frontend."""
     from pathlib import Path

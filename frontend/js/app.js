@@ -15,7 +15,12 @@ var cur = {slug:"", title:"", ep:1, mode:"sub", quality:"best", res:null, eps:[]
             hasAutoSkippedIntro:false,
             hasAutoSkippedOutro:false,
             activeSkipTarget:0,
-            autoSkip:false
+            autoSkip:(function(){
+              try {
+                var s = localStorage.getItem("tatap_auto_skip");
+                return s === "1" || s === "true";
+              } catch(_) { return false; }
+            })()
            };
 
 var FONT_MAP = {
@@ -3045,7 +3050,9 @@ function checkSkipTimes(currentTime){
   var v=$("vid");
   var intro=cur.intro;
   var outro=cur.outro;
-  var isAutoSkip = !!(window.settings && window.settings.autoSkip !== undefined ? window.settings.autoSkip : cur.autoSkip);
+  var isAutoSkip = !!(window.settings && window.settings.autoSkip !== undefined
+                      ? window.settings.autoSkip
+                      : (cur.autoSkip || localStorage.getItem("tatap_auto_skip") === "1" || localStorage.getItem("tatap_auto_skip") === "true"));
   var t = (typeof currentTime === "number" && !isNaN(currentTime)) ? currentTime : ((window.art && !isNaN(window.art.currentTime)) ? window.art.currentTime : (v ? v.currentTime : 0));
   var dur = (window.art && !isNaN(window.art.duration)) ? window.art.duration : (v ? v.duration : Infinity);
 
@@ -4050,9 +4057,11 @@ function playUrl(url,referrer,sub,subRef,resumeTime,token){
             cur.autoSkip = state;
             window.settings = window.settings || {};
             window.settings.autoSkip = state;
-            if(window.Tatap && window.Tatap.saveSettings){
-              window.Tatap.saveSettings({ auto_skip: state });
+            try { localStorage.setItem("tatap_auto_skip", state ? "1" : "0"); } catch(_){}
+            if(window.Tatap && window.Tatap.setSetting){
+              window.Tatap.setSetting({ auto_skip: state ? 1 : 0 });
             }
+            syncAutoSkipUI(state);
             if(window.art && window.art.notice){
               window.art.notice.show = "Auto Skip OP/ED: " + (state ? "Aktif" : "Nonaktif");
             }
@@ -4245,7 +4254,18 @@ function playUrl(url,referrer,sub,subRef,resumeTime,token){
             zIndex: 25,
             pointerEvents: "auto"
           },
-          click: function(){
+          mounted: function($layer){
+            var btn = $layer.querySelector("#art-aniskip-btn");
+            if(btn){
+              btn.addEventListener("click", function(e){
+                e.preventDefault();
+                e.stopPropagation();
+                doSkip();
+              });
+            }
+          },
+          click: function(e){
+            if(e && e.stopPropagation) e.stopPropagation();
             var artBtn = $("art-aniskip-btn");
             if(artBtn && !artBtn.classList.contains("hidden")){
               doSkip();
@@ -4608,9 +4628,11 @@ function playUrl(url,referrer,sub,subRef,resumeTime,token){
       }
     });
 
-    art.once("video:loadedmetadata", function(){
-      if((!cur.intro || !cur.outro) && window.Tatap && window.Tatap.skipTimes && art.duration > 0){
-        var dur = Math.round(art.duration);
+    var hasAttemptedSkipRecovery = false;
+    function tryRecoverSkipTimes(){
+      if(hasAttemptedSkipRecovery && cur.intro && cur.outro) return;
+      if(window.Tatap && window.Tatap.skipTimes){
+        var dur = (window.art && !isNaN(window.art.duration) && window.art.duration > 0) ? Math.round(window.art.duration) : 0;
         var skipMal = (cur.res && cur.res.mal_id) || cur.mal_id || "";
         window.Tatap.skipTimes(cur.slug, cur.ep, cur.title, skipMal, dur).then(function(skRes){
           if(cur.playToken !== token) return;
@@ -4625,10 +4647,15 @@ function playUrl(url,referrer,sub,subRef,resumeTime,token){
               hasNew = true;
             }
             if(hasNew) checkSkipTimes();
+            if(cur.intro || cur.outro) hasAttemptedSkipRecovery = true;
           }
         }).catch(function(){});
       }
-    });
+    }
+
+    art.once("video:loadedmetadata", tryRecoverSkipTimes);
+    art.on("video:durationchange", tryRecoverSkipTimes);
+    art.once("video:canplay", tryRecoverSkipTimes);
 
     art.on("video:timeupdate", function(){
       paintCue();
@@ -5968,6 +5995,15 @@ function syncTranslate(){
   btn.setAttribute("data-on",cur.translate?"1":"0");
   btn.title="Translate ID: "+(cur.translate?"on":"off")+" (butuh track English sebagai source)";
 }
+
+function syncAutoSkipUI(state){
+  var isEnabled = (state !== undefined) ? !!state : !!cur.autoSkip;
+  var badge = $("drawer-aniskip-badge");
+  if(badge){
+    badge.textContent = isEnabled ? "Aktif" : "Mati";
+    badge.style.color = isEnabled ? "#38bdf8" : "";
+  }
+}
 function setTranslate(on){
   cur.translate=!!on;
   try{localStorage.setItem("tatap_translate",cur.translate?"1":"0");}catch(e){}
@@ -5975,7 +6011,8 @@ function setTranslate(on){
   // Re-render dropdown agar opsi Indonesian (AI) muncul/hilang.
   var subs=(cur.res&&cur.res.subtitles)||[];
   if(cur.translate){
-    var picked=pickSubtitleUrl(subs, "Indonesian");
+    var targetLang = (cur.subLang && cur.subLang.toLowerCase().indexOf("ai") >= 0) ? "Indonesian (AI)" : (cur.subLang || "Indonesian");
+    var picked=pickSubtitleUrl(subs, targetLang);
     if(picked){
       cur.activeSub=picked;
       switchSubtitleTrack(picked);
@@ -6990,12 +7027,15 @@ function init(){
         if(r.data.mode) {cur.mode=r.data.mode; syncSeg();}
         if(r.data.preferred_source) {cur.source=r.data.preferred_source; renderSourceUI();}
         if(r.data.auto_skip !== undefined) {
-          cur.autoSkip = !!r.data.auto_skip;
+          cur.autoSkip = (r.data.auto_skip === 1 || r.data.auto_skip === "1" || r.data.auto_skip === true);
           window.settings.autoSkip = cur.autoSkip;
+          try { localStorage.setItem("tatap_auto_skip", cur.autoSkip ? "1" : "0"); } catch(_){}
         }
+        syncAutoSkipUI(cur.autoSkip);
       }
     }).catch(function(){});
   }
+  syncAutoSkipUI(cur.autoSkip);
   document.querySelectorAll("#mode-seg button").forEach(function(b){
     b.addEventListener("click",function(){
       document.querySelectorAll("#mode-seg button").forEach(function(x){x.classList.remove("active");});
@@ -7259,6 +7299,31 @@ function init(){
     var label = en ? "Aktif (Filter Dewasa)" : "Nonaktif (Semua Konten Non-Hentai)";
     toast("Mode Aman: " + label, 1500);
     if(window.Tui && window.Tui.loadView) window.Tui.loadView();
+  });
+
+  var drawerAniSkip = $("drawer-toggle-aniskip");
+  if(drawerAniSkip) drawerAniSkip.addEventListener("click", function(){
+    closeDrawer();
+    var nextState = !cur.autoSkip;
+    cur.autoSkip = nextState;
+    window.settings = window.settings || {};
+    window.settings.autoSkip = nextState;
+    try { localStorage.setItem("tatap_auto_skip", nextState ? "1" : "0"); } catch(_){}
+    if(window.Tatap && window.Tatap.setSetting){
+      window.Tatap.setSetting({ auto_skip: nextState ? 1 : 0 });
+    }
+    syncAutoSkipUI(nextState);
+    if(window.art && window.art.setting && window.art.setting.update){
+      try {
+        window.art.setting.update({
+          name: "aniskip-auto",
+          tooltip: nextState ? "Aktif" : "Nonaktif",
+          switch: nextState
+        });
+      } catch(_){}
+    }
+    if(window.TatapSfx) TatapSfx.play("select");
+    toast("Lewati Opening & Ending (AniSkip): " + (nextState ? "Aktif" : "Mati"), 1500, "icon-skip");
   });
 
   var drawerToggleTheme = $("drawer-toggle-theme");
