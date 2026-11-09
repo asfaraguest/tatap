@@ -75,7 +75,7 @@ def test_webview2_hardware_acceleration_and_pinned_mini_player():
 
 
 def test_pinned_mini_player_ui_and_css():
-    """Memastikan elemen UI dan CSS untuk mode Pinned Mini Player terdefinisi lengkap."""
+    """Memastikan elemen UI dan CSS untuk mode Pinned Mini Player terdefinisi lengkap dan kontrol bawah disupresi."""
     index_html = (ROOT / "frontend" / "index.html").read_text(encoding="utf-8")
     style_css = (ROOT / "frontend" / "css" / "style.css").read_text(encoding="utf-8")
 
@@ -83,6 +83,8 @@ def test_pinned_mini_player_ui_and_css():
     assert "body.is-pinned-mini" in style_css
     assert ".pinned-mini-badge" in style_css
     assert "show-mini-controls" in style_css
+    assert "body.is-pinned-mini .art-bottom" in style_css
+    assert "body.is-pinned-mini .art-controls" in style_css
 
 
 def test_web_pip_subtitles_css_rule():

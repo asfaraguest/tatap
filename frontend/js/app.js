@@ -2743,7 +2743,6 @@ async function enterPinnedMini(){
   }
 
   window.addEventListener("mousemove", handleMiniMouseMove);
-  handleMiniMouseMove();
 
   if(window.art && typeof window.art.resize === "function"){
     window.art.resize();
