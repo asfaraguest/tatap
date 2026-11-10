@@ -4967,7 +4967,6 @@ function closePlayer(){
   if(document.body.classList.contains("is-pinned-mini")){
     exitPinnedMini();
   }
-  if(window.TatapSfx) TatapSfx.play("back");
   // 1. Invalidate all pending async playback tokens immediately
   cur.playToken = ++_playTokenCounter;
   TvNavigationManager.hidePlayerControls();
@@ -6714,6 +6713,14 @@ var TatapSfx = (function(){
     return localStorage.getItem("tatap_sfx_enabled") !== "0";
   }
 
+  function isPlayerActive(){
+    var pm = document.getElementById("player-modal");
+    if(pm && !pm.classList.contains("hidden")) return true;
+    if(window.art && window.art.template && window.art.template.$player) return true;
+    if(document.body && document.body.classList.contains("is-pinned-mini")) return true;
+    return false;
+  }
+
   function setEnabled(val){
     var enabled = !!val;
     localStorage.setItem("tatap_sfx_enabled", enabled ? "1" : "0");
@@ -6753,6 +6760,7 @@ var TatapSfx = (function(){
 
   function play(type){
     if(!isEnabled()) return;
+    if(isPlayerActive()) return;
     var ctx = getCtx();
     if(!ctx) return;
 
@@ -6858,6 +6866,7 @@ var TatapSfx = (function(){
     toggle: toggle,
     syncUI: syncUI,
     play: play,
+    isPlayerActive: isPlayerActive,
     initUnlock: initUnlock
   };
 })();
@@ -7524,6 +7533,7 @@ function init(){
 
   // Global interactive acoustic tick for PS5 tactile feeling
   document.addEventListener("mouseover", function(e){
+    if(window.TatapSfx && window.TatapSfx.isPlayerActive && window.TatapSfx.isPlayerActive()) return;
     var target = e.target;
     if(!target) return;
     var el = target.closest(".poster-card, .nav-tab-btn, .popover-item, .drawer-item, .seg button, .ep, .pager-btn, .header-drawer-btn, .ep-range-chip");

@@ -85,3 +85,21 @@ def test_frontend_sfx_and_safe_mode_dom_and_js():
     assert 'TatapSfx.play("tab")' in term_js
     assert 'case "sfx":' in term_js
     assert 'case "safe":' in term_js
+
+def test_sfx_suppressed_in_artplayer_stage():
+    app_js = (ROOT / "frontend" / "js" / "app.js").read_text(encoding="utf-8")
+    # Verify isPlayerActive detector exists and checks player modal, artplayer, and pinned mini
+    assert "function isPlayerActive()" in app_js
+    assert 'document.getElementById("player-modal")' in app_js
+    assert 'window.art && window.art.template && window.art.template.$player' in app_js
+    assert 'classList.contains("is-pinned-mini")' in app_js
+
+    # Verify play(type) guards against active player
+    assert "if(isPlayerActive()) return;" in app_js
+    assert "isPlayerActive: isPlayerActive" in app_js
+
+    # Verify mouseover acoustic tick skips when player is active
+    assert "window.TatapSfx.isPlayerActive && window.TatapSfx.isPlayerActive()) return;" in app_js
+
+    # Verify closePlayer does not play back sound (silent exit per Option B)
+    assert 'function closePlayer(){\n  if(document.body.classList.contains("is-pinned-mini")){\n    exitPinnedMini();\n  }\n  // 1. Invalidate' in app_js
