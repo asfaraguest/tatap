@@ -537,7 +537,7 @@ def detect_provider_from_key(key: str) -> tuple:
         return ("google", "gemini-2.0-flash", "https://generativelanguage.googleapis.com/v1beta/openai")
     if k.startswith("sk-or-"):
         return ("openrouter", "google/gemini-2.0-flash-exp:free", "https://openrouter.ai/api/v1")
-    if k.startswith("ollama_") or k.startswith("ol_") or (len(k) > 35 and "." in k):
+    if k.startswith("ollama_") or k.startswith("ol_"):
         return ("ollama", "gpt-oss:20b", "https://ollama.com/v1")
     if k.startswith("sk-") or k.startswith("sk_"):
         return ("openai", "gpt-4o-mini", "https://api.openai.com/v1")
@@ -957,6 +957,35 @@ Output format (MANDATORY): one line per input as "N|translation" with the same N
 
 
 def _fansub_system_prompt(src_name: str, tgt: str, tgt_name: str, custom_prompt: str = "") -> str:
+    cp = (custom_prompt or "").strip()
+    technical_format_rule = (
+        "\n\n==============================\n"
+        "FORMAT KELUARAN (MUTLAK WAJIB DIPATUHI):\n"
+        "1. Output WAJIB berupa baris-baris bernomor persis: N|teks_terjemahan (contoh: 1|Halo, 2|Apa kabar?).\n"
+        "2. Jangan sertakan teks pembuka, penutup, atau tanda kurung/kutip tambahan.\n"
+        "3. Pertahankan token <br> persis pada posisinya untuk ganti baris dalam 1 cue.\n"
+        "4. Jumlah baris dan nomor ID output WAJIB PERSIS SAMA dengan baris input yang diminta.\n"
+        "==============================\n"
+    )
+
+    if cp:
+        # Jika pengguna menyetel custom prompt lengkap / mandiri (lebih dari 200 karakter atau punya struktur section),
+        # jadikan custom prompt pengguna sebagai instruksi fansub utama tanpa menumpuk 400 baris prompt default.
+        if len(cp) > 200 or any(k in cp.upper() for k in ("PERAN", "PRINSIP", "PANDUAN", "ATURAN", "ROLE", "SYSTEM")):
+            return cp + technical_format_rule
+        else:
+            # Custom prompt pendek (gaya bahasa/dialek spesifik): padukan dengan instruksi fansub ringkas
+            src_label = "bahasa Inggris" if (src_name or "").lower() in ("en", "english") else (src_name or "bahasa Inggris")
+            compact_base = (
+                f"Kamu adalah penerjemah fansub anime Indonesia berpengalaman. Terjemahkan subtitle {src_label} "
+                "menjadi bahasa Indonesia yang sangat luwes, hidup, enak dibaca sekilas, dan adaptif mengikuti adegan.\n"
+                "Hindari bahasa kaku mesin penerjemah. Gunakan Bahasa Indonesia lisan/fansub alami. "
+                "Pertahankan nama orang, istilah anime, dan honorifik Jepang (-san, -kun, -chan, Senpai, Sensei).\n\n"
+                "INSTRUKSI KHUSUS DARI PENGGUNA:\n"
+                f"{cp}"
+            )
+            return compact_base + technical_format_rule
+
     base = ""
     if (tgt or "").lower() == "id":
         src_label = "bahasa Inggris" if (src_name or "").lower() in ("en", "english") else (src_name or "bahasa Inggris")
@@ -966,17 +995,6 @@ def _fansub_system_prompt(src_name: str, tgt: str, tgt_name: str, custom_prompt:
             base = _FANSUB_PROMPT_ID
     else:
         base = _FANSUB_PROMPT_GENERIC.format(src=src_name, tgt=tgt_name)
-
-    if custom_prompt and custom_prompt.strip():
-        cp = custom_prompt.strip()
-        user_block = (
-            "\n\n==============================\n"
-            "INSTRUKSI KHUSUS & GAYA DARI PENGGUNA (PRIORITAS TINGGI):\n"
-            f"{cp}\n"
-            "Patuhi instruksi gaya bahasa, dialek, dan istilah di atas dalam menerjemahkan dialog.\n"
-            "==============================\n"
-        )
-        base = base + user_block
     return base
 
 
@@ -2583,10 +2601,15 @@ class _RateLimited(RuntimeError):
 
 
 async def _chat_completion(client, apiurl, headers, payload) -> str:
-    r = await client.post(apiurl + "/chat/completions", json=payload, headers=headers)
+    clean_url = (apiurl or "").strip().rstrip("/")
+    if not clean_url.endswith("/chat/completions"):
+        endpoint_url = clean_url + "/chat/completions"
+    else:
+        endpoint_url = clean_url
+    r = await client.post(endpoint_url, json=payload, headers=headers)
     if r.status_code == 400 and any(k in payload for k in ("reasoning_format", "reasoning_effort")):
         payload = {k: v for k, v in payload.items() if k not in ("reasoning_format", "reasoning_effort")}
-        r = await client.post(apiurl + "/chat/completions", json=payload, headers=headers)
+        r = await client.post(endpoint_url, json=payload, headers=headers)
     if r.status_code == 429:
         raise _RateLimited(f"Rate limit (429): {_extract_err(r)}")
     if r.status_code in (401, 403):
@@ -2629,19 +2652,26 @@ async def call_openai_translate(cues, src, tgt, apikey, model, apiurl, timeout=1
     if not cues:
         return cues, stats
     apikey = (apikey or "").strip().strip("\"'").strip()
-    apiurl = (apiurl or "https://generativelanguage.googleapis.com/v1beta/openai").strip().rstrip("/")
-    prov = detect_provider(apiurl)
+    apiurl = (apiurl or "").strip().rstrip("/")
+    prov = detect_provider(apiurl) if apiurl else ""
 
-    # Otomatis sesuaikan model & apiurl berdasarkan format apikey dari pengguna
+    # Otomatis sesuaikan model & apiurl HANYA JIKA belum disetel pengguna (jangan timpa pilihan pengguna)
     if apikey:
         inferred_prov, inferred_model, inferred_url = detect_provider_from_key(apikey)
-        if inferred_prov != "custom" and (prov != inferred_prov or not model):
-            prov = inferred_prov
+        if not apiurl and inferred_url:
             apiurl = inferred_url
+            prov = inferred_prov
+        if not model and inferred_model:
             model = inferred_model
 
+    if not apiurl:
+        apiurl = "https://generativelanguage.googleapis.com/v1beta/openai"
+        prov = "google"
+    if not prov:
+        prov = detect_provider(apiurl)
+
     model = _normalize_model_name(prov, model)
-    cfg = _PROVIDER_CFG[prov]
+    cfg = _PROVIDER_CFG.get(prov, _PROVIDER_CFG["custom"])
     stats["provider"] = prov
 
     src_name = LANG_NAMES.get((src or "").lower(), src or "English")

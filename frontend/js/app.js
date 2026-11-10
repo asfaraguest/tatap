@@ -3317,8 +3317,11 @@ function startProgressiveChunkTranslate(sourceUrl, originalTrackUrl, mode, token
         chunks: chunks,
         aborted: false,
         activeWorkers: 0,
-        maxWorkers: 2,
-        completedCount: 0
+        maxWorkers: (mode === "ai" ? 1 : 2),
+        completedCount: 0,
+        actualEngine: mode,
+        aiFailed: false,
+        aiError: ""
       };
       cur._subChunkState = chunkState;
 
@@ -3335,10 +3338,16 @@ function startProgressiveChunkTranslate(sourceUrl, originalTrackUrl, mode, token
               referer: ref,
               lang: "id",
               mode: mode,
+              engine: chunkState.actualEngine,
+              ai_failed: chunkState.aiFailed,
               vtt_text: fullVtt
             })
           }).catch(function(){});
-          toast("✨ Seluruh subtitle Indonesia (" + modeLabel + ") selesai diterjemahkan!", 3500);
+          if(mode === "ai" && chunkState.aiFailed){
+            toast("✨ Subtitle Indonesia selesai diterjemahkan (Fallback GTX+)", 3500);
+          } else {
+            toast("✨ Seluruh subtitle Indonesia (" + modeLabel + ") selesai diterjemahkan!", 3500);
+          }
         }
       }
 
@@ -3380,6 +3389,16 @@ function startProgressiveChunkTranslate(sourceUrl, originalTrackUrl, mode, token
               if(chunkState.aborted || cur.playToken !== token) return;
 
               if(resData && resData.success && resData.data && resData.data.cues){
+                if(resData.data.ai_failed){
+                  chunkState.aiFailed = true;
+                  if(!chunkState.aiError && resData.data.error){
+                    chunkState.aiError = resData.data.error;
+                  }
+                }
+                if(resData.data.engine){
+                  chunkState.actualEngine = resData.data.engine;
+                }
+
                 var translatedList = resData.data.cues;
                 for(var k = 0; k < translatedList.length; k++){
                   var idx = chk.lo + k;
@@ -3395,7 +3414,12 @@ function startProgressiveChunkTranslate(sourceUrl, originalTrackUrl, mode, token
                 paintCue();
 
                 if(chk.index === 0){
-                  toast("Subtitle Indonesia (" + modeLabel + ") siap! Memuat lanjutan di latar...", 3000);
+                  if(mode === "ai" && chunkState.aiFailed){
+                    var errHint = chunkState.aiError ? (" (" + chunkState.aiError.slice(0, 60) + ")") : "";
+                    toast("⚠️ AI Fansub gagal" + errHint + ", beralih ke GTX+", 4500);
+                  } else {
+                    toast("Subtitle Indonesia (" + modeLabel + ") siap! Memuat lanjutan di latar...", 3000);
+                  }
                 }
               } else {
                 // Fallback error untuk chunk ini: tampilkan teks asli daripada freeze

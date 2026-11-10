@@ -3065,7 +3065,9 @@ async def api_translate_sub_chunk(body: dict = None):
             "tier": str(tier.get("level") or clean_mode),
             "engine": str(tier.get("engine") or clean_mode),
             "model": str(tier.get("model") or ""),
-            "count": len(out_cues)
+            "count": len(out_cues),
+            "error": str(tier.get("error") or ""),
+            "ai_failed": bool(tier.get("ai_failed"))
         })
     except Exception as exc:
         return fail(f"Gagal menerjemahkan chunk: {exc}")
@@ -3080,6 +3082,8 @@ async def api_save_subtitle_cache(body: dict = None):
     lang = str(body.get("lang") or "id").strip().lower()
     mode = str(body.get("mode") or "gtx+").strip().lower()
     vtt_text = str(body.get("vtt_text") or "").strip()
+    engine = str(body.get("engine") or "").strip().lower()
+    ai_failed = bool(body.get("ai_failed"))
 
     if not url or not vtt_text:
         return fail("url dan vtt_text wajib diisi")
@@ -3103,6 +3107,11 @@ async def api_save_subtitle_cache(body: dict = None):
 
     if lang != "id" or _is_valid_id_subtitle(vtt_text):
         if clean_mode == "ai":
+            # JANGAN simpan ke key_llm jika terjemahan sebenarnya berasal dari fallback GTX!
+            if ai_failed or (engine and engine != "ai"):
+                print(f"[SUB CACHE] Skip saving to key_llm: translation was produced by fallback {engine}")
+                await set_subtitle_cache(key_gtxplus, vtt_text)
+                return ok({"cached": True, "key": key_gtxplus, "warning": "Saved to gtx+ fallback only"})
             await set_subtitle_cache(key_llm, vtt_text)
         else:
             await set_subtitle_cache(key_gtxplus, vtt_text)
@@ -3200,7 +3209,7 @@ async def _translate_with_fallback(cues, src, tgt, requested_mode="gtx"):
         # Fallback ke Google GTX+
         try:
             translated = await call_gtx_translate(cues, src, tgt, mode="gtx+")
-            return {"cues": translated, "level": "tier2", "engine": "gtx+", "error": last_err}
+            return {"cues": translated, "level": "tier2", "engine": "gtx+", "error": last_err, "ai_failed": True}
         except Exception as e:
             last_err = f"{last_err} | GTX+ error: {e}"
             print(f"[TRANSLATE GTX+ ERROR] {e}")
@@ -3208,7 +3217,7 @@ async def _translate_with_fallback(cues, src, tgt, requested_mode="gtx"):
         # Fallback ke Google GTX
         try:
             translated = await call_gtx_translate(cues, src, tgt, mode="gtx")
-            return {"cues": translated, "level": "tier1", "engine": "gtx", "error": last_err}
+            return {"cues": translated, "level": "tier1", "engine": "gtx", "error": last_err, "ai_failed": True}
         except Exception as e:
             last_err = f"{last_err} | GTX error: {e}"
             print(f"[TRANSLATE GTX ERROR] {e}")
