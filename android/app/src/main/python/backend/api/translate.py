@@ -471,6 +471,9 @@ def _normalize_model_name(prov: str, model: str) -> str:
     m = (model or "").strip()
     if not m:
         return _DEFAULT_MODEL.get(prov, "gpt-oss:20b")
+    # Bersihkan prefix "models/" jika pengguna memasukkannya
+    if m.startswith("models/"):
+        m = m[7:].strip()
     # Koreksi typo penulisan umum (misal genma -> gemma)
     if "genma" in m.lower():
         m = _re.sub(r"(?i)genma", "gemma", m)
@@ -2669,6 +2672,12 @@ async def call_openai_translate(cues, src, tgt, apikey, model, apiurl, timeout=1
         prov = "google"
     if not prov:
         prov = detect_provider(apiurl)
+
+    if prov == "google":
+        # Google Generative Language OpenAI endpoint wajib berakhiran /v1beta/openai
+        clean_u = apiurl.rstrip("/")
+        if "generativelanguage.googleapis.com" in clean_u and not clean_u.endswith("/openai"):
+            apiurl = "https://generativelanguage.googleapis.com/v1beta/openai"
 
     model = _normalize_model_name(prov, model)
     cfg = _PROVIDER_CFG.get(prov, _PROVIDER_CFG["custom"])
