@@ -550,7 +550,7 @@ def _model_chain(prov: str, model: str):
     if prov == "ollama":
         chain += OLLAMA_FREE_MODELS
     elif prov == "google":
-        chain += ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-2.5-flash"]
+        chain += ["gemini-2.0-flash", "gemini-2.0-flash-lite", "gemini-1.5-flash"]
     elif prov == "groq":
         chain.append("llama-3.3-70b-versatile")
     seen, out = set(), []
