@@ -460,9 +460,13 @@ _LEGACY_MODEL_UPGRADE = {
         "gpt-oss-20b": "gpt-oss:20b",
     },
     "google": {
-        "gemini-3.1-flash-lite": "gemini-2.0-flash",
-        "gemini-3.8-flash": "gemini-2.0-flash",
-        "gemini-1.5-flash-latest": "gemini-1.5-flash",
+        "gemini-2.0-flash": "gemini-3.1-flash-lite",
+        "gemini-2.0-flash-lite": "gemini-3.1-flash-lite",
+        "gemini-2.5-flash": "gemini-3.5-flash",
+        "gemini-2.5-flash-lite": "gemini-3.5-flash-lite",
+        "gemini-1.5-flash": "gemini-3.1-flash-lite",
+        "gemini-1.5-flash-latest": "gemini-3.1-flash-lite",
+        "gemini-flash-latest": "gemini-3.5-flash",
     },
 }
 
@@ -470,7 +474,7 @@ def _normalize_model_name(prov: str, model: str) -> str:
     """Normalisasi nama model: tangani variasi penulisan/typo dan pembaruan model lama."""
     m = (model or "").strip()
     if not m:
-        return _DEFAULT_MODEL.get(prov, "gpt-oss:20b")
+        return _DEFAULT_MODEL.get(prov, "gemini-3.1-flash-lite" if prov == "google" else "gpt-oss:20b")
     # Bersihkan prefix "models/" jika pengguna memasukkannya
     if m.startswith("models/"):
         m = m[7:].strip()
@@ -482,7 +486,7 @@ def _normalize_model_name(prov: str, model: str) -> str:
 _DEFAULT_MODEL = {
     "ollama": "gpt-oss:20b",
     "ollama_local": "gpt-oss:20b",
-    "google": "gemini-2.0-flash",
+    "google": "gemini-3.1-flash-lite",
     "groq": "llama-3.3-70b-versatile",
     "openrouter": "google/gemini-2.0-flash-exp:free",
     "openai": "gpt-4o-mini",
@@ -533,11 +537,11 @@ def detect_provider_from_key(key: str) -> tuple:
     """Mengembalikan (provider, default_model, default_apiurl) menyesuaikan apikey dari user."""
     k = (key or "").strip().strip("\"'").strip()
     if not k:
-        return ("google", "gemini-2.0-flash", "https://generativelanguage.googleapis.com/v1beta/openai")
+        return ("google", "gemini-3.1-flash-lite", "https://generativelanguage.googleapis.com/v1beta/openai")
     if k.startswith("gsk_"):
         return ("groq", "llama-3.3-70b-versatile", "https://api.groq.com/openai/v1")
     if k.startswith("AQ.") or k.startswith("AIza") or k.startswith("AQ"):
-        return ("google", "gemini-2.0-flash", "https://generativelanguage.googleapis.com/v1beta/openai")
+        return ("google", "gemini-3.1-flash-lite", "https://generativelanguage.googleapis.com/v1beta/openai")
     if k.startswith("sk-or-"):
         return ("openrouter", "google/gemini-2.0-flash-exp:free", "https://openrouter.ai/api/v1")
     if k.startswith("ollama_") or k.startswith("ol_"):
@@ -553,7 +557,7 @@ def _model_chain(prov: str, model: str):
     if prov == "ollama":
         chain += OLLAMA_FREE_MODELS
     elif prov == "google":
-        chain += ["gemini-2.0-flash", "gemini-2.0-flash-lite", "gemini-1.5-flash"]
+        chain += ["gemini-3.1-flash-lite", "gemini-3.5-flash", "gemini-3.5-flash-lite", "gemini-flash-lite-latest"]
     elif prov == "groq":
         chain.append("llama-3.3-70b-versatile")
     seen, out = set(), []

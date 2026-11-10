@@ -2774,7 +2774,7 @@ async def _prewarm_sub_translation(url: str, referer: str, src: str = "en", lang
     key_gtx = "sub2|gtx|" + base_hash
     key_gtxplus = "sub2|gtx+|" + base_hash
     custom_prompt = (await get_setting("translate_custom_prompt", "")).strip()
-    active_model = (await get_setting("translate_model", "gemini-2.0-flash")).strip()
+    active_model = (await get_setting("translate_model", "gemini-3.1-flash-lite")).strip()
     prompt_tag = hashlib.sha1(f"{active_model}|{custom_prompt}".encode("utf-8")).hexdigest()[:8] if custom_prompt else "def"
     key_llm = f"sub2|llm|{base_hash}|{prompt_tag}"
     hit = await _get_validated_subtitle_cache(key_gtx, lang=lang)
@@ -2892,7 +2892,7 @@ async def proxy_sub(url: str = Query(""),
     key_aigtx = "sub2|aigtx|" + base_hash
     key_gtx = "sub2|gtx|" + base_hash
     custom_prompt = (await get_setting("translate_custom_prompt", "")).strip()
-    active_model = (await get_setting("translate_model", "gemini-2.0-flash")).strip()
+    active_model = (await get_setting("translate_model", "gemini-3.1-flash-lite")).strip()
     prompt_tag = hashlib.sha1(f"{active_model}|{custom_prompt}".encode("utf-8")).hexdigest()[:8] if custom_prompt else "def"
     key_llm = f"sub2|llm|{base_hash}|{prompt_tag}"
     key_os_merge = "sub2|os_merge|" + os_ctx_hash
@@ -3101,7 +3101,7 @@ async def api_save_subtitle_cache(body: dict = None):
     key_gtxplus = "sub2|gtx+|" + base_hash
 
     custom_prompt = (await get_setting("translate_custom_prompt", "")).strip()
-    active_model = (await get_setting("translate_model", "gemini-2.0-flash")).strip()
+    active_model = (await get_setting("translate_model", "gemini-3.1-flash-lite")).strip()
     prompt_tag = hashlib.sha1(f"{active_model}|{custom_prompt}".encode("utf-8")).hexdigest()[:8] if custom_prompt else "def"
     key_llm = f"sub2|llm|{base_hash}|{prompt_tag}"
 
@@ -3193,7 +3193,7 @@ async def _translate_with_fallback(cues, src, tgt, requested_mode="gtx"):
         # 1. Coba AI Fansub jika ada API key atau LLM lokal
         if await _llm_enabled():
             apikey = await get_setting("translate_apikey", "")
-            model = await get_setting("translate_model", "gemini-2.0-flash")
+            model = await get_setting("translate_model", "gemini-3.1-flash-lite")
             apiurl = await get_setting("translate_apiurl", "https://generativelanguage.googleapis.com/v1beta/openai")
             custom_prompt = await get_setting("translate_custom_prompt", "")
             try:
@@ -3234,7 +3234,7 @@ async def _translate_with_fallback(cues, src, tgt, requested_mode="gtx"):
         # 2. Coba AI jika aktif
         if await _llm_enabled():
             apikey = await get_setting("translate_apikey", "")
-            model = await get_setting("translate_model", "gemini-2.0-flash")
+            model = await get_setting("translate_model", "gemini-3.1-flash-lite")
             apiurl = await get_setting("translate_apiurl", "https://generativelanguage.googleapis.com/v1beta/openai")
             custom_prompt = await get_setting("translate_custom_prompt", "")
             try:
@@ -3272,7 +3272,7 @@ async def _translate_with_fallback(cues, src, tgt, requested_mode="gtx"):
         # 3. Coba AI jika aktif
         if await _llm_enabled():
             apikey = await get_setting("translate_apikey", "")
-            model = await get_setting("translate_model", "gemini-2.0-flash")
+            model = await get_setting("translate_model", "gemini-3.1-flash-lite")
             apiurl = await get_setting("translate_apiurl", "https://generativelanguage.googleapis.com/v1beta/openai")
             custom_prompt = await get_setting("translate_custom_prompt", "")
             try:
@@ -4017,7 +4017,7 @@ async def get_set():
         # Translate API (opsional). User isi via settings panel. Fallback ke
         # MyMemory kalau kosong. translate_apikey tidak pernah di-log.
         "translate_apikey": _v("translate_apikey", ""),
-        "translate_model": _v("translate_model", "gemini-2.0-flash"),
+        "translate_model": _v("translate_model", "gemini-3.1-flash-lite"),
         "translate_apiurl": _v("translate_apiurl", "https://generativelanguage.googleapis.com/v1beta/openai"),
         "translate_custom_prompt": _v("translate_custom_prompt", ""),
         "safe_mode": _v("safe_mode", "1"),

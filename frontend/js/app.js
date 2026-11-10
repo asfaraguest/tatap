@@ -6608,7 +6608,7 @@ async function openAiSettingsModal(){
     var r = await window.Tatap.getSettings();
     var d = (r && r.success && r.data) || {};
     var key = d.translate_apikey || "";
-    var model = d.translate_model || "gemini-2.0-flash";
+    var model = d.translate_model || "gemini-3.1-flash-lite";
     var url = d.translate_apiurl || "https://generativelanguage.googleapis.com/v1beta/openai";
     var prompt = d.translate_custom_prompt || "";
 
@@ -7416,7 +7416,7 @@ function init(){
     btn.addEventListener("click", function(){
       var prov = btn.getAttribute("data-provider");
       if(prov === "gemini"){
-        if($("ai-input-model")) $("ai-input-model").value = "gemini-2.0-flash";
+        if($("ai-input-model")) $("ai-input-model").value = "gemini-3.1-flash-lite";
         if($("ai-input-url")) $("ai-input-url").value = "https://generativelanguage.googleapis.com/v1beta/openai";
       } else if(prov === "groq"){
         if($("ai-input-model")) $("ai-input-model").value = "llama-3.3-70b-versatile";
@@ -7472,7 +7472,7 @@ function init(){
 
     var payload = {
       translate_apikey: key,
-      translate_model: model || "gemini-2.0-flash",
+      translate_model: model || "gemini-3.1-flash-lite",
       translate_apiurl: url || "https://generativelanguage.googleapis.com/v1beta/openai",
       translate_custom_prompt: prompt
     };
