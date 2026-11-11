@@ -4046,6 +4046,12 @@ async def set_set(body: dict = None):
             await set_setting(k, body[k])
     return await get_set()
 
+@app.get("/api/translate/providers")
+async def get_translate_providers_api():
+    """Mengembalikan katalog resmi provider AI free-tier dan model-model yang didukung."""
+    from api.translate import FREE_TIER_CATALOG
+    return {"success": True, "data": FREE_TIER_CATALOG}
+
 @app.get("/api/translate/logs")
 async def get_translate_logs_api():
     """Mengambil riwayat log aktivitas translasi subtitle terbaru."""

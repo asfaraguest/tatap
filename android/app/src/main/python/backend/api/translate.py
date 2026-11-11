@@ -1,8 +1,8 @@
 """Subtitle translation module.
 
 Multi-tier fallback translate subtitle cues (orkestrasi di main._translate_with_fallback):
-  Tier 1: AI Fansub LLM (OpenAI-compatible: Ollama Cloud free / Gemini / Groq / OpenRouter /
-          Ollama lokal). Format ber-ID `N|teks`, batch paralel, rotasi model saat limit,
+  Tier 1: AI Fansub LLM (OpenAI-compatible: Google Gemini / Groq / OpenRouter /
+          Cerebras / Custom). Format ber-ID `N|teks`, batch paralel, rotasi model saat limit,
           baris yang gagal diisi Google GTX (hybrid) — tidak lagi all-or-nothing.
   Tier 2: Google GTX Web RPC (zero-key, terjemahan literal/kaku)
   Tier 3: MyMemory REST API publik (gratis, 5000 char/day per IP, soft limit 4500)
@@ -450,14 +450,81 @@ def _extract_err(resp):
 # Tier 1: AI Fansub (LLM, OpenAI-compatible)
 # ---------------------------------------------------------------------------
 
-# Model Ollama Cloud yang masuk Free plan (khusus gpt-oss)
-OLLAMA_FREE_MODELS = ["gpt-oss:20b", "gpt-oss:120b"]
+# Katalog Resmi Provider AI Free Tier & Model-Model yang Didukung
+FREE_TIER_CATALOG = {
+    "google": {
+        "name": "Google Gemini",
+        "label": "Google AI Studio",
+        "url": "https://generativelanguage.googleapis.com/v1beta/openai",
+        "default": "gemini-3.1-flash-lite",
+        "key_prefix": ["AIza", "AQ.", "AQ"],
+        "models": [
+            {"id": "gemini-3.1-flash-lite", "tag": "Rekomendasi", "desc": "Cepat & Ringan"},
+            {"id": "gemini-3.5-flash", "tag": "Akurat", "desc": "Multitask Kuat"},
+            {"id": "gemini-3.5-flash-lite", "tag": "Hemat", "desc": "Ultra Low Cost"},
+            {"id": "gemini-flash-lite-latest", "tag": "Terbaru", "desc": "Versi Flash Lite Terbaru"},
+        ],
+        "chain": [
+            "gemini-3.1-flash-lite",
+            "gemini-3.5-flash",
+            "gemini-3.5-flash-lite",
+            "gemini-flash-lite-latest",
+        ],
+    },
+    "groq": {
+        "name": "Groq",
+        "label": "Groq Cloud",
+        "url": "https://api.groq.com/openai/v1",
+        "default": "llama-3.3-70b-versatile",
+        "key_prefix": ["gsk_"],
+        "models": [
+            {"id": "llama-3.3-70b-versatile", "tag": "Rekomendasi", "desc": "70B Akurasi Tinggi"},
+            {"id": "llama-3.1-8b-instant", "tag": "Cepat", "desc": "Instant Low Latency"},
+            {"id": "gemma2-9b-it", "tag": "Gemma 2", "desc": "Google Gemma 2 9B"},
+        ],
+        "chain": ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "gemma2-9b-it"],
+    },
+    "openrouter": {
+        "name": "OpenRouter",
+        "label": "OpenRouter (Free)",
+        "url": "https://openrouter.ai/api/v1",
+        "default": "google/gemini-2.0-flash-exp:free",
+        "key_prefix": ["sk-or-"],
+        "models": [
+            {"id": "google/gemini-2.0-flash-exp:free", "tag": "Rekomendasi", "desc": "Gemini 2.0 Free"},
+            {"id": "meta-llama/llama-3.3-70b-instruct:free", "tag": "Llama 3.3", "desc": "Llama 70B Free"},
+            {"id": "deepseek/deepseek-r1:free", "tag": "DeepSeek", "desc": "R1 Reasoning Free"},
+            {"id": "qwen/qwen-2.5-coder-32b-instruct:free", "tag": "Qwen", "desc": "Qwen 32B Free"},
+            {"id": "mistralai/mistral-7b-instruct:free", "tag": "Mistral", "desc": "Mistral 7B Free"},
+        ],
+        "chain": [
+            "google/gemini-2.0-flash-exp:free",
+            "meta-llama/llama-3.3-70b-instruct:free",
+            "deepseek/deepseek-r1:free",
+            "qwen/qwen-2.5-coder-32b-instruct:free",
+        ],
+    },
+    "cerebras": {
+        "name": "Cerebras",
+        "label": "Cerebras (Fast)",
+        "url": "https://api.cerebras.ai/v1",
+        "default": "llama3.3-70b",
+        "key_prefix": ["csk-"],
+        "models": [
+            {"id": "llama3.3-70b", "tag": "Rekomendasi", "desc": "2000+ t/s High Quality"},
+            {"id": "llama3.1-8b", "tag": "Instan", "desc": "Ultra Fast Latency"},
+        ],
+        "chain": ["llama3.3-70b", "llama3.1-8b"],
+    },
+}
 
 # Normalisasi penamaan model lama ke model aktif
 _LEGACY_MODEL_UPGRADE = {
     "ollama": {
-        "gpt-oss:20b-cloud": "gpt-oss:20b",
-        "gpt-oss-20b": "gpt-oss:20b",
+        "gpt-oss:20b": "llama-3.3-70b-versatile",
+        "gpt-oss:120b": "llama-3.3-70b-versatile",
+        "gpt-oss:20b-cloud": "llama-3.3-70b-versatile",
+        "gpt-oss-20b": "llama-3.3-70b-versatile",
     },
     "google": {
         "gemini-2.0-flash": "gemini-3.1-flash-lite",
@@ -474,7 +541,7 @@ def _normalize_model_name(prov: str, model: str) -> str:
     """Normalisasi nama model: tangani variasi penulisan/typo dan pembaruan model lama."""
     m = (model or "").strip()
     if not m:
-        return _DEFAULT_MODEL.get(prov, "gemini-3.1-flash-lite" if prov == "google" else "gpt-oss:20b")
+        return _DEFAULT_MODEL.get(prov, "gemini-3.1-flash-lite")
     # Bersihkan prefix "models/" jika pengguna memasukkannya
     if m.startswith("models/"):
         m = m[7:].strip()
@@ -484,29 +551,31 @@ def _normalize_model_name(prov: str, model: str) -> str:
     return _LEGACY_MODEL_UPGRADE.get(prov, {}).get(m, m)
 
 _DEFAULT_MODEL = {
-    "ollama": "gpt-oss:20b",
-    "ollama_local": "gpt-oss:20b",
     "google": "gemini-3.1-flash-lite",
     "groq": "llama-3.3-70b-versatile",
     "openrouter": "google/gemini-2.0-flash-exp:free",
+    "cerebras": "llama3.3-70b",
     "openai": "gpt-4o-mini",
-    "custom": "gpt-4o-mini",
+    "custom": "gemini-3.1-flash-lite",
 }
 
 # batch = jumlah cue per request, conc = request paralel.
 _PROVIDER_CFG = {
     "google": {"batch": 80, "conc": 2},
-    "ollama": {"batch": 50, "conc": 3},
-    "ollama_local": {"batch": 20, "conc": 1},
     "groq": {"batch": 40, "conc": 2},
     "openrouter": {"batch": 40, "conc": 2},
+    "cerebras": {"batch": 40, "conc": 2},
     "openai": {"batch": 60, "conc": 3},
     "custom": {"batch": 40, "conc": 2},
 }
 
 _PROVIDER_LABEL = {
-    "google": "Google AI Studio", "ollama": "Ollama Cloud", "ollama_local": "Ollama Lokal",
-    "groq": "Groq", "openrouter": "OpenRouter", "openai": "OpenAI", "custom": "OpenAI-compatible",
+    "google": "Google AI Studio",
+    "groq": "Groq",
+    "openrouter": "OpenRouter (Free)",
+    "cerebras": "Cerebras (Fast Free)",
+    "openai": "OpenAI",
+    "custom": "OpenAI-compatible",
 }
 
 
@@ -520,14 +589,12 @@ def detect_provider(apiurl: str) -> str:
     u = (apiurl or "").lower()
     if "googleapis.com" in u:
         return "google"
-    if "ollama.com" in u:
-        return "ollama"
-    if is_local_llm(u):
-        return "ollama_local"
     if "groq.com" in u:
         return "groq"
     if "openrouter.ai" in u:
         return "openrouter"
+    if "cerebras.ai" in u:
+        return "cerebras"
     if "openai.com" in u:
         return "openai"
     return "custom"
@@ -544,22 +611,18 @@ def detect_provider_from_key(key: str) -> tuple:
         return ("google", "gemini-3.1-flash-lite", "https://generativelanguage.googleapis.com/v1beta/openai")
     if k.startswith("sk-or-"):
         return ("openrouter", "google/gemini-2.0-flash-exp:free", "https://openrouter.ai/api/v1")
-    if k.startswith("ollama_") or k.startswith("ol_"):
-        return ("ollama", "gpt-oss:20b", "https://ollama.com/v1")
+    if k.startswith("csk-"):
+        return ("cerebras", "llama3.3-70b", "https://api.cerebras.ai/v1")
     if k.startswith("sk-") or k.startswith("sk_"):
         return ("openai", "gpt-4o-mini", "https://api.openai.com/v1")
-    return ("custom", "gpt-4o-mini", "https://api.openai.com/v1")
+    return ("custom", "gemini-3.1-flash-lite", "https://generativelanguage.googleapis.com/v1beta/openai")
 
 
 def _model_chain(prov: str, model: str):
     """Urutan model yang dicoba; model berikutnya dipakai saat limit/402/404."""
     chain = [model]
-    if prov == "ollama":
-        chain += OLLAMA_FREE_MODELS
-    elif prov == "google":
-        chain += ["gemini-3.1-flash-lite", "gemini-3.5-flash", "gemini-3.5-flash-lite", "gemini-flash-lite-latest"]
-    elif prov == "groq":
-        chain.append("llama-3.3-70b-versatile")
+    if prov in FREE_TIER_CATALOG:
+        chain += FREE_TIER_CATALOG[prov].get("chain", [])
     seen, out = set(), []
     for m in chain:
         if m and m not in seen:
@@ -967,7 +1030,7 @@ def _fansub_system_prompt(src_name: str, tgt: str, tgt_name: str, custom_prompt:
     cp = (custom_prompt or "").strip()
     technical_format_rule = (
         "\n\n==============================\n"
-        "FORMAT KELUARAN (MUTLAK WAJIB DIPATUHI):\n"
+        "FORMAT KELUARAN (WAJIB):\n"
         "1. Output WAJIB berupa baris-baris bernomor persis: N|teks_terjemahan (contoh: 1|Halo, 2|Apa kabar?).\n"
         "2. Jangan sertakan teks pembuka, penutup, atau tanda kurung/kutip tambahan.\n"
         "3. Pertahankan token <br> persis pada posisinya untuk ganti baris dalam 1 cue.\n"
@@ -980,7 +1043,7 @@ def _fansub_system_prompt(src_name: str, tgt: str, tgt_name: str, custom_prompt:
         # jadikan custom prompt pengguna sebagai instruksi fansub utama tanpa menumpuk 400 baris prompt default.
         if len(cp) > 200 or any(k in cp.upper() for k in ("PERAN", "PRINSIP", "PANDUAN", "ATURAN", "ROLE", "SYSTEM")):
             return cp + technical_format_rule
-        else:
+        elif (tgt or "").lower() == "id":
             # Custom prompt pendek (gaya bahasa/dialek spesifik): padukan dengan instruksi fansub ringkas
             src_label = "bahasa Inggris" if (src_name or "").lower() in ("en", "english") else (src_name or "bahasa Inggris")
             compact_base = (
@@ -988,10 +1051,20 @@ def _fansub_system_prompt(src_name: str, tgt: str, tgt_name: str, custom_prompt:
                 "menjadi bahasa Indonesia yang sangat luwes, hidup, enak dibaca sekilas, dan adaptif mengikuti adegan.\n"
                 "Hindari bahasa kaku mesin penerjemah. Gunakan Bahasa Indonesia lisan/fansub alami. "
                 "Pertahankan nama orang, istilah anime, dan honorifik Jepang (-san, -kun, -chan, Senpai, Sensei).\n\n"
-                "INSTRUKSI KHUSUS DARI PENGGUNA:\n"
+                "INSTRUKSI KHUSUS & GAYA DARI PENGGUNA (PRIORITAS TINGGI):\n"
                 f"{cp}"
             )
             return compact_base + technical_format_rule
+        else:
+            compact_base = (
+                f"You are an experienced anime fansub translator. Translate the subtitles from {src_name} to natural, fluent {tgt_name}.\n\n"
+                "INSTRUKSI KHUSUS & GAYA DARI PENGGUNA (PRIORITAS TINGGI):\n"
+                f"{cp}\n\n"
+                "Output format (MANDATORY):\n"
+                "1. Each line MUST be formatted as: N|translation\n"
+                "2. Preserve <br> tokens exactly for line breaks."
+            )
+            return compact_base
 
     base = ""
     if (tgt or "").lower() == "id":

@@ -6588,6 +6588,144 @@ function closeUpdateModal(){
   if(m) m.classList.add("hidden");
 }
 
+var AI_FREE_CATALOG = {
+  gemini: {
+    label: "Google Gemini",
+    prov: "google",
+    url: "https://generativelanguage.googleapis.com/v1beta/openai",
+    placeholderKey: "Tempel API key Google AI Studio (AIza... / AQ...)",
+    defaultModel: "gemini-3.1-flash-lite",
+    models: [
+      { id: "gemini-3.1-flash-lite", tag: "Rekomendasi", desc: "Cepat & Ringan" },
+      { id: "gemini-3.5-flash", tag: "Akurat", desc: "Multitask Kuat" },
+      { id: "gemini-3.5-flash-lite", tag: "Hemat", desc: "Ultra Low Cost" },
+      { id: "gemini-flash-lite-latest", tag: "Terbaru", desc: "Flash Lite Terbaru" }
+    ]
+  },
+  groq: {
+    label: "Groq",
+    prov: "groq",
+    url: "https://api.groq.com/openai/v1",
+    placeholderKey: "Tempel API key Groq (gsk_...)",
+    defaultModel: "llama-3.3-70b-versatile",
+    models: [
+      { id: "llama-3.3-70b-versatile", tag: "Rekomendasi", desc: "70B Akurasi Tinggi" },
+      { id: "llama-3.1-8b-instant", tag: "Cepat", desc: "Instant Low Latency" },
+      { id: "gemma2-9b-it", tag: "Gemma 2", desc: "Google Gemma 9B" }
+    ]
+  },
+  openrouter: {
+    label: "OpenRouter (Free)",
+    prov: "openrouter",
+    url: "https://openrouter.ai/api/v1",
+    placeholderKey: "Tempel API key OpenRouter (sk-or-...)",
+    defaultModel: "google/gemini-2.0-flash-exp:free",
+    models: [
+      { id: "google/gemini-2.0-flash-exp:free", tag: "Rekomendasi", desc: "Gemini 2.0 Free" },
+      { id: "meta-llama/llama-3.3-70b-instruct:free", tag: "Llama 3.3", desc: "70B Free" },
+      { id: "deepseek/deepseek-r1:free", tag: "DeepSeek", desc: "R1 Reasoning Free" },
+      { id: "qwen/qwen-2.5-coder-32b-instruct:free", tag: "Qwen", desc: "Coder 32B Free" },
+      { id: "mistralai/mistral-7b-instruct:free", tag: "Mistral", desc: "Mistral 7B Free" }
+    ]
+  },
+  cerebras: {
+    label: "Cerebras (Fast)",
+    prov: "cerebras",
+    url: "https://api.cerebras.ai/v1",
+    placeholderKey: "Tempel API key Cerebras (csk-...)",
+    defaultModel: "llama3.3-70b",
+    models: [
+      { id: "llama3.3-70b", tag: "Rekomendasi", desc: "2000+ t/s High Quality" },
+      { id: "llama3.1-8b", tag: "Instan", desc: "Ultra Fast Latency" }
+    ]
+  }
+};
+
+function detectAiProviderKey(url, key) {
+  var k = (key || "").trim();
+  if(k.indexOf("gsk_") === 0) return "groq";
+  if(k.indexOf("AQ.") === 0 || k.indexOf("AIza") === 0 || k.indexOf("AQ") === 0) return "gemini";
+  if(k.indexOf("sk-or-") === 0) return "openrouter";
+  if(k.indexOf("csk-") === 0) return "cerebras";
+
+  var u = (url || "").toLowerCase();
+  if(u.indexOf("googleapis.com") !== -1) return "gemini";
+  if(u.indexOf("groq.com") !== -1) return "groq";
+  if(u.indexOf("openrouter.ai") !== -1) return "openrouter";
+  if(u.indexOf("cerebras.ai") !== -1) return "cerebras";
+  return "gemini";
+}
+
+function renderFreeTierModels(providerKey, activeModel) {
+  var provData = AI_FREE_CATALOG[providerKey] || AI_FREE_CATALOG.gemini;
+  var currentModel = (activeModel || ($("ai-input-model") ? $("ai-input-model").value : "") || provData.defaultModel).trim();
+
+  // Update badge provider
+  var badgeProv = $("ai-free-models-prov");
+  if(badgeProv) badgeProv.textContent = provData.label;
+
+  // Update preset button active state
+  document.querySelectorAll(".ai-presets-row .btn-preset").forEach(function(b){
+    if(b.getAttribute("data-provider") === providerKey){
+      b.classList.add("active");
+    } else {
+      b.classList.remove("active");
+    }
+  });
+
+  // Update datalist for auto-complete on input
+  var dl = $("ai-model-datalist");
+  if(dl){
+    dl.innerHTML = "";
+    (provData.models || []).forEach(function(m){
+      var opt = document.createElement("option");
+      opt.value = m.id;
+      opt.label = m.tag + " - " + m.desc;
+      dl.appendChild(opt);
+    });
+  }
+
+  // Populate interactive chips
+  var container = $("ai-free-models-chips");
+  if(container){
+    container.innerHTML = "";
+    (provData.models || []).forEach(function(m){
+      var chip = document.createElement("button");
+      chip.type = "button";
+      chip.className = "ai-model-chip" + (m.id === currentModel ? " active" : "");
+      chip.setAttribute("data-model", m.id);
+      chip.title = m.desc || m.id;
+
+      var nameSpan = document.createElement("span");
+      nameSpan.className = "ai-chip-name";
+      nameSpan.textContent = m.id;
+
+      var tagSpan = document.createElement("span");
+      tagSpan.className = "ai-chip-badge";
+      tagSpan.textContent = m.tag;
+
+      chip.appendChild(nameSpan);
+      chip.appendChild(tagSpan);
+
+      chip.addEventListener("click", function(){
+        if($("ai-input-model")) {
+          $("ai-input-model").value = m.id;
+        }
+        if($("ai-status-model")) {
+          $("ai-status-model").textContent = m.id;
+        }
+        container.querySelectorAll(".ai-model-chip").forEach(function(c){
+          c.classList.remove("active");
+        });
+        chip.classList.add("active");
+        if(window.TatapSfx) TatapSfx.play("select");
+      });
+
+      container.appendChild(chip);
+    });
+  }
+}
+
 async function openAiSettingsModal(){
   var m = $("ai-settings-modal");
   if(!m) return;
@@ -6617,7 +6755,16 @@ async function openAiSettingsModal(){
     if($("ai-input-url")) $("ai-input-url").value = url;
     if($("ai-input-prompt")) $("ai-input-prompt").value = prompt;
 
-    var provLabel = key ? (key.indexOf("gsk_")===0 ? "Groq" : (key.indexOf("AQ.")===0 || key.indexOf("AIza")===0) ? "Google Gemini" : key.indexOf("sk-")===0 ? "OpenAI" : "Aktif (Kustom)") : "Belum Disetel";
+    var provKey = detectAiProviderKey(url, key);
+    renderFreeTierModels(provKey, model);
+
+    var provLabel = key ? (
+      key.indexOf("gsk_") === 0 ? "Groq" :
+      (key.indexOf("AQ.") === 0 || key.indexOf("AIza") === 0) ? "Google Gemini" :
+      key.indexOf("sk-or-") === 0 ? "OpenRouter (Free)" :
+      key.indexOf("csk-") === 0 ? "Cerebras (Fast)" :
+      key.indexOf("sk-") === 0 ? "OpenAI" : "Aktif (Kustom)"
+    ) : "Belum Disetel";
     if($("ai-status-prov")) {
       $("ai-status-prov").textContent = provLabel;
       $("ai-status-prov").className = "badge-status " + (key ? "completed" : "ongoing");
@@ -7411,25 +7558,60 @@ function init(){
     if(e.target === aiModal) closeAiSettingsModal();
   });
 
-  // AI Presets
+  // AI Presets & Dynamic Free Tier Model Selection
   document.querySelectorAll(".ai-presets-row .btn-preset").forEach(function(btn){
     btn.addEventListener("click", function(){
       var prov = btn.getAttribute("data-provider");
-      if(prov === "gemini"){
-        if($("ai-input-model")) $("ai-input-model").value = "gemini-3.1-flash-lite";
-        if($("ai-input-url")) $("ai-input-url").value = "https://generativelanguage.googleapis.com/v1beta/openai";
-      } else if(prov === "groq"){
-        if($("ai-input-model")) $("ai-input-model").value = "llama-3.3-70b-versatile";
-        if($("ai-input-url")) $("ai-input-url").value = "https://api.groq.com/openai/v1";
-      } else if(prov === "ollama"){
-        if($("ai-input-model")) $("ai-input-model").value = "gpt-oss:20b";
-        if($("ai-input-url")) $("ai-input-url").value = "https://ollama.com/v1";
-      } else if(prov === "openai"){
-        if($("ai-input-model")) $("ai-input-model").value = "gpt-4o-mini";
-        if($("ai-input-url")) $("ai-input-url").value = "https://api.openai.com/v1";
-      }
+      var pData = AI_FREE_CATALOG[prov];
+      if(!pData) return;
+      if($("ai-input-model")) $("ai-input-model").value = pData.defaultModel;
+      if($("ai-input-url")) $("ai-input-url").value = pData.url;
+      if($("ai-input-key") && pData.placeholderKey) $("ai-input-key").placeholder = pData.placeholderKey;
+      if($("ai-status-model")) $("ai-status-model").textContent = pData.defaultModel;
+      renderFreeTierModels(prov, pData.defaultModel);
+      if(window.TatapSfx) TatapSfx.play("tick");
     });
   });
+
+  // Real-time API Key Provider Detection & Dynamic Model Switching
+  var aiKeyInput = $("ai-input-key");
+  if(aiKeyInput){
+    aiKeyInput.addEventListener("input", function(){
+      var val = aiKeyInput.value.trim();
+      if(!val) return;
+      var detected = detectAiProviderKey("", val);
+      if(detected && AI_FREE_CATALOG[detected]){
+        var pData = AI_FREE_CATALOG[detected];
+        if($("ai-input-url") && (!($("ai-input-url").value) || $("ai-input-url").value.indexOf("localhost") === -1)) {
+          $("ai-input-url").value = pData.url;
+        }
+        var curModel = $("ai-input-model") ? $("ai-input-model").value.trim() : "";
+        var isModelMismatched = !curModel || (detected !== "gemini" && curModel.indexOf("gemini") !== -1) || (detected === "gemini" && curModel.indexOf("llama") !== -1);
+        if($("ai-input-model") && isModelMismatched) {
+          $("ai-input-model").value = pData.defaultModel;
+          if($("ai-status-model")) $("ai-status-model").textContent = pData.defaultModel;
+        }
+        renderFreeTierModels(detected, $("ai-input-model") ? $("ai-input-model").value : pData.defaultModel);
+      }
+    });
+  }
+
+  // Model input dynamic chip sync
+  var aiModelInput = $("ai-input-model");
+  if(aiModelInput){
+    aiModelInput.addEventListener("input", function(){
+      var cur = aiModelInput.value.trim();
+      if($("ai-status-model")) $("ai-status-model").textContent = cur || "gemini-3.1-flash-lite";
+      var chips = document.querySelectorAll("#ai-free-models-chips .ai-model-chip");
+      chips.forEach(function(c){
+        if(c.getAttribute("data-model") === cur){
+          c.classList.add("active");
+        } else {
+          c.classList.remove("active");
+        }
+      });
+    });
+  }
 
   // Custom Prompt Templates
   var tplCasual = $("btn-tpl-casual");

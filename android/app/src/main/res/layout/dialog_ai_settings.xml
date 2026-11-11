@@ -68,7 +68,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="3dp"
-                    android:text="Model   : gemini-2.0-flash"
+                    android:text="Model   : gemini-3.1-flash-lite"
                     android:textColor="#E1E7EF"
                     android:textSize="11.5sp" />
 
@@ -131,23 +131,23 @@
                 android:layout_marginBottom="12dp">
 
                 <Button
-                    android:id="@+id/btn_preset_ollama"
+                    android:id="@+id/btn_preset_openrouter"
                     android:layout_width="0dp"
                     android:layout_height="34dp"
                     android:layout_weight="1"
                     android:layout_marginEnd="3dp"
-                    android:text="Ollama Cloud"
+                    android:text="OpenRouter (Free)"
                     android:textColor="#FFFFFF"
                     android:backgroundTint="#161922"
                     android:textSize="10.5sp" />
 
                 <Button
-                    android:id="@+id/btn_preset_openai"
+                    android:id="@+id/btn_preset_cerebras"
                     android:layout_width="0dp"
                     android:layout_height="34dp"
                     android:layout_weight="1"
                     android:layout_marginStart="3dp"
-                    android:text="OpenAI"
+                    android:text="Cerebras (Fast)"
                     android:textColor="#FFFFFF"
                     android:backgroundTint="#161922"
                     android:textSize="10.5sp" />
@@ -167,7 +167,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="40dp"
                 android:background="@drawable/bg_input_field"
-                android:hint="Tempel API key di sini"
+                android:hint="Tempel API key (AQ..., gsk_..., sk-or-..., csk-...)"
                 android:textColorHint="#5A6578"
                 android:textColor="#F1F5F9"
                 android:textSize="12sp"
@@ -189,7 +189,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="40dp"
                 android:background="@drawable/bg_input_field"
-                android:hint="gemini-2.0-flash"
+                android:hint="gemini-3.1-flash-lite"
                 android:textColorHint="#5A6578"
                 android:textColor="#F1F5F9"
                 android:textSize="12sp"

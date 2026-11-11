@@ -27,10 +27,27 @@ def test_parse_id_lines_ignores_noise_and_out_of_range():
 
 
 def test_detect_provider():
-    assert T.detect_provider("https://ollama.com/v1") == "ollama"
-    assert T.detect_provider("http://localhost:11434/v1") == "ollama_local"
     assert T.detect_provider("https://generativelanguage.googleapis.com/v1beta/openai") == "google"
-    assert T._model_chain("ollama", "gpt-oss:20b") == ["gpt-oss:20b", "gpt-oss:120b"]
+    assert T.detect_provider("https://api.groq.com/openai/v1") == "groq"
+    assert T.detect_provider("https://openrouter.ai/api/v1") == "openrouter"
+    assert T.detect_provider("https://api.cerebras.ai/v1") == "cerebras"
+    assert T.detect_provider("https://api.openai.com/v1") == "openai"
+    assert T.detect_provider("https://custom-llm.example.com/v1") == "custom"
+
+    # Verifikasi chain fallback free tier
+    assert T._model_chain("google", "gemini-3.1-flash-lite")[0] == "gemini-3.1-flash-lite"
+    assert "gemini-3.5-flash" in T._model_chain("google", "gemini-3.1-flash-lite")
+    assert "llama-3.1-8b-instant" in T._model_chain("groq", "llama-3.3-70b-versatile")
+    assert "meta-llama/llama-3.3-70b-instruct:free" in T._model_chain("openrouter", "google/gemini-2.0-flash-exp:free")
+    assert "llama3.1-8b" in T._model_chain("cerebras", "llama3.3-70b")
+
+    # Verifikasi key detection
+    assert T.detect_provider_from_key("AIzaSyD...")[0] == "google"
+    assert T.detect_provider_from_key("AQ.AbCd...")[0] == "google"
+    assert T.detect_provider_from_key("gsk_12345")[0] == "groq"
+    assert T.detect_provider_from_key("sk-or-v1-abcdef")[0] == "openrouter"
+    assert T.detect_provider_from_key("csk-998877")[0] == "cerebras"
+    assert T.detect_provider_from_key("sk-proj-12345")[0] == "openai"
 
 
 def _cues(n):
@@ -50,7 +67,7 @@ def test_retry_missing_ids_and_gtx_fill(monkeypatch):
         return "\n".join(f"{i}|terjemahan {i}" for i in ids)
 
     monkeypatch.setattr(T, "_chat_completion", fake_chat)
-    out, stats = asyncio.run(T.call_openai_translate(_cues(3), "en", "id", "k", "gpt-oss:20b", "https://ollama.com/v1"))
+    out, stats = asyncio.run(T.call_openai_translate(_cues(3), "en", "id", "k", "llama-3.3-70b-versatile", "https://api.groq.com/openai/v1"))
     assert [c["text"] for c in out] == ["terjemahan 1", "terjemahan 2", "terjemahan 3"]
     assert calls[1] == [2]  # hanya ID yang hilang di-retry
     assert stats["llm_lines"] == 3 and stats["gtx_lines"] == 0
@@ -58,7 +75,7 @@ def test_retry_missing_ids_and_gtx_fill(monkeypatch):
 
 def test_model_rotation_and_hybrid(monkeypatch):
     async def fake_chat(client, apiurl, headers, payload):
-        if payload["model"] == "gpt-oss:20b":
+        if payload["model"] == "llama-3.3-70b-versatile":
             raise T._RateLimited("429")
         user = payload["messages"][1]["content"]
         ids = [int(l.split("|")[0]) for l in user.split("\n") if "|" in l and l.split("|")[0].isdigit()]
@@ -69,9 +86,9 @@ def test_model_rotation_and_hybrid(monkeypatch):
 
     monkeypatch.setattr(T, "_chat_completion", fake_chat)
     monkeypatch.setattr(T, "call_gtx_translate", fake_gtx)
-    out, stats = asyncio.run(T.call_openai_translate(_cues(3), "en", "id", "k", "gpt-oss:20b", "https://ollama.com/v1"))
+    out, stats = asyncio.run(T.call_openai_translate(_cues(3), "en", "id", "k", "llama-3.3-70b-versatile", "https://api.groq.com/openai/v1"))
     assert [c["text"] for c in out] == ["gtx", "ok 2", "ok 3"]
-    assert stats["model"] == "gpt-oss:120b"
+    assert stats["model"] == "llama-3.1-8b-instant"
     assert stats["gtx_lines"] == 1
 
 
@@ -81,7 +98,7 @@ def test_fatal_key_raises(monkeypatch):
 
     monkeypatch.setattr(T, "_chat_completion", fake_chat)
     try:
-        asyncio.run(T.call_openai_translate(_cues(2), "en", "id", "k", "", "https://ollama.com/v1"))
+        asyncio.run(T.call_openai_translate(_cues(2), "en", "id", "k", "", "https://api.groq.com/openai/v1"))
         assert False, "harus raise"
     except RuntimeError as e:
         assert "401" in str(e)
@@ -456,6 +473,39 @@ def test_fansub_prompt_id_tlc_master():
     assert "<br>" in parsed[5]
     restored_5 = T._restore_line(parsed[5])
     assert restored_5 == "Merepotkan sekali... Mau gimana lagi, biar aku yang urus ini sendiri.\nKalian mundur saja!"
+
+
+def test_free_tier_catalog_structure():
+    assert "google" in T.FREE_TIER_CATALOG
+    assert "groq" in T.FREE_TIER_CATALOG
+    assert "openrouter" in T.FREE_TIER_CATALOG
+    assert "cerebras" in T.FREE_TIER_CATALOG
+    assert "ollama" not in T.FREE_TIER_CATALOG
+
+    # Setiap provider wajib memiliki default model dan models list
+    for prov, data in T.FREE_TIER_CATALOG.items():
+        assert "default" in data
+        assert "models" in data
+        assert "chain" in data
+        assert len(data["models"]) >= 2
+        model_ids = [m["id"] for m in data["models"]]
+        assert data["default"] in model_ids
+
+
+def test_api_translate_providers_endpoint():
+    from fastapi.testclient import TestClient
+    from main import app
+
+    client = TestClient(app)
+    res = client.get("/api/translate/providers")
+    assert res.status_code == 200
+    data = res.json()
+    assert data["success"] is True
+    assert "google" in data["data"]
+    assert "openrouter" in data["data"]
+    assert "groq" in data["data"]
+    assert "cerebras" in data["data"]
+
 
 
 

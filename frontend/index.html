@@ -835,9 +835,9 @@
 
       <!-- Provider Preset Buttons -->
       <div class="ai-glass-card">
-        <label class="ai-field-label">Pilih Template Provider AI Cepat:</label>
+        <label class="ai-field-label">Pilih Template Provider AI Cepat (Free Tier):</label>
         <div class="ai-presets-row">
-          <button type="button" class="btn-preset" data-provider="gemini">
+          <button type="button" class="btn-preset active" data-provider="gemini">
             <svg class="ai-preset-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M2 12h20M4.93 4.93l14.14 14.14M4.93 19.07l14.14-14.14"/></svg>
             Google Gemini
           </button>
@@ -845,13 +845,13 @@
             <svg class="ai-preset-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
             Groq (Llama 3)
           </button>
-          <button type="button" class="btn-preset" data-provider="ollama">
-            <svg class="ai-preset-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><circle cx="9" cy="9" r="1.5"/><circle cx="15" cy="9" r="1.5"/><path d="M9 15c1 1 5 1 6 0"/></svg>
-            Ollama Cloud
+          <button type="button" class="btn-preset" data-provider="openrouter">
+            <svg class="ai-preset-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>
+            OpenRouter (Free)
           </button>
-          <button type="button" class="btn-preset" data-provider="openai">
-            <svg class="ai-preset-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M8 12h8M12 8v8"/></svg>
-            OpenAI
+          <button type="button" class="btn-preset" data-provider="cerebras">
+            <svg class="ai-preset-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+            Cerebras (Fast)
           </button>
         </div>
       </div>
@@ -859,20 +859,35 @@
       <!-- API Key & Endpoints Card -->
       <div class="ai-glass-card">
         <div class="ai-field-group">
-          <label for="ai-input-key" class="ai-field-label">API Key (OpenAI-compatible / Gemini / Groq):</label>
+          <label for="ai-input-key" class="ai-field-label">API Key (Gemini / Groq / OpenRouter / Cerebras):</label>
           <div class="ai-input-wrap">
-            <input type="password" id="ai-input-key" class="ai-input" placeholder="Tempel API key di sini (AQ..., gsk_..., sk-...)">
+            <input type="password" id="ai-input-key" class="ai-input" placeholder="Tempel API key di sini (AQ..., AIza..., gsk_..., sk-or-..., csk-...)">
           </div>
         </div>
 
         <div class="ai-fields-inline">
           <div class="ai-field-group" style="flex:1">
             <label for="ai-input-model" class="ai-field-label">Model LLM:</label>
-            <input type="text" id="ai-input-model" class="ai-input" placeholder="gemini-3.1-flash-lite">
+            <input type="text" id="ai-input-model" class="ai-input" list="ai-model-datalist" placeholder="gemini-3.1-flash-lite" autocomplete="off">
+            <datalist id="ai-model-datalist"></datalist>
           </div>
           <div class="ai-field-group" style="flex:1.5">
             <label for="ai-input-url" class="ai-field-label">Endpoint API URL:</label>
             <input type="text" id="ai-input-url" class="ai-input" placeholder="https://generativelanguage.googleapis.com/v1beta/openai">
+          </div>
+        </div>
+
+        <!-- Model List & Free Tier Selection Chips -->
+        <div id="ai-free-models-box" class="ai-free-models-box">
+          <div class="ai-free-models-header">
+            <span class="ai-free-models-title">
+              <svg class="ai-stars-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+              Model Free Tier Tersedia (Klik untuk memilih):
+            </span>
+            <span id="ai-free-models-prov" class="ai-models-prov-badge">Google Gemini</span>
+          </div>
+          <div id="ai-free-models-chips" class="ai-free-models-chips" role="group" aria-label="Pilihan Model Free Tier">
+            <!-- Dynamically populated chips -->
           </div>
         </div>
       </div>

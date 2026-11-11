@@ -429,14 +429,116 @@ body.no-crt #crt{display:none}
   box-shadow: 0 4px 12px rgba(56, 189, 248, 0.18);
 }
 
-.btn-preset:active {
-  transform: translateY(0);
+.btn-preset.active {
+  background: rgba(56, 189, 248, 0.18);
+  border-color: #38bdf8;
+  color: #38bdf8;
+  box-shadow: 0 0 14px rgba(56, 189, 248, 0.25);
 }
 
 .ai-preset-icon {
   width: 13px;
   height: 13px;
   color: #38bdf8;
+}
+
+/* Free Tier Models Container & Chips */
+.ai-free-models-box {
+  margin-top: 10px;
+  background: rgba(15, 23, 42, 0.55);
+  border: 1px dashed rgba(56, 189, 248, 0.25);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.ai-free-models-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.ai-free-models-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #94a3b8;
+}
+
+.ai-stars-icon {
+  width: 12px;
+  height: 12px;
+  color: #38bdf8;
+}
+
+.ai-models-prov-badge {
+  font-size: 9.5px;
+  font-weight: 700;
+  color: #38bdf8;
+  background: rgba(56, 189, 248, 0.12);
+  border: 1px solid rgba(56, 189, 248, 0.28);
+  padding: 2px 7px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.ai-free-models-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.ai-model-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  padding: 5px 9px;
+  font-size: 11px;
+  color: #e2e8f0;
+  cursor: pointer;
+  transition: all 140ms cubic-bezier(0.4, 0, 0.2, 1);
+  user-select: none;
+}
+
+.ai-model-chip:hover {
+  background: rgba(56, 189, 248, 0.12);
+  border-color: rgba(56, 189, 248, 0.4);
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
+.ai-model-chip.active {
+  background: rgba(56, 189, 248, 0.2);
+  border-color: #38bdf8;
+  color: #38bdf8;
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.3);
+  font-weight: 600;
+}
+
+.ai-chip-name {
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+}
+
+.ai-chip-badge {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #94a3b8;
+}
+
+.ai-model-chip.active .ai-chip-badge {
+  background: rgba(56, 189, 248, 0.25);
+  color: #ffffff;
 }
 
 .ai-fields-inline {
