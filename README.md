@@ -13,8 +13,8 @@
   </p>
 
   <p>
-    <a href="https://github.com/asfaraguest/tatap/releases/latest/download/tatap-release-v2.12.6.apk"><img src="https://img.shields.io/badge/Download-Android%20Mobile-3DDC84?style=for-the-badge&logo=android&logoColor=white" alt="Android Mobile APK"></a>
-    <a href="https://github.com/asfaraguest/tatap/releases/latest/download/tatap-tv-release-v2.12.6.apk"><img src="https://img.shields.io/badge/Download-Android%20TV-0081C9?style=for-the-badge&logo=android&logoColor=white" alt="Android TV APK"></a>
+    <a href="https://github.com/asfaraguest/tatap/releases/latest/download/tatap-release-v2.12.7.apk"><img src="https://img.shields.io/badge/Download-Android%20Mobile-3DDC84?style=for-the-badge&logo=android&logoColor=white" alt="Android Mobile APK"></a>
+    <a href="https://github.com/asfaraguest/tatap/releases/latest/download/tatap-tv-release-v2.12.7.apk"><img src="https://img.shields.io/badge/Download-Android%20TV-0081C9?style=for-the-badge&logo=android&logoColor=white" alt="Android TV APK"></a>
     <a href="https://github.com/asfaraguest/tatap/releases/latest/download/tatap-windows-x64-portable.zip"><img src="https://img.shields.io/badge/Download-Windows%20x64-0078D6?style=for-the-badge&logo=windows&logoColor=white" alt="Windows Portable"></a>
     <a href="https://github.com/asfaraguest/tatap/releases/latest/download/Tatap-x86_64.AppImage"><img src="https://img.shields.io/badge/Download-Linux%20AppImage-FCC624?style=for-the-badge&logo=linux&logoColor=black" alt="Linux AppImage"></a>
   </p>
@@ -50,16 +50,20 @@ Tatap menyediakan opsi takarir yang dapat dipilih langsung dari pemutar:
 
 ### Konfigurasi AI Fansub (BYOK)
 
-Untuk menggunakan model bahasa kustom pada pemutar, ketik perintah berikut pada kolom input pencarian:
+Untuk menggunakan terjemahan gaya fansub berbasis LLM (BYOK), Anda dapat memasukkan API key langsung via modal pengaturan AI (`⚙️ AI`) di pemutar video atau melalui perintah cepat pada kolom pencarian / terminal in-app:
 
-| Perintah | Layanan / Provider |
-| :--- | :--- |
-| `:gemini <api_key>` | Google AI Studio (Gemini 2.0 Flash) |
-| `:groq <api_key>` | Groq Cloud (Llama 3.3) |
-| `:openai <api_key>` | OpenAI |
-| `:ollama <api_key>` | Ollama (Lokal / Cloud) |
+| Perintah | Layanan / Provider | Model Free Tier Default & Pilihan |
+| :--- | :--- | :--- |
+| `:gemini <api_key>` | Google AI Studio | `gemini-3.1-flash-lite` *(Default)*, `gemini-3.5-flash`, `gemini-3.5-flash-lite` |
+| `:groq <api_key>` | Groq Cloud | `llama-3.3-70b-versatile` *(Default)*, `llama-3.1-8b-instant`, `gemma2-9b-it` |
+| `:openrouter <api_key>` | OpenRouter (Free) | `google/gemini-2.0-flash-exp:free` *(Default)*, `meta-llama/llama-3.3-70b:free`, `deepseek/deepseek-r1:free` |
+| `:cerebras <api_key>` | Cerebras (Fast Free) | `llama3.3-70b` *(Default / 2000+ t/s)*, `llama3.1-8b` |
+| `:openai <api_key>` | OpenAI | `gpt-4o-mini` |
 
-Perintah manajemen: `:apikey` (cek status kunci), `:apikey clear` (hapus kunci), `:model <nama_model>` (ganti model).
+> [!TIP]
+> **Pemilihan Model Otomatis via Chips:** Pada dialog pengaturan AI Fansub, Tatap secara otomatis memunculkan tombol chip interaktif dari seluruh model free-tier yang didukung provider. Anda cukup mengeklik salah satu chip untuk langsung beralih model tanpa perlu mengetik manual.
+
+Perintah manajemen: `:apikey` (cek status kunci & rekomendasi model), `:apikey clear` (hapus kunci), `:model <nama_model>` (ganti model manual), `:prompt` (atur persona/gaya bahasa fansub).
 
 ---
 
@@ -69,8 +73,8 @@ Pilih paket instalasi resmi sesuai perangkat Anda:
 
 | Platform Perangkat | Tombol Unduh Langsung | Format Berkas | Keterangan & Kompatibilitas |
 | :--- | :---: | :---: | :--- |
-| **Android Ponsel / Tablet** | [![Unduh Android APK](https://img.shields.io/badge/Download-Android%20APK-3DDC84?style=for-the-badge&logo=android&logoColor=white)](https://github.com/asfaraguest/tatap/releases/latest/download/tatap-release-v2.12.6.apk) | `.apk` (~35 MB) | Signed Production APK (Android 7.0 s/d 16, Watch Portrait View & Adaptive Icons) |
-| **Android TV / Google TV** | [![Unduh Android TV APK](https://img.shields.io/badge/Download-Android%20TV%20APK-0081C9?style=for-the-badge&logo=android&logoColor=white)](https://github.com/asfaraguest/tatap/releases/latest/download/tatap-tv-release-v2.12.6.apk) | `.apk` (~35 MB) | Signed Production APK khusus TV (Leanback 10-foot UI & Remote D-pad) |
+| **Android Ponsel / Tablet** | [![Unduh Android APK](https://img.shields.io/badge/Download-Android%20APK-3DDC84?style=for-the-badge&logo=android&logoColor=white)](https://github.com/asfaraguest/tatap/releases/latest/download/tatap-release-v2.12.7.apk) | `.apk` (~35 MB) | Signed Production APK (Android 7.0 s/d 16, Watch Portrait View & Adaptive Icons) |
+| **Android TV / Google TV** | [![Unduh Android TV APK](https://img.shields.io/badge/Download-Android%20TV%20APK-0081C9?style=for-the-badge&logo=android&logoColor=white)](https://github.com/asfaraguest/tatap/releases/latest/download/tatap-tv-release-v2.12.7.apk) | `.apk` (~35 MB) | Signed Production APK khusus TV (Leanback 10-foot UI & Remote D-pad) |
 | **Windows (x64)** | [![Unduh Windows Portable](https://img.shields.io/badge/Download-Windows%20Portable-0078D6?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/asfaraguest/tatap/releases/latest/download/tatap-windows-x64-portable.zip) | `.zip` (~26 MB) | Standalone Portable (Ekstrak zip & jalankan `Tatap.exe`) |
 | **Linux (x86_64)** | [![Unduh Linux AppImage](https://img.shields.io/badge/Download-Linux%20AppImage-FCC624?style=for-the-badge&logo=linux&logoColor=black)](https://github.com/asfaraguest/tatap/releases/latest/download/Tatap-x86_64.AppImage) | `.AppImage` (~58 MB) | Standalone AppImage (Berikan izin `chmod +x` lalu jalankan) |
 
@@ -79,6 +83,37 @@ Pilih paket instalasi resmi sesuai perangkat Anda:
 > Jika ponsel Anda (khususnya Samsung One UI 6.0+) memblokir pemasangan dengan pesan *"Pemasangan diblokir (Auto Blocker)"* atau *"Diblokir oleh Play Protect"*, ikuti solusi langkah-demi-langkah pada **[Panduan Pemecahan Masalah Instalasi Android](docs/TROUBLESHOOTING_ANDROID.md)**.
 
 Seluruh arsip versi rilis stabil sebelumnya tersedia di [Halaman Rilis Resmi GitHub](https://github.com/asfaraguest/tatap/releases). Untuk memantau grafik dan riwayat total unduhan secara transparan, kunjungi [Dasbor Statistik Unduhan Tatap](https://somsubhra.github.io/github-release-stats/?username=asfaraguest&repository=tatap).
+
+### Panduan Penggunaan Tatap Windows (Portable x64)
+
+Paket **Tatap Windows Portable** adalah aplikasi desktop mandiri (*standalone*) tanpa proses instalasi yang rumit:
+
+1. **Unduh & Ekstrak:**
+   - Unduh berkas **`tatap-windows-x64-portable.zip`** dari tabel di atas.
+   - Ekstrak seluruh isi berkas zip ke folder mana pun di PC Anda (misalnya `D:\Tatap` atau flashdisk portabel).
+2. **Jalankan Aplikasi Langsung:**
+   - Masuk ke folder hasil ekstrak dan klik dua kali pada **`Tatap.exe`**.
+   - Aplikasi akan langsung menampilkan layar *Bootscreen Splash* responsif sembari menginisialisasi backend lokal (`127.0.0.1:8767`) dan membuka jendela aplikasi desktop berbasis Microsoft Edge WebView2 dengan akselerasi GPU zero-copy.
+   - *Tidak membutuhkan instalasi Python, Node.js, maupun dependensi eksternal lainnya.*
+3. **Mode Pinned Always-On-Top Mini Player (Multitasking Sambil Nonton):**
+   - Saat anime sedang diputar, tekan tombol keyboard **`i`** atau klik tombol **`📌 PIN`** pada bilah kendali pemutar.
+   - Jendela Tatap akan otomatis mengecil ke sudut layar (560×315 piksel) dan terkunci selalu di lapisan teratas (*Always-on-Top* via Win32 `HWND_TOPMOST`), sehingga Anda dapat mengetik, bekerja, atau browsing tanpa tertutup jendela lain.
+   - Seluruh kontrol bawah otomatis bersembunyi untuk memberikan ruang pandang yang bersih bebas distraksi, sementara **subtitle Bahasa Indonesia tetap dirender utuh dan tajam** di atas video.
+   - Untuk mengembalikan jendela ke ukuran semula, tekan kembali tombol **`i`**, tombol **`Kembalikan`** di bilah atas pemutar, atau tombol **`Esc`**.
+4. **Pintasan Keyboard (Hotkeys) Lengkap di Windows:**
+   - `Spasi` / `K` : Putar / Jeda video (*Play / Pause*)
+   - `F` : Masuk / Keluar mode layar penuh (*Fullscreen*)
+   - `i` : Toggle Pinned Mini Player Always-on-Top
+   - `←` / `→` : Mundur / Maju 5 detik (*Scrubbing*)
+   - `J` / `L` : Mundur / Maju 10 detik
+   - `[` / `]` : Navigasi grup rentang episode atau atur kecepatan putar
+   - `N` / `P` : Lompat ke Episode Berikutnya / Sebelumnya
+   - `S` : Lewati Opening/Ending otomatis (AniSkip)
+   - `M` : Matikan / Nyalakan audio (*Mute toggle*)
+   - `/` : Buka terminal perintah in-app & pencarian cepat
+   - `Esc` : Keluar dari Fullscreen, tutup Mini Player, atau batalkan dialog
+
+---
 
 ### Menjalankan Versi Self-Hosted (Web Server / VPS / Localhost)
 
