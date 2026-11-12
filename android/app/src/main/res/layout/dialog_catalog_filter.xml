@@ -965,10 +965,10 @@
             android:id="@+id/btn_reset_catalog_filter"
             android:layout_width="wrap_content"
             android:layout_height="36dp"
-            android:text="Hapus Filter"
+            android:text="[ 全解除 · HAPUS ]"
             android:textColor="@color/text_danger"
-            android:backgroundTint="#161A24"
-            android:textSize="@dimen/text_subhead"
+            android:background="@drawable/bg_menu_toggle"
+            android:textSize="@dimen/text_badge"
             android:fontFamily="sans-serif-medium" />
 
         <View
@@ -980,10 +980,10 @@
             android:id="@+id/btn_apply_catalog_filter"
             android:layout_width="wrap_content"
             android:layout_height="36dp"
-            android:text="Terapkan Filter"
-            android:textColor="#0B132B"
-            android:backgroundTint="#38BDF8"
-            android:textSize="@dimen/text_subhead"
+            android:text="[ 適用 · TERAPKAN ]"
+            android:textColor="#0A0C14"
+            android:backgroundTint="@color/accent_cyan"
+            android:textSize="@dimen/text_badge"
             android:fontFamily="sans-serif-medium"
             android:paddingHorizontal="16dp" />
     </LinearLayout>

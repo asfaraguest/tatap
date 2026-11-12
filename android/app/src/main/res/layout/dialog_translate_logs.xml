@@ -26,10 +26,10 @@
             android:id="@+id/btn_close_logs_dialog"
             android:layout_width="30dp"
             android:layout_height="30dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
+            android:background="@drawable/bg_menu_toggle"
             android:drawableStart="@drawable/ic_close"
-            android:drawableTint="#8892B0"
-            android:padding="8dp" />
+            android:drawableTint="@color/accent_cyan"
+            android:padding="7dp" />
     </LinearLayout>
 
     <ScrollView
@@ -59,10 +59,10 @@
             android:id="@+id/btn_refresh_logs"
             android:layout_width="wrap_content"
             android:layout_height="34dp"
-            android:text="Segarkan"
+            android:text="[ 更新 · SEGAR ]"
             android:textColor="@color/text_accent"
-            android:backgroundTint="#161A24"
-            android:textSize="@dimen/text_caption"
+            android:background="@drawable/bg_menu_toggle"
+            android:textSize="@dimen/text_badge"
             android:fontFamily="sans-serif-medium"
             android:layout_marginEnd="8dp" />
 
@@ -70,9 +70,11 @@
             android:id="@+id/btn_dismiss_logs"
             android:layout_width="wrap_content"
             android:layout_height="34dp"
-            android:text="Tutup"
+            android:text="[ 閉じる · TUTUP ]"
             android:textColor="@color/text_muted"
-            android:backgroundTint="#161A24"
+            android:background="@drawable/bg_menu_toggle"
+            android:textSize="@dimen/text_badge"
+            android:fontFamily="sans-serif-medium" />
             android:textSize="@dimen/text_caption"
             android:fontFamily="sans-serif-medium" />
     </LinearLayout>

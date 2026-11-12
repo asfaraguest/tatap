@@ -567,14 +567,14 @@ public class MainActivity extends Activity {
         if (layoutSearchBox != null) {
             ViewGroup.LayoutParams lp = layoutSearchBox.getLayoutParams();
             if (lp != null) {
-                lp.height = dpToPx(34);
+                lp.height = dpToPx(38);
                 layoutSearchBox.setLayoutParams(lp);
             }
         }
         if (btnToggleMenu != null) {
             ViewGroup.LayoutParams lp = btnToggleMenu.getLayoutParams();
             if (lp != null) {
-                lp.height = dpToPx(34);
+                lp.height = dpToPx(38);
                 btnToggleMenu.setLayoutParams(lp);
             }
         }
@@ -2907,9 +2907,9 @@ public class MainActivity extends Activity {
         if (pbLoading != null) pbLoading.setVisibility(View.VISIBLE);
         if (tvPageIndicator != null) {
             if (totalPages > 1) {
-                tvPageIndicator.setText("Hal " + currentPage + " / " + totalPages);
+                tvPageIndicator.setText("第 " + currentPage + " 頁 / Hal " + currentPage + " / " + totalPages);
             } else {
-                tvPageIndicator.setText("Hal " + currentPage);
+                tvPageIndicator.setText("第 " + currentPage + " 頁 / Hal " + currentPage);
             }
         }
         btnPrevPage.setEnabled(currentPage > 1);
@@ -3157,9 +3157,9 @@ public class MainActivity extends Activity {
         }
         if (tvPageIndicator != null) {
             if (totalPages > 1) {
-                tvPageIndicator.setText("Hal " + currentPage + " / " + totalPages);
+                tvPageIndicator.setText("第 " + currentPage + " 頁 / Hal " + currentPage + " / " + totalPages);
             } else {
-                tvPageIndicator.setText("Hal " + currentPage);
+                tvPageIndicator.setText("第 " + currentPage + " 頁 / Hal " + currentPage);
             }
         }
 

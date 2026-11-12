@@ -201,7 +201,7 @@ public class DetailActivity extends Activity {
         btnSortOrder.setOnClickListener(v -> {
             HapticHelper.performTick(v);
             isAscending = !isAscending;
-            btnSortOrder.setText(isAscending ? "1 - N" : "N - 1");
+            btnSortOrder.setText(isAscending ? "[ 昇順 · 1 - N ]" : "[ 降順 · N - 1 ]");
             updateEpisodeDisplay();
         });
 
@@ -1024,24 +1024,24 @@ public class DetailActivity extends Activity {
         this.isBookmarked = bookmarked;
         if (btnBookmark == null) return;
         if (bookmarked) {
-            btnBookmark.setText("Tersimpan");
-            btnBookmark.setTextColor(0xFFFBBF24);
+            btnBookmark.setText("[ 推し · TERSIMPAN ]");
+            btnBookmark.setTextColor(0xFFFFB800);
             btnBookmark.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xFF2A2210));
             if (btnBookmark instanceof com.google.android.material.button.MaterialButton) {
                 com.google.android.material.button.MaterialButton mb = (com.google.android.material.button.MaterialButton) btnBookmark;
                 mb.setAllCaps(false);
                 mb.setIconResource(R.drawable.ic_star_filled);
-                mb.setIconTint(android.content.res.ColorStateList.valueOf(0xFFFBBF24));
+                mb.setIconTint(android.content.res.ColorStateList.valueOf(0xFFFFB800));
             }
         } else {
-            btnBookmark.setText("+ Favorit");
-            btnBookmark.setTextColor(0xFF94A3B8);
-            btnBookmark.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xFF1E2433));
+            btnBookmark.setText("[ ＋ 推し · FAVORIT ]");
+            btnBookmark.setTextColor(0xFF00F0FF);
+            btnBookmark.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xFF181C2B));
             if (btnBookmark instanceof com.google.android.material.button.MaterialButton) {
                 com.google.android.material.button.MaterialButton mb = (com.google.android.material.button.MaterialButton) btnBookmark;
                 mb.setAllCaps(false);
                 mb.setIconResource(R.drawable.ic_star_outline);
-                mb.setIconTint(android.content.res.ColorStateList.valueOf(0xFF94A3B8));
+                mb.setIconTint(android.content.res.ColorStateList.valueOf(0xFF00F0FF));
             }
         }
     }

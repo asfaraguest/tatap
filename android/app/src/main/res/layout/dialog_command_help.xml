@@ -26,10 +26,10 @@
             android:id="@+id/btn_close_help_dialog"
             android:layout_width="30dp"
             android:layout_height="30dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
+            android:background="@drawable/bg_menu_toggle"
             android:drawableStart="@drawable/ic_close"
-            android:drawableTint="@color/text_muted"
-            android:padding="8dp" />
+            android:drawableTint="@color/accent_cyan"
+            android:padding="7dp" />
     </LinearLayout>
 
     <TextView

@@ -74,10 +74,10 @@
             android:id="@+id/btn_reset_genre_filter"
             android:layout_width="wrap_content"
             android:layout_height="34dp"
-            android:text="Hapus Filter"
+            android:text="[ 全解除 · HAPUS ]"
             android:textColor="@color/text_danger"
-            android:backgroundTint="@color/bg_surface_elevated"
-            android:textSize="@dimen/text_caption"
+            android:background="@drawable/bg_menu_toggle"
+            android:textSize="@dimen/text_badge"
             android:fontFamily="sans-serif-medium"
             android:layout_marginEnd="8dp" />
 
@@ -85,10 +85,10 @@
             android:id="@+id/btn_dismiss_genre"
             android:layout_width="wrap_content"
             android:layout_height="34dp"
-            android:text="Tutup"
+            android:text="[ 閉じる · TUTUP ]"
             android:textColor="@color/text_muted"
-            android:backgroundTint="@color/bg_surface_elevated"
-            android:textSize="@dimen/text_caption"
+            android:background="@drawable/bg_menu_toggle"
+            android:textSize="@dimen/text_badge"
             android:fontFamily="sans-serif-medium" />
     </LinearLayout>
 </LinearLayout>

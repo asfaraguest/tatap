@@ -12,7 +12,7 @@
     android:clipToPadding="false"
     android:background="@color/bg_root">
 
-    <!-- Top App Bar / Modern Unified Header with Clean Fluid Search Bar (44dp) -->
+    <!-- Top App Bar / Modern Unified Header (44dp) -->
     <LinearLayout
         android:id="@+id/layout_header_root"
         android:layout_width="match_parent"
@@ -20,7 +20,7 @@
         android:orientation="horizontal"
         android:gravity="center_vertical"
         android:background="@color/bg_root"
-        android:paddingHorizontal="12dp">
+        android:paddingHorizontal="14dp">
 
         <!-- App Brand Logo / Title (Kapital TATAP dengan Stempel Anime) -->
         <LinearLayout
@@ -55,85 +55,21 @@
                 android:letterSpacing="0.02" />
         </LinearLayout>
 
-        <!-- Fluid Search Bar (Clean from icon, pure text field) -->
-        <LinearLayout
-            android:id="@+id/layout_search_box"
+        <View
             android:layout_width="0dp"
-            android:layout_height="34dp"
-            android:layout_weight="1"
-            android:background="@drawable/bg_search_box"
-            android:gravity="center_vertical"
-            android:paddingHorizontal="12dp"
-            android:layout_marginEnd="8dp">
+            android:layout_height="1dp"
+            android:layout_weight="1" />
 
-            <EditText
-                android:id="@+id/et_search"
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="1"
-                android:background="@null"
-                android:drawableStart="@drawable/ic_search"
-                android:drawablePadding="6dp"
-                android:drawableTint="#64748B"
-                android:paddingStart="2dp"
-                android:hint="Cari anime atau :command..."
-                android:textColorHint="@color/text_hint"
-                android:textColor="@color/text_primary"
-                android:textSize="@dimen/text_body_medium"
-                android:fontFamily="sans-serif"
-                android:imeOptions="actionSearch"
-                android:inputType="text"
-                android:singleLine="true" />
-
-            <!-- Clear Search Button (Hanya muncul saat ada teks diketik) -->
-            <TextView
-                android:id="@+id/btn_clear_search"
-                android:layout_width="22dp"
-                android:layout_height="22dp"
-                android:gravity="center"
-                android:drawableStart="@drawable/ic_close"
-                android:drawableTint="#64748B"
-                android:padding="4dp"
-                android:visibility="gone"
-                android:clickable="true"
-                android:focusable="true"
-                android:background="?attr/selectableItemBackgroundBorderless" />
-        </LinearLayout>
-
-        <!-- Status Online Server Icon (Antara Search Bar & Tombol Menu) -->
-        <ImageView
-            android:id="@+id/btn_status_power"
-            android:layout_width="34dp"
-            android:layout_height="34dp"
-            android:background="@drawable/bg_status_pill"
-            android:clickable="true"
-            android:focusable="true"
-            android:foreground="?attr/selectableItemBackgroundBorderless"
-            android:padding="7dp"
-            android:src="@drawable/ic_server"
-            app:tint="#10B981"
-            android:layout_marginEnd="8dp"
-            android:contentDescription="Status Backend Server" />
-
-        <!-- Header Quick Menu Button -->
+        <!-- Subtitle on Top Header Bar -->
         <TextView
-            android:id="@+id/btn_toggle_menu"
+            android:id="@+id/tv_header_sub"
             android:layout_width="wrap_content"
-            android:layout_height="34dp"
-            android:background="@drawable/bg_menu_toggle"
-            android:clickable="true"
-            android:focusable="true"
-            android:foreground="?attr/selectableItemBackground"
-            android:nextFocusDown="@+id/btn_tab_musim"
-            android:gravity="center"
-            android:paddingHorizontal="10dp"
-            android:drawableStart="@drawable/ic_more_vert"
-            android:drawablePadding="4dp"
-            android:drawableTint="#CBD5E1"
-            android:text="Menu"
-            android:textColor="@color/text_secondary"
-            android:textSize="@dimen/text_caption"
-            android:fontFamily="sans-serif-medium" />
+            android:layout_height="wrap_content"
+            android:text="『 公式配信 / OFFICIAL 』"
+            android:textColor="@color/text_dim"
+            android:textSize="10sp"
+            android:fontFamily="sans-serif-medium"
+            android:letterSpacing="0.02" />
     </LinearLayout>
 
     <!-- Command Execution Feedback Banner -->
@@ -220,14 +156,14 @@
             android:id="@+id/btn_clear_history_all"
             android:layout_width="wrap_content"
             android:layout_height="28dp"
-            android:background="@drawable/bg_header_button"
+            android:background="@drawable/bg_badge_tamat"
             android:clickable="true"
             android:focusable="true"
             android:foreground="?attr/selectableItemBackground"
             android:gravity="center"
             android:paddingHorizontal="10dp"
-            android:text="Hapus Semua"
-            android:textColor="@color/text_danger"
+            android:text="[ 全消去 · HAPUS ]"
+            android:textColor="#FFFFFF"
             android:textSize="@dimen/text_badge"
             android:fontFamily="sans-serif-medium"
             android:visibility="gone" />
@@ -437,14 +373,14 @@
                 android:id="@+id/btn_day_senin"
                 android:layout_width="wrap_content"
                 android:layout_height="30dp"
-                android:minWidth="62dp"
-                android:layout_marginEnd="5dp"
+                android:minWidth="66dp"
+                android:layout_marginEnd="6dp"
                 android:background="@drawable/bg_header_button"
                 android:clickable="true"
                 android:focusable="true"
                 android:gravity="center"
                 android:paddingHorizontal="10dp"
-                android:text="Senin"
+                android:text="[ 月 · SENIN ]"
                 android:textColor="@color/text_muted"
                 android:textSize="@dimen/text_caption"
                 android:fontFamily="sans-serif-medium" />
@@ -453,14 +389,14 @@
                 android:id="@+id/btn_day_selasa"
                 android:layout_width="wrap_content"
                 android:layout_height="30dp"
-                android:minWidth="62dp"
-                android:layout_marginEnd="5dp"
+                android:minWidth="66dp"
+                android:layout_marginEnd="6dp"
                 android:background="@drawable/bg_header_button"
                 android:clickable="true"
                 android:focusable="true"
                 android:gravity="center"
                 android:paddingHorizontal="10dp"
-                android:text="Selasa"
+                android:text="[ 火 · SELASA ]"
                 android:textColor="@color/text_muted"
                 android:textSize="@dimen/text_caption"
                 android:fontFamily="sans-serif-medium" />
@@ -469,14 +405,14 @@
                 android:id="@+id/btn_day_rabu"
                 android:layout_width="wrap_content"
                 android:layout_height="30dp"
-                android:minWidth="62dp"
-                android:layout_marginEnd="5dp"
+                android:minWidth="66dp"
+                android:layout_marginEnd="6dp"
                 android:background="@drawable/bg_header_button"
                 android:clickable="true"
                 android:focusable="true"
                 android:gravity="center"
                 android:paddingHorizontal="10dp"
-                android:text="Rabu"
+                android:text="[ 水 · RABU ]"
                 android:textColor="@color/text_muted"
                 android:textSize="@dimen/text_caption"
                 android:fontFamily="sans-serif-medium" />
@@ -485,14 +421,14 @@
                 android:id="@+id/btn_day_kamis"
                 android:layout_width="wrap_content"
                 android:layout_height="30dp"
-                android:minWidth="62dp"
-                android:layout_marginEnd="5dp"
+                android:minWidth="66dp"
+                android:layout_marginEnd="6dp"
                 android:background="@drawable/bg_header_button"
                 android:clickable="true"
                 android:focusable="true"
                 android:gravity="center"
                 android:paddingHorizontal="10dp"
-                android:text="Kamis"
+                android:text="[ 木 · KAMIS ]"
                 android:textColor="@color/text_muted"
                 android:textSize="@dimen/text_caption"
                 android:fontFamily="sans-serif-medium" />
@@ -501,14 +437,14 @@
                 android:id="@+id/btn_day_jumat"
                 android:layout_width="wrap_content"
                 android:layout_height="30dp"
-                android:minWidth="62dp"
-                android:layout_marginEnd="5dp"
+                android:minWidth="66dp"
+                android:layout_marginEnd="6dp"
                 android:background="@drawable/bg_header_button"
                 android:clickable="true"
                 android:focusable="true"
                 android:gravity="center"
                 android:paddingHorizontal="10dp"
-                android:text="Jumat"
+                android:text="[ 金 · JUMAT ]"
                 android:textColor="@color/text_muted"
                 android:textSize="@dimen/text_caption"
                 android:fontFamily="sans-serif-medium" />
@@ -517,14 +453,14 @@
                 android:id="@+id/btn_day_sabtu"
                 android:layout_width="wrap_content"
                 android:layout_height="30dp"
-                android:minWidth="62dp"
-                android:layout_marginEnd="5dp"
+                android:minWidth="66dp"
+                android:layout_marginEnd="6dp"
                 android:background="@drawable/bg_header_button"
                 android:clickable="true"
                 android:focusable="true"
                 android:gravity="center"
                 android:paddingHorizontal="10dp"
-                android:text="Sabtu"
+                android:text="[ 土 · SABTU ]"
                 android:textColor="@color/text_muted"
                 android:textSize="@dimen/text_caption"
                 android:fontFamily="sans-serif-medium" />
@@ -533,13 +469,13 @@
                 android:id="@+id/btn_day_minggu"
                 android:layout_width="wrap_content"
                 android:layout_height="30dp"
-                android:minWidth="62dp"
+                android:minWidth="66dp"
                 android:background="@drawable/bg_header_button"
                 android:clickable="true"
                 android:focusable="true"
                 android:gravity="center"
                 android:paddingHorizontal="10dp"
-                android:text="Minggu"
+                android:text="[ 日 · MINGGU ]"
                 android:textColor="@color/text_muted"
                 android:textSize="@dimen/text_caption"
                 android:fontFamily="sans-serif-medium" />
@@ -579,9 +515,12 @@
             android:layout_marginEnd="8dp"
             android:drawableStart="@drawable/ic_filter"
             android:drawablePadding="5dp"
-            android:drawableTint="#38BDF8"
-            android:text="Filter"
-            android:textColor="@color/text_accent"
+            android:drawableTint="#00F0FF"
+            android:text="[ 絞込 · FILTER ]"
+            android:textColor="@color/accent_cyan"
+            android:textSize="@dimen/text_subhead"
+            android:fontFamily="sans-serif-medium"
+            android:visibility="gone" />
             android:textSize="@dimen/text_subhead"
             android:fontFamily="sans-serif-medium"
             android:visibility="gone" />
@@ -705,27 +644,40 @@
                         android:foreground="?attr/selectableItemBackground"
                         android:gravity="center"
                         android:paddingHorizontal="18dp"
-                        android:text="Cari Ulang / 再読み込み"
-                        android:textColor="@color/text_accent"
+                        android:text="[ 再読込 · CARI ULANG ]"
+                        android:textColor="@color/accent_cyan"
                         android:textSize="@dimen/text_subhead"
                         android:fontFamily="sans-serif-medium" />
                 </LinearLayout>
             </FrameLayout>
         </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
+    </FrameLayout>
 
-        <!-- Floating Transparent Pagination Bar -->
+    <!-- DOCKED BOTTOM MENU CONTAINER (Docked Menu di Bawah - Full Anime) -->
+    <LinearLayout
+        android:id="@+id/layout_bottom_dock"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:background="@drawable/bg_bottom_dock"
+        android:elevation="8dp"
+        android:paddingHorizontal="12dp"
+        android:paddingTop="8dp"
+        android:paddingBottom="10dp">
+
+        <!-- Row 1: Pagination Pager (Hanya tampil saat multi-halaman) -->
         <LinearLayout
             android:id="@+id/layout_pagination"
             android:layout_width="wrap_content"
-            android:layout_height="36dp"
-            android:layout_gravity="bottom|center_horizontal"
-            android:layout_marginBottom="14dp"
+            android:layout_height="32dp"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginBottom="8dp"
             android:background="@drawable/bg_floating_pagination"
-            android:elevation="6dp"
+            android:elevation="2dp"
             android:gravity="center"
             android:orientation="horizontal"
-            android:paddingHorizontal="6dp"
-            android:paddingVertical="3dp">
+            android:paddingHorizontal="4dp"
+            android:paddingVertical="2dp">
 
             <TextView
                 android:id="@+id/btn_prev_page"
@@ -738,10 +690,10 @@
                 android:nextFocusUp="@+id/rv_anime_grid"
                 android:nextFocusRight="@+id/btn_next_page"
                 android:gravity="center"
-                android:paddingHorizontal="14dp"
-                android:text="Sebelumnya"
+                android:paddingHorizontal="12dp"
+                android:text="« 前へ · SEBELUMNYA"
                 android:textColor="@color/text_secondary"
-                android:textSize="@dimen/text_caption"
+                android:textSize="@dimen/text_badge"
                 android:fontFamily="sans-serif-medium" />
 
             <TextView
@@ -751,10 +703,10 @@
                 android:layout_marginHorizontal="6dp"
                 android:background="@drawable/bg_floating_page_indicator"
                 android:gravity="center"
-                android:paddingHorizontal="12dp"
-                android:text="Hal 1"
-                android:textColor="@color/text_accent"
-                android:textSize="@dimen/text_caption"
+                android:paddingHorizontal="10dp"
+                android:text="第 1 頁 / Hal 1"
+                android:textColor="@color/accent_cyan"
+                android:textSize="@dimen/text_badge"
                 android:fontFamily="sans-serif-medium" />
 
             <TextView
@@ -768,11 +720,100 @@
                 android:nextFocusUp="@+id/rv_anime_grid"
                 android:nextFocusLeft="@+id/btn_prev_page"
                 android:gravity="center"
-                android:paddingHorizontal="14dp"
-                android:text="Berikutnya"
+                android:paddingHorizontal="12dp"
+                android:text="次へ · BERIKUTNYA »"
                 android:textColor="@color/text_secondary"
+                android:textSize="@dimen/text_badge"
+                android:fontFamily="sans-serif-medium" />
+        </LinearLayout>
+
+        <!-- Row 2: Search Box + Server Status Core + Menu Toggle -->
+        <LinearLayout
+            android:id="@+id/layout_dock_actions"
+            android:layout_width="match_parent"
+            android:layout_height="38dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <!-- Fluid Search Bar (Clean Anime Terminal Style) -->
+            <LinearLayout
+                android:id="@+id/layout_search_box"
+                android:layout_width="0dp"
+                android:layout_height="38dp"
+                android:layout_weight="1"
+                android:background="@drawable/bg_search_box"
+                android:gravity="center_vertical"
+                android:paddingHorizontal="10dp"
+                android:layout_marginEnd="8dp">
+
+                <EditText
+                    android:id="@+id/et_search"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:background="@null"
+                    android:drawableStart="@drawable/ic_search"
+                    android:drawablePadding="6dp"
+                    android:drawableTint="#64748B"
+                    android:paddingStart="2dp"
+                    android:hint="「 アニメ検索 · CARI / :COMMAND 」"
+                    android:textColorHint="@color/text_hint"
+                    android:textColor="@color/text_primary"
+                    android:textSize="@dimen/text_body_medium"
+                    android:fontFamily="sans-serif"
+                    android:imeOptions="actionSearch"
+                    android:inputType="text"
+                    android:singleLine="true" />
+
+                <!-- Clear Search Button -->
+                <TextView
+                    android:id="@+id/btn_clear_search"
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
+                    android:gravity="center"
+                    android:drawableStart="@drawable/ic_close"
+                    android:drawableTint="#64748B"
+                    android:padding="4dp"
+                    android:visibility="gone"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:background="?attr/selectableItemBackgroundBorderless" />
+            </LinearLayout>
+
+            <!-- Status Online Server Core Beacon -->
+            <ImageView
+                android:id="@+id/btn_status_power"
+                android:layout_width="38dp"
+                android:layout_height="38dp"
+                android:background="@drawable/bg_status_pill"
+                android:clickable="true"
+                android:focusable="true"
+                android:foreground="?attr/selectableItemBackgroundBorderless"
+                android:padding="8dp"
+                android:src="@drawable/ic_server"
+                app:tint="#00E676"
+                android:layout_marginEnd="8dp"
+                android:contentDescription="Status Backend Server" />
+
+            <!-- Header Quick Menu Button -->
+            <TextView
+                android:id="@+id/btn_toggle_menu"
+                android:layout_width="wrap_content"
+                android:layout_height="38dp"
+                android:background="@drawable/bg_menu_toggle"
+                android:clickable="true"
+                android:focusable="true"
+                android:foreground="?attr/selectableItemBackground"
+                android:nextFocusDown="@+id/btn_tab_musim"
+                android:gravity="center"
+                android:paddingHorizontal="10dp"
+                android:drawableStart="@drawable/ic_more_vert"
+                android:drawablePadding="4dp"
+                android:drawableTint="#00F0FF"
+                android:text="[ メニュー · MENU ]"
+                android:textColor="@color/text_primary"
                 android:textSize="@dimen/text_caption"
                 android:fontFamily="sans-serif-medium" />
         </LinearLayout>
-    </FrameLayout>
+    </LinearLayout>
 </LinearLayout>
