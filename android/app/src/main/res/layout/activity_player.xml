@@ -5,7 +5,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="#090A0F">
+    android:background="@color/bg_root">
 
     <!-- Panggung Video (Player View + Overlays) -->
     <FrameLayout
@@ -209,12 +209,12 @@
         android:layout_gravity="bottom|end"
         android:layout_marginEnd="32dp"
         android:layout_marginBottom="72dp"
-        android:backgroundTint="#D90F172A"
-        app:strokeColor="#38BDF8"
+        android:backgroundTint="@color/hud_background"
+        app:strokeColor="@color/text_accent"
         app:strokeWidth="1.5dp"
         app:cornerRadius="19dp"
         app:icon="@drawable/ic_skip_next"
-        app:iconTint="#38BDF8"
+        app:iconTint="@color/text_accent"
         app:iconPadding="5dp"
         app:iconSize="15dp"
         android:paddingHorizontal="14dp"
@@ -310,7 +310,7 @@
             app:strokeColor="#33FFFFFF"
             app:strokeWidth="1dp"
             app:cornerRadius="18dp"
-            android:backgroundTint="#CC161B26"
+            android:backgroundTint="@color/hud_background"
             android:focusable="false"
             android:visibility="gone" />
 
@@ -331,7 +331,7 @@
             app:strokeColor="#33FFFFFF"
             app:strokeWidth="1dp"
             app:cornerRadius="18dp"
-            android:backgroundTint="#CC161B26"
+            android:backgroundTint="@color/hud_background"
             android:visibility="gone" />
 
         <!-- Tombol Pilihan Resolusi / Kualitas Video -->
@@ -351,7 +351,7 @@
             app:strokeColor="#33FFFFFF"
             app:strokeWidth="1dp"
             app:cornerRadius="18dp"
-            android:backgroundTint="#CC161B26"
+            android:backgroundTint="@color/hud_background"
             android:visibility="gone" />
 
         <!-- Tombol Pilihan Kecepatan Putar Video -->
@@ -371,7 +371,7 @@
             app:strokeColor="#33FFFFFF"
             app:strokeWidth="1dp"
             app:cornerRadius="18dp"
-            android:backgroundTint="#CC161B26"
+            android:backgroundTint="@color/hud_background"
             android:visibility="gone" />
 
         <!-- Tombol Pengaturan Tampilan & Gaya Subtitle -->
@@ -391,7 +391,7 @@
             app:strokeColor="#33FFFFFF"
             app:strokeWidth="1dp"
             app:cornerRadius="18dp"
-            android:backgroundTint="#CC161B26"
+            android:backgroundTint="@color/hud_background"
             android:visibility="gone" />
 
         <!-- Tombol Pilihan Subtitle Engine / Bahasa -->
@@ -409,7 +409,7 @@
             app:strokeColor="#33FFFFFF"
             app:strokeWidth="1dp"
             app:cornerRadius="18dp"
-            android:backgroundTint="#CC161B26"
+            android:backgroundTint="@color/hud_background"
             android:visibility="gone" />
         </LinearLayout>
     </LinearLayout>
@@ -423,7 +423,7 @@
         android:layout_marginStart="24dp"
         android:background="@drawable/bg_screen_lock_button"
         android:src="@drawable/ic_lock_open"
-        app:tint="#38BDF8"
+        app:tint="@color/text_accent"
         android:contentDescription="Kunci Layar"
         android:visibility="gone" />
 
@@ -434,12 +434,12 @@
         android:layout_height="40dp"
         android:layout_gravity="start|center_vertical"
         android:layout_marginStart="24dp"
-        android:backgroundTint="#D90F172A"
-        app:strokeColor="#38BDF8"
+        android:backgroundTint="@color/hud_background"
+        app:strokeColor="@color/text_accent"
         app:strokeWidth="1.5dp"
         app:cornerRadius="20dp"
         app:icon="@drawable/ic_lock"
-        app:iconTint="#38BDF8"
+        app:iconTint="@color/text_accent"
         app:iconPadding="6dp"
         app:iconSize="15dp"
         android:paddingHorizontal="16dp"
@@ -597,9 +597,9 @@
                     android:textSize="@dimen/text_caption"
                     android:fontFamily="sans-serif-medium"
                     android:textColor="@color/text_accent"
-                    android:backgroundTint="#15233D"
+                    android:backgroundTint="@color/bg_surface_elevated"
                     app:cornerRadius="16dp"
-                    app:strokeColor="#38BDF8"
+                    app:strokeColor="@color/text_accent"
                     app:strokeWidth="1dp" />
             </LinearLayout>
         </LinearLayout>

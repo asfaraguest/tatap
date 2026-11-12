@@ -10,7 +10,7 @@
     android:paddingTop="@dimen/tv_overscan_vertical"
     android:paddingBottom="@dimen/tv_overscan_vertical"
     android:clipToPadding="false"
-    android:background="#090A0F">
+    android:background="@color/bg_root">
 
     <!-- Top App Bar / Modern Unified Header with Clean Fluid Search Bar (44dp) -->
     <LinearLayout
@@ -19,7 +19,7 @@
         android:layout_height="44dp"
         android:orientation="horizontal"
         android:gravity="center_vertical"
-        android:background="#090A0F"
+        android:background="@color/bg_root"
         android:paddingHorizontal="12dp">
 
         <!-- App Brand Logo / Title (Kapital TATAP) -->

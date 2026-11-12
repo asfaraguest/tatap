@@ -13,6 +13,29 @@ Format versi menggunakan skema `MAJOR.MINOR.PATCH`:
 - **MINOR (x.Y.0):** Penambahan fitur atau kapabilitas baru yang tetap kompatibel ke belakang (*backward-compatible new features*). Digit PATCH direset ke 0.
 - **PATCH (x.y.Z):** Perbaikan bug, peningkatan stabilitas, atau perbaikan internal tanpa penambahan fitur baru (*backward-compatible bug fixes*).
 
+## [2.12.8] - 2026-11-12
+
+### Justifikasi SemVer 2.0.0 (PATCH: 2.12.7 -> 2.12.8)
+Kenaikan digit PATCH diterapkan sesuai kaidah Semantic Versioning 2.0.0 dan Direktif #3 [`AGENTS.md`](AGENTS.md) untuk penyegaran visual antarmuka pengguna (*UI/UX Refresh*) dan harmonisasi design tokens palet tema gelap Apple / Material Design 3 pada platform Android (Mobile & TV), modernisasi card grid & poster scrim, elevasi hero detail screen, serta pemolesan kontrol player & OSD HUD tanpa perombakan skema database maupun modifikasi kontrak eksternal yang tidak kompatibel.
+
+### Added & Changed
+1. **Harmonisasi Design Tokens & Tema Gelap (`android/app/src/main/res/values/colors.xml`, `themes.xml`):**
+   - Menyelaraskan status bar, navigation bar, dan background window root ke token semantik resmi `@color/bg_root` (`#161618`) dan aksen `@color/accent_cyan` (`#0A84FF`), mengeliminasi nilai hex hardcoded yang tidak konsisten.
+   - Menambahkan token translucent frosted glass: `@color/bg_glass_card`, `@color/bg_glass_capsule`, `@color/badge_glass_scrim`, dan `@color/tab_pill_active`.
+2. **Modernisasi Badge Kartu & Scrim (`android/app/src/main/res/drawable/`, `item_anime_card.xml`):**
+   - Memperhalus gradien `bg_poster_scrim.xml` dengan transisi multi-stop yang lembut untuk menjamin keterbacaan teks judul anime di atas poster.
+   - Mempercantik badge format (`bg_badge_type.xml`), skor bintang (`bg_badge_score.xml`), dan status sub (`bg_badge_sub.xml`) dengan sudut `6dp`, latar belakang semi-transparan `#D9161618`, dan outline border aksen tipis (`0.8dp`).
+3. **Penyegaran Navigasi Tab Kategori & Search Bar (`activity_main.xml`, drawables):**
+   - Memodernisasi tab navigasi horizontal (`bg_tab_active.xml` dan `bg_tab_inactive.xml`) ke bentuk capsule pills (`16dp` radius) berlatar elevated surface (`#26262B`) dengan border aksen cyan kontras tinggi.
+   - Memperhalus sudut search box (`bg_search_box.xml`) menjadi `14dp` bergaya fluid input.
+4. **Penyegaran Layar Detail Anime (`activity_detail.xml`, `item_season_chip.xml`, `item_range_chip.xml`):**
+   - Menyelaraskan latar belakang thumbnail poster dan chip filter musim/range ke token `@color/bg_surface_elevated` dan `@color/border_soft`.
+   - Menjaga paritas sempurna antara layout Portrait dan Landscape pada perangkat HP maupun tablet.
+5. **Penyegaran Kontrol Player Video & OSD HUD (`activity_player.xml`):**
+   - Menyelaraskan tombol HUD aksi cepat (Lewati OP/ED, Kunci Layar, Resolusi, Audio, Skala Fit/Full) dari warna slate navy lama ke token `@color/hud_background` (`#D9161618`) dan aksen `@color/text_accent`.
+6. **Harmonisasi Dialog Aplikasi:**
+   - Menyelaraskan dialog update (`dialog_app_update.xml`), dialog download (`dialog_app_download.xml`), selector genre (`dialog_genre_selector.xml`), dan bantuan perintah (`dialog_command_help.xml`) ke tema semantik resmi Tatap.
+
 ## [2.12.7] - 2026-11-03
 
 ### Justifikasi SemVer 2.0.0 (PATCH: 2.12.6 -> 2.12.7)

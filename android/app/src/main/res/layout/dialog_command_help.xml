@@ -28,7 +28,7 @@
             android:layout_height="30dp"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:drawableStart="@drawable/ic_close"
-            android:drawableTint="#8892B0"
+            android:drawableTint="@color/text_muted"
             android:padding="8dp" />
     </LinearLayout>
 

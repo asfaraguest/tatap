@@ -9,8 +9,8 @@
     android:clickable="true"
     app:cardCornerRadius="8dp"
     app:cardElevation="0dp"
-    app:cardBackgroundColor="#161B26"
-    app:strokeColor="#2A3347"
+    app:cardBackgroundColor="@color/bg_surface_elevated"
+    app:strokeColor="@color/border_soft"
     app:strokeWidth="1.5dp">
 
     <LinearLayout

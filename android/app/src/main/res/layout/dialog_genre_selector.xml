@@ -28,7 +28,7 @@
             android:layout_height="30dp"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:drawableStart="@drawable/ic_close"
-            android:drawableTint="#8892B0"
+            android:drawableTint="@color/text_muted"
             android:padding="8dp" />
     </LinearLayout>
 
@@ -52,7 +52,7 @@
         android:layout_height="28dp"
         android:layout_gravity="center"
         android:layout_marginVertical="16dp"
-        android:indeterminateTint="#38BDF8" />
+        android:indeterminateTint="@color/accent_cyan" />
 
     <!-- Genre Grid -->
     <androidx.recyclerview.widget.RecyclerView
@@ -76,7 +76,7 @@
             android:layout_height="34dp"
             android:text="Hapus Filter"
             android:textColor="@color/text_danger"
-            android:backgroundTint="#161A24"
+            android:backgroundTint="@color/bg_surface_elevated"
             android:textSize="@dimen/text_caption"
             android:fontFamily="sans-serif-medium"
             android:layout_marginEnd="8dp" />
@@ -87,7 +87,7 @@
             android:layout_height="34dp"
             android:text="Tutup"
             android:textColor="@color/text_muted"
-            android:backgroundTint="#161A24"
+            android:backgroundTint="@color/bg_surface_elevated"
             android:textSize="@dimen/text_caption"
             android:fontFamily="sans-serif-medium" />
     </LinearLayout>

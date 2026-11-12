@@ -18,7 +18,7 @@
             android:layout_width="28dp"
             android:layout_height="28dp"
             android:src="@drawable/ic_update"
-            app:tint="#38BDF8"
+            app:tint="@color/text_accent"
             android:contentDescription="Update Icon" />
 
         <LinearLayout
@@ -54,14 +54,14 @@
             android:layout_height="32dp"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:src="@drawable/ic_close"
-            app:tint="#8892B0"
+            app:tint="@color/text_muted"
             android:contentDescription="Tutup" />
     </LinearLayout>
 
     <View
         android:layout_width="match_parent"
         android:layout_height="1dp"
-        android:background="#202636"
+        android:background="@color/border_soft"
         android:layout_marginVertical="12dp" />
 
     <!-- Notes Section Header -->
@@ -113,8 +113,8 @@
             android:textSize="@dimen/text_subhead"
             android:fontFamily="sans-serif-medium"
             android:textAllCaps="false"
-            android:backgroundTint="#161C28"
-            app:strokeColor="#2A3347"
+            android:backgroundTint="@color/bg_surface_elevated"
+            app:strokeColor="@color/border_soft"
             app:strokeWidth="1dp"
             app:cornerRadius="8dp"
             android:paddingHorizontal="16dp"
@@ -126,11 +126,11 @@
             android:layout_height="40dp"
             android:layout_marginStart="10dp"
             android:text="Perbarui Sekarang"
-            android:textColor="#080C14"
+            android:textColor="#FFFFFF"
             android:textSize="@dimen/text_subhead"
             android:fontFamily="sans-serif-medium"
             android:textAllCaps="false"
-            android:backgroundTint="#38BDF8"
+            android:backgroundTint="@color/accent_cyan"
             app:cornerRadius="8dp"
             android:paddingHorizontal="18dp"
             android:focusable="true" />
