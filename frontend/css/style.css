@@ -1886,14 +1886,13 @@ body.is-pinned-mini #pm-btn-unpin {
   align-items: center !important;
   gap: 5px !important;
   padding: 4px 10px !important;
-  background: rgba(15, 23, 42, 0.75) !important;
+  background: rgba(15, 23, 42, 0.95) !important;
   border: 1px solid rgba(56, 189, 248, 0.45) !important;
   color: #e0f2fe !important;
   border-radius: 6px !important;
   font-size: 11px !important;
   font-weight: 700 !important;
   cursor: pointer !important;
-  backdrop-filter: blur(8px) !important;
   transition: all 0.15s ease !important;
 }
 

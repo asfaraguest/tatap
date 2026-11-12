@@ -769,7 +769,7 @@ public class DetailActivity extends Activity {
             holder.tvTitle.setText(ep < 10 ? "0" + ep : String.valueOf(ep));
 
             if (ep == cachedLastPlayedEp) {
-                // Last played episode: Flat Electric Cyan
+                // Last played episode: Apple System Blue (Nomor Saja) / Flat Electric Cyan
                 holder.card.setCardBackgroundColor(0xFF142436);
                 holder.card.setStrokeColor(0xFF00F0FF);
                 holder.tvTitle.setTextColor(0xFF00F0FF);
