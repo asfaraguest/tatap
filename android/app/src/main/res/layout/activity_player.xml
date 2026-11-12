@@ -56,7 +56,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginStart="8dp"
-            android:text="2X Cepat >>"
+            android:text="2.0x 加速中 >>"
             android:textColor="@color/text_primary"
             android:textSize="@dimen/text_title_medium"
             android:fontFamily="sans-serif-medium" />
@@ -218,7 +218,7 @@
         app:iconPadding="5dp"
         app:iconSize="15dp"
         android:paddingHorizontal="14dp"
-        android:text="Lewati Opening"
+        android:text="Lewati Opening / スキップ"
         android:textColor="@color/text_accent"
         android:textSize="@dimen/text_subhead"
         android:fontFamily="sans-serif-medium"

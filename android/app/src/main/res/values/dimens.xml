@@ -8,7 +8,7 @@
     <dimen name="tv_tab_height">34dp</dimen>
     <dimen name="tv_card_poster_height">205dp</dimen>
     <dimen name="tv_card_margin">5dp</dimen>
-    <dimen name="tv_card_corner_radius">8dp</dimen>
+    <dimen name="tv_card_corner_radius">4dp</dimen>
     <dimen name="tv_card_padding_horizontal">10dp</dimen>
     <dimen name="tv_card_padding_top">8dp</dimen>
     <dimen name="tv_card_padding_bottom">10dp</dimen>

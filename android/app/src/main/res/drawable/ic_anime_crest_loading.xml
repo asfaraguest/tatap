@@ -1,0 +1,36 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+
+    <!-- Outer Tech-Anime Ring -->
+    <path
+        android:strokeColor="#3300F0FF"
+        android:strokeWidth="1.5"
+        android:fillColor="#00000000"
+        android:pathData="M24,4 A20,20 0 1,1 23.9,4" />
+
+    <!-- 4 Geometric Anime Shuriken Blades -->
+    <!-- Blade 1: Top -->
+    <path
+        android:fillColor="#00F0FF"
+        android:pathData="M24,6 L27,21 L24,24 L21,21 Z" />
+    <!-- Blade 2: Right -->
+    <path
+        android:fillColor="#FF2A85"
+        android:pathData="M42,24 L27,27 L24,24 L27,21 Z" />
+    <!-- Blade 3: Bottom -->
+    <path
+        android:fillColor="#00F0FF"
+        android:pathData="M24,42 L21,27 L24,24 L27,27 Z" />
+    <!-- Blade 4: Left -->
+    <path
+        android:fillColor="#FF2A85"
+        android:pathData="M6,24 L21,21 L24,24 L21,27 Z" />
+
+    <!-- Center Diamond Core -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M24,21 L27,24 L24,27 L21,24 Z" />
+</vector>

@@ -1,31 +1,33 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Background & Surface Colors (Apple Dark Palette) -->
-    <color name="bg_root">#161618</color>
-    <color name="bg_surface">#1E1E22</color>
-    <color name="bg_surface_elevated">#26262B</color>
-    <color name="border_soft">#2C2C32</color>
-    <color name="border_focus">#0A84FF</color>
+    <!-- Background & Surface Colors (Flat Anime Kuro Palette) -->
+    <color name="bg_root">#0A0C14</color>
+    <color name="bg_surface">#121520</color>
+    <color name="bg_surface_elevated">#181C2B</color>
+    <color name="border_soft">#22273D</color>
+    <color name="border_focus">#00F0FF</color>
 
     <!-- Semantic Typography Colors -->
-    <color name="text_primary">#F5F5F7</color>
-    <color name="text_secondary">#E5E5EA</color>
-    <color name="text_muted">#A1A1A6</color>
-    <color name="text_dim">#6E6E73</color>
-    <color name="text_hint">#48484A</color>
-    <color name="text_accent">#0A84FF</color>
-    <color name="text_success">#30D158</color>
-    <color name="text_warning">#FF9F0A</color>
-    <color name="text_danger">#FF453A</color>
+    <color name="text_primary">#FFFFFF</color>
+    <color name="text_secondary">#DCE2F0</color>
+    <color name="text_muted">#8A94A8</color>
+    <color name="text_dim">#5E687A</color>
+    <color name="text_hint">#485265</color>
+    <color name="text_accent">#00F0FF</color>
+    <color name="text_success">#00E676</color>
+    <color name="text_warning">#FFB800</color>
+    <color name="text_danger">#FF1744</color>
 
-    <!-- UI Accent Tokens (Apple System Blue) -->
-    <color name="accent_cyan">#0A84FF</color>
-    <color name="accent_cyan_glow">#330A84FF</color>
-    <color name="hud_background">#D9161618</color>
+    <!-- UI Accent Tokens (Flat Anime Electric Cyan & Sakura Neon) -->
+    <color name="accent_cyan">#00F0FF</color>
+    <color name="accent_cyan_glow">#3300F0FF</color>
+    <color name="accent_sakura">#FF2A85</color>
+    <color name="accent_sakura_soft">#26FF2A85</color>
+    <color name="hud_background">#E60A0C14</color>
 
     <!-- Modern Glassmorphism & Translucent Accents -->
-    <color name="bg_glass_card">#201E1E22</color>
-    <color name="bg_glass_capsule">#D91E1E22</color>
+    <color name="bg_glass_card">#20121520</color>
+    <color name="bg_glass_capsule">#E6121520</color>
     <color name="badge_glass_scrim">#8A000000</color>
-    <color name="tab_pill_active">#1F0A84FF</color>
+    <color name="tab_pill_active">#1F00F0FF</color>
 </resources>

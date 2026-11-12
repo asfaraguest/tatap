@@ -22,17 +22,38 @@
         android:background="@color/bg_root"
         android:paddingHorizontal="12dp">
 
-        <!-- App Brand Logo / Title (Kapital TATAP) -->
-        <TextView
-            android:id="@+id/tv_app_logo"
+        <!-- App Brand Logo / Title (Kapital TATAP dengan Stempel Anime) -->
+        <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="TATAP"
-            android:textColor="@color/text_primary"
-            android:textSize="@dimen/text_headline"
-            android:fontFamily="sans-serif-medium"
-            android:letterSpacing="0.04"
-            android:layout_marginEnd="10dp" />
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginEnd="10dp">
+
+            <TextView
+                android:id="@+id/tv_app_logo"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="TATAP"
+                android:textColor="@color/text_primary"
+                android:textSize="@dimen/text_headline"
+                android:fontFamily="sans-serif-medium"
+                android:letterSpacing="0.04" />
+
+            <TextView
+                android:id="@+id/tv_app_badge_anime"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="4dp"
+                android:background="@drawable/bg_badge_tamat"
+                android:paddingHorizontal="4dp"
+                android:paddingVertical="1.5dp"
+                android:text="アニメ"
+                android:textColor="#FFFFFF"
+                android:textSize="8.5sp"
+                android:fontFamily="sans-serif-medium"
+                android:letterSpacing="0.02" />
+        </LinearLayout>
 
         <!-- Fluid Search Bar (Clean from icon, pure text field) -->
         <LinearLayout
@@ -621,14 +642,14 @@
                         android:id="@+id/pb_central_loading"
                         android:layout_width="40dp"
                         android:layout_height="40dp"
-                        android:indeterminateTint="#38BDF8" />
+                        android:indeterminateTint="@color/accent_cyan" />
 
                     <TextView
                         android:id="@+id/tv_loading_label"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="10dp"
-                        android:text="Memuat data anime..."
+                        android:text="Memuat Dunia Anime... / 読み込み中"
                         android:textColor="@color/text_dim"
                         android:textSize="@dimen/text_body_medium"
                         android:fontFamily="sans-serif"
@@ -645,11 +666,19 @@
                     android:padding="24dp"
                     android:visibility="gone">
 
+                    <ImageView
+                        android:id="@+id/iv_empty_anime_mascot"
+                        android:layout_width="88dp"
+                        android:layout_height="88dp"
+                        android:layout_marginBottom="12dp"
+                        android:src="@drawable/ic_anime_mascot_empty"
+                        android:contentDescription="Maskot Anime Tatap" />
+
                     <TextView
                         android:id="@+id/tv_empty_title"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Tidak Ada Anime Ditemukan"
+                        android:text="Belum Ada Anime di Sini~"
                         android:textColor="@color/text_primary"
                         android:textSize="@dimen/text_title_large"
                         android:fontFamily="sans-serif-medium" />
@@ -660,7 +689,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="6dp"
                         android:gravity="center"
-                        android:text="Coba gunakan kata kunci lain atau periksa koneksi backend."
+                        android:text="Ayo jelajahi katalog dan temukan tontonan favoritmu hari ini! / お気に入りのアニメを見つけよう"
                         android:textColor="@color/text_dim"
                         android:textSize="@dimen/text_body_medium"
                         android:fontFamily="sans-serif" />
@@ -676,7 +705,7 @@
                         android:foreground="?attr/selectableItemBackground"
                         android:gravity="center"
                         android:paddingHorizontal="18dp"
-                        android:text="Coba Lagi"
+                        android:text="Cari Ulang / 再読み込み"
                         android:textColor="@color/text_accent"
                         android:textSize="@dimen/text_subhead"
                         android:fontFamily="sans-serif-medium" />

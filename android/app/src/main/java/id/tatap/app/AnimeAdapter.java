@@ -134,43 +134,43 @@ public class AnimeAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
         int episode = item.optInt("episode", 0);
         String playedAt = item.optString("played_at", "");
 
-        // Format Subtitle / Status / History Badge (Apple Flat: Nomor Episode Saja)
+        // Format Subtitle / Status / History Badge (Flat Full Anime Style)
         if (episode > 0) {
-            holder.tvBadgeEp.setText(String.valueOf(episode));
+            holder.tvBadgeEp.setText("第 " + episode + " 話");
             holder.tvBadgeEp.setBackgroundResource(R.drawable.bg_badge_sub);
-            holder.tvBadgeEp.setTextColor(0xFFF1F5F9);
+            holder.tvBadgeEp.setTextColor(0xFF00F0FF);
         } else if ("TAMAT".equalsIgnoreCase(badge) || isFinished) {
-            holder.tvBadgeEp.setText("TAMAT");
+            holder.tvBadgeEp.setText("完結 · TAMAT");
             holder.tvBadgeEp.setBackgroundResource(R.drawable.bg_badge_tamat);
-            holder.tvBadgeEp.setTextColor(0xFFECFDF5);
+            holder.tvBadgeEp.setTextColor(0xFFFFFFFF);
         } else if ("SERIAL PANJANG".equalsIgnoreCase(badge) || isLongRunning) {
             if (!epsCounter.isEmpty()) {
-                holder.tvBadgeEp.setText(epsCounter);
+                holder.tvBadgeEp.setText(epsCounter + " 話");
             } else if (!eps.isEmpty() && !eps.equals("0")) {
-                holder.tvBadgeEp.setText(eps);
+                holder.tvBadgeEp.setText(eps + " 話");
             } else if (!sub.isEmpty()) {
                 holder.tvBadgeEp.setText(sub);
             } else {
-                holder.tvBadgeEp.setText("SERIAL");
+                holder.tvBadgeEp.setText("連載 · SERIAL");
             }
             holder.tvBadgeEp.setBackgroundResource(R.drawable.bg_badge_long);
-            holder.tvBadgeEp.setTextColor(0xFFFFFBEB);
+            holder.tvBadgeEp.setTextColor(0xFFFFFFFF);
         } else if (!epsCounter.isEmpty()) {
-            holder.tvBadgeEp.setText(epsCounter);
+            holder.tvBadgeEp.setText(epsCounter + " 話");
             holder.tvBadgeEp.setBackgroundResource(R.drawable.bg_badge_sub);
-            holder.tvBadgeEp.setTextColor(0xFFF1F5F9);
+            holder.tvBadgeEp.setTextColor(0xFFDCE2F0);
         } else if (!sub.isEmpty()) {
             holder.tvBadgeEp.setText(sub);
             holder.tvBadgeEp.setBackgroundResource(R.drawable.bg_badge_sub);
-            holder.tvBadgeEp.setTextColor(0xFFF1F5F9);
+            holder.tvBadgeEp.setTextColor(0xFFDCE2F0);
         } else if (!eps.isEmpty() && !eps.equals("0")) {
-            holder.tvBadgeEp.setText(eps);
+            holder.tvBadgeEp.setText(eps + " 話");
             holder.tvBadgeEp.setBackgroundResource(R.drawable.bg_badge_sub);
-            holder.tvBadgeEp.setTextColor(0xFFF1F5F9);
+            holder.tvBadgeEp.setTextColor(0xFFDCE2F0);
         } else {
-            holder.tvBadgeEp.setText("ANIME");
+            holder.tvBadgeEp.setText("アニメ");
             holder.tvBadgeEp.setBackgroundResource(R.drawable.bg_badge_sub);
-            holder.tvBadgeEp.setTextColor(0xFFF1F5F9);
+            holder.tvBadgeEp.setTextColor(0xFFDCE2F0);
         }
 
         // Format Meta Info
@@ -197,10 +197,10 @@ public class AnimeAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
             }
             if (!epsCounter.isEmpty()) {
                 if (metaStr.length() > 0) metaStr.append(" · ");
-                metaStr.append(epsCounter).append(" Ep");
+                metaStr.append(epsCounter).append(" 話");
             } else if (!eps.isEmpty() && !eps.equals("0")) {
                 if (metaStr.length() > 0) metaStr.append(" · ");
-                metaStr.append(eps).append(" Ep");
+                metaStr.append(eps).append(" 話");
             }
             if (!duration.isEmpty()) {
                 if (metaStr.length() > 0) metaStr.append(" · ");
@@ -210,7 +210,7 @@ public class AnimeAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
                 metaStr.append(type);
             }
         }
-        holder.tvMeta.setText(metaStr.length() > 0 ? metaStr.toString() : "Tatap Anime");
+        holder.tvMeta.setText(metaStr.length() > 0 ? metaStr.toString() : "アニメ · Tatap Anime");
 
         ImageLoader.load(poster, holder.ivPoster);
 

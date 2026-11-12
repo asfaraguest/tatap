@@ -306,25 +306,25 @@ public class DetailActivity extends Activity {
             mb.setAllCaps(false);
             mb.setIconResource(R.drawable.ic_play);
             if (lastEp > 0) {
-                mb.setText("Lanjutkan " + lastEp);
-                mb.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xFF0A84FF));
-                mb.setTextColor(0xFFFFFFFF);
-                mb.setIconTint(android.content.res.ColorStateList.valueOf(0xFFFFFFFF));
-                mb.setStrokeColor(android.content.res.ColorStateList.valueOf(0xFF0A84FF));
+                mb.setText("Lanjutkan · 第 " + lastEp + " 話");
+                mb.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xFF00F0FF));
+                mb.setTextColor(0xFF0A0C14);
+                mb.setIconTint(android.content.res.ColorStateList.valueOf(0xFF0A0C14));
+                mb.setStrokeColor(android.content.res.ColorStateList.valueOf(0xFF00F0FF));
                 mb.setStrokeWidth((int) (1 * getResources().getDisplayMetrics().density));
             } else {
-                mb.setText("Putar 1");
-                mb.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xFF0A84FF));
-                mb.setTextColor(0xFFFFFFFF);
-                mb.setIconTint(android.content.res.ColorStateList.valueOf(0xFFFFFFFF));
-                mb.setStrokeColor(android.content.res.ColorStateList.valueOf(0xFF0A84FF));
+                mb.setText("Putar · 第 1 話");
+                mb.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xFF00F0FF));
+                mb.setTextColor(0xFF0A0C14);
+                mb.setIconTint(android.content.res.ColorStateList.valueOf(0xFF0A0C14));
+                mb.setStrokeColor(android.content.res.ColorStateList.valueOf(0xFF00F0FF));
                 mb.setStrokeWidth((int) (1 * getResources().getDisplayMetrics().density));
             }
         } else {
             if (lastEp > 0) {
-                btnQuickPlay.setText("Lanjutkan " + lastEp);
+                btnQuickPlay.setText("Lanjutkan · 第 " + lastEp + " 話");
             } else {
-                btnQuickPlay.setText("Putar 1");
+                btnQuickPlay.setText("Putar · 第 1 話");
             }
         }
     }
@@ -527,14 +527,14 @@ public class DetailActivity extends Activity {
             if (statusVal != null && !statusVal.trim().isEmpty()) {
                 String sLower = statusVal.trim().toLowerCase();
                 if (sLower.contains("finish") || sLower.contains("tamat") || sLower.contains("completed")) {
-                    tvStatus.setText("TAMAT");
+                    tvStatus.setText("完結 · TAMAT");
                     tvStatus.setBackgroundResource(R.drawable.bg_detail_status_finished);
-                    tvStatus.setTextColor(0xFF10B981);
+                    tvStatus.setTextColor(0xFFFF5252);
                     tvStatus.setVisibility(View.VISIBLE);
                 } else if (sLower.contains("releas") || sLower.contains("airing") || sLower.contains("ongoing")) {
-                    tvStatus.setText("ONGOING");
+                    tvStatus.setText("放送中 · ON AIR");
                     tvStatus.setBackgroundResource(R.drawable.bg_detail_status_ongoing);
-                    tvStatus.setTextColor(0xFF38BDF8);
+                    tvStatus.setTextColor(0xFF00E676);
                     tvStatus.setVisibility(View.VISIBLE);
                 } else {
                     tvStatus.setVisibility(View.GONE);
@@ -766,27 +766,27 @@ public class DetailActivity extends Activity {
         @Override
         public void onBindViewHolder(@NonNull EpisodeViewHolder holder, int position) {
             int ep = episodes.get(position);
-            holder.tvTitle.setText(String.valueOf(ep));
+            holder.tvTitle.setText(ep < 10 ? "0" + ep : String.valueOf(ep));
 
             if (ep == cachedLastPlayedEp) {
-                // Last played episode: Apple System Blue (Nomor Saja)
-                holder.card.setCardBackgroundColor(0xFF162A45);
-                holder.card.setStrokeColor(0xFF0A84FF);
-                holder.tvTitle.setTextColor(0xFF0A84FF);
+                // Last played episode: Flat Electric Cyan
+                holder.card.setCardBackgroundColor(0xFF142436);
+                holder.card.setStrokeColor(0xFF00F0FF);
+                holder.tvTitle.setTextColor(0xFF00F0FF);
                 holder.tvTitle.setTypeface(null, android.graphics.Typeface.BOLD);
                 holder.tvBadge.setVisibility(View.GONE);
             } else if (cachedWatchedSet.contains(ep)) {
-                // Watched episode: Apple Muted Surface (Nomor Saja)
-                holder.card.setCardBackgroundColor(0xFF141418);
-                holder.card.setStrokeColor(0xFF222228);
-                holder.tvTitle.setTextColor(0xFF71717A);
+                // Watched episode: Flat Muted Surface
+                holder.card.setCardBackgroundColor(0xFF121520);
+                holder.card.setStrokeColor(0xFF1F2436);
+                holder.tvTitle.setTextColor(0xFF71798E);
                 holder.tvTitle.setTypeface(null, android.graphics.Typeface.NORMAL);
                 holder.tvBadge.setVisibility(View.GONE);
             } else {
-                // Unwatched episode: Apple Clean Elevated Surface (Nomor Saja)
-                holder.card.setCardBackgroundColor(0xFF1C1C22);
-                holder.card.setStrokeColor(0xFF2C2E38);
-                holder.tvTitle.setTextColor(0xFFF5F5F7);
+                // Unwatched episode: Flat Anime Surface
+                holder.card.setCardBackgroundColor(0xFF181C2B);
+                holder.card.setStrokeColor(0xFF22273D);
+                holder.tvTitle.setTextColor(0xFFFFFFFF);
                 holder.tvTitle.setTypeface(null, android.graphics.Typeface.NORMAL);
                 holder.tvBadge.setVisibility(View.GONE);
             }

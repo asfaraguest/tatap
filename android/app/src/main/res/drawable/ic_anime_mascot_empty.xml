@@ -1,0 +1,111 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="96dp"
+    android:height="96dp"
+    android:viewportWidth="96"
+    android:viewportHeight="96">
+
+    <!-- Anime Aura Glow (Cyan Soft Halo) -->
+    <path
+        android:fillColor="#1500F0FF"
+        android:pathData="M48,8 C26,8 8,26 8,48 C8,70 26,88 48,88 C70,88 88,70 88,48 C88,26 70,8 48,8 Z" />
+
+    <!-- Cat Ears / Nekomimi Headset Left -->
+    <path
+        android:fillColor="#FF2A85"
+        android:pathData="M24,28 L34,10 L38,30 Z" />
+    <path
+        android:fillColor="#FFD1E3"
+        android:pathData="M27,27 L33,14 L36,28 Z" />
+
+    <!-- Cat Ears / Nekomimi Headset Right -->
+    <path
+        android:fillColor="#FF2A85"
+        android:pathData="M72,28 L62,10 L58,30 Z" />
+    <path
+        android:fillColor="#FFD1E3"
+        android:pathData="M69,27 L63,14 L60,28 Z" />
+
+    <!-- Chibi Hair Base (Dark Navy Manga Hair) -->
+    <path
+        android:fillColor="#1A2035"
+        android:pathData="M22,38 C22,22 34,16 48,16 C62,16 74,22 74,38 C74,48 72,56 72,56 C72,56 68,52 68,44 C68,36 60,34 48,34 C36,34 28,36 28,44 C28,52 24,56 24,56 C24,56 22,48 22,38 Z" />
+
+    <!-- Chibi Face (Soft Anime Peach) -->
+    <path
+        android:fillColor="#FFF0E5"
+        android:pathData="M26,42 C26,34 35,32 48,32 C61,32 70,34 70,42 C70,54 62,62 48,62 C34,62 26,54 26,42 Z" />
+
+    <!-- Anime Bangs / Forehead Strands -->
+    <path
+        android:fillColor="#222B45"
+        android:pathData="M28,34 Q38,42 36,46 Q44,38 48,44 Q52,38 60,46 Q58,42 68,34 C64,28 58,26 48,26 C38,26 32,28 28,34 Z" />
+
+    <!-- Anime Headphone Band -->
+    <path
+        android:strokeColor="#00F0FF"
+        android:strokeWidth="2.5"
+        android:fillColor="#00000000"
+        android:pathData="M24,40 C24,24 35,18 48,18 C61,18 72,24 72,40" />
+
+    <!-- Headphone Cups Left & Right -->
+    <path
+        android:fillColor="#00F0FF"
+        android:pathData="M20,38 L25,38 L25,48 L20,48 Z" />
+    <path
+        android:fillColor="#00F0FF"
+        android:pathData="M71,38 L76,38 L76,48 L71,48 Z" />
+
+    <!-- Anime Big Eyes Left -->
+    <path
+        android:fillColor="#00F0FF"
+        android:pathData="M35,46 C35,43 38,41 40,41 C42,41 43,43 43,46 C43,49 42,51 40,51 C38,51 35,49 35,46 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M38,43 C38,42 39,41 40,41 C41,41 41,42 41,43 C41,44 41,45 40,45 C39,45 38,44 38,43 Z" />
+
+    <!-- Anime Big Eyes Right -->
+    <path
+        android:fillColor="#00F0FF"
+        android:pathData="M53,46 C53,43 54,41 56,41 C58,41 61,43 61,46 C61,49 58,51 56,51 C54,51 53,49 53,46 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M56,43 C56,42 57,41 58,41 C59,41 59,42 59,43 C59,44 59,45 58,45 C57,45 56,44 56,43 Z" />
+
+    <!-- Anime Blush (Pink Cheeks) -->
+    <path
+        android:fillColor="#33FF2A85"
+        android:pathData="M31,50 C31,48 33,48 35,48 C37,48 37,50 35,52 C33,52 31,51 31,50 Z" />
+    <path
+        android:fillColor="#33FF2A85"
+        android:pathData="M59,50 C59,48 61,48 63,48 C65,48 65,50 63,52 C61,52 59,51 59,50 Z" />
+
+    <!-- Cute Smiling Anime Mouth -->
+    <path
+        android:strokeColor="#FF2A85"
+        android:strokeWidth="1.2"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M45,53 Q48,56 51,53" />
+
+    <!-- Chibi Hands Holding Empty Frame -->
+    <!-- Screen/Frame Background (Flat Slate) -->
+    <path
+        android:fillColor="#151928"
+        android:strokeColor="#00F0FF"
+        android:strokeWidth="1.5"
+        android:pathData="M22,64 L74,64 C76,64 78,66 78,68 L78,82 C78,84 76,86 74,86 L22,86 C20,86 18,84 18,82 L18,68 C18,66 20,64 22,64 Z" />
+
+    <!-- Cute Empty Screen Content (Kanji Watermark & Scanline) -->
+    <path
+        android:strokeColor="#3000F0FF"
+        android:strokeWidth="1"
+        android:pathData="M26,72 L70,72 M26,78 L56,78" />
+
+    <!-- Paws / Chibi Hands Over Frame -->
+    <path
+        android:fillColor="#FFF0E5"
+        android:pathData="M24,66 C24,62 28,62 28,66 C28,69 24,69 24,66 Z" />
+    <path
+        android:fillColor="#FFF0E5"
+        android:pathData="M68,66 C68,62 72,62 72,66 C72,69 68,69 68,66 Z" />
+</vector>
